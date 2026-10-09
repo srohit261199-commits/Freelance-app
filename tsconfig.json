@@ -13,5 +13,5 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["src", "tests", "vite.config.mts"]
+  "include": ["src", "tests", "vite.config.mts", "vite.preview.mts"]
 }

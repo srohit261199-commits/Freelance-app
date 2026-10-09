@@ -16,7 +16,8 @@
     "test": "vitest run",
     "dist:win": "npm run build && electron-builder --win --publish never",
     "seed": "python3 scripts/make_seed.py",
-    "dist:win:linux": "npm run build && electron-builder --win portable --publish never -c.win.signAndEditExecutable=false"
+    "dist:win:linux": "npm run build && electron-builder --win portable --publish never -c.win.signAndEditExecutable=false",
+    "preview": "node scripts/make-preview.mjs"
   },
   "build": {
     "appId": "com.rohitsharma.freelancehub",

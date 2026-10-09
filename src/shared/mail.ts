@@ -36,6 +36,7 @@ export function classify(mail: RawMail, companies: CompanyConfig[]): EmailCompan
   const text = `${mail.subject} ${mail.snippet}`.toLowerCase();
   for (const c of companies) {
     if (c.match.domains.some(d => domain === d || domain.endsWith('.' + d) || to.includes('@' + d))) return c.id;
+    if ((c.match.emails ?? []).some(e => e && (email === e.toLowerCase() || to.includes(e.toLowerCase())))) return c.id;
   }
   for (const c of companies) {
     const names = c.match.names.map(n => n.toLowerCase());

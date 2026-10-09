@@ -3,7 +3,7 @@ import type { AppState, CompanyConfig, Complexity, Currency } from '../../shared
 import { COMPLEXITY_LABELS } from '../../shared/status';
 import { ordinal } from '../../shared/money';
 import { hub } from '../hub';
-import { Field, Icon, fmtDate, relTime, useApp } from '../ui';
+import { ConfirmButton, Field, Icon, fmtDate, relTime, useApp } from '../ui';
 
 export function Settings({ state, now }: { state: AppState; now: Date }) {
   const { toast } = useApp();
@@ -199,19 +199,18 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
           >
             <Icon name="download" /> Back up data
           </button>
-          <button
-            type="button"
-            onClick={async () => {
-              if (!confirm('Replace everything in the app with a backup file?')) return;
+          <ConfirmButton
+            className=""
+            label="Restore backup"
+            confirmLabel="Click again: this replaces everything"
+            onConfirm={async () => {
               try {
                 if (await hub.restore()) toast('Backup restored');
               } catch (err) {
                 toast(String(err), 'error');
               }
             }}
-          >
-            Restore backup
-          </button>
+          />
           <button type="button" onClick={() => hub.openDataFolder()}>
             <Icon name="folder" /> Open data folder
           </button>
@@ -296,9 +295,12 @@ function CompanyEditor({ company: c }: { company: CompanyConfig }) {
           </Field>
         </div>
       )}
-      <div className="grid3">
+      <div className="grid2">
         <Field label="Mail domains" hint="Comma separated">
           <TextInput value={c.match.domains.join(', ')} onSave={v => save({ match: { ...c.match, domains: list(v) } })} />
+        </Field>
+        <Field label="Email addresses" hint="People who write from personal addresses">
+          <TextInput value={(c.match.emails ?? []).join(', ')} onSave={v => save({ match: { ...c.match, emails: list(v).map(e => e.toLowerCase()) } })} />
         </Field>
         <Field label="People (Teams / mail names)" hint="Teams notification mails are matched by sender name">
           <TextInput value={c.match.names.join(', ')} onSave={v => save({ match: { ...c.match, names: list(v) } })} />

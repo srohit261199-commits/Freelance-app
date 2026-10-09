@@ -1,0 +1,48 @@
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.preview-app {
+  flex: 1;
+  min-height: 0;
+}
+.preview-bar {
+  background: var(--warn-bg);
+  color: var(--text);
+  border-bottom: 1px solid var(--line);
+  padding: 8px 16px;
+  font-size: 12.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pv-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.pv-main span {
+  flex: 1;
+  min-width: 0;
+}
+.pv-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.pv-note a {
+  word-break: break-all;
+}
+@media (max-width: 760px) {
+  .pv-main span {
+    flex-basis: 100%;
+    order: 3;
+  }
+}

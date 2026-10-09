@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AppState, Currency, Subscription } from '../../shared/types';
 import { convert, daysUntil, formatMoney, monthlyCost, rollRenewal } from '../../shared/money';
 import { hub } from '../hub';
-import { Field, Icon, Modal, fmtDate, useApp } from '../ui';
+import { ConfirmButton, Field, Icon, Modal, fmtDate, useApp } from '../ui';
 
 const STATUS_LABEL: Record<Subscription['status'], string> = { active: 'Active', trial: 'Trial', cancelling: 'Cancelled, still active', cancelled: 'Ended' };
 
@@ -151,18 +151,14 @@ function SubEditor({ sub, onClose }: { sub: Partial<Subscription>; onClose(): vo
       footer={
         <>
           {sub.id && (
-            <button
-              type="button"
-              className="danger ghost"
-              onClick={async () => {
-                if (confirm(`Delete ${sub.name}?`)) {
-                  await hub.remove('subscriptions', sub.id!);
-                  onClose();
-                }
+            <ConfirmButton
+              label="Delete"
+              confirmLabel="Click again to delete"
+              onConfirm={async () => {
+                await hub.remove('subscriptions', sub.id!);
+                onClose();
               }}
-            >
-              Delete
-            </button>
+            />
           )}
           <span className="grow" />
           <button type="button" onClick={onClose}>

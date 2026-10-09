@@ -51,6 +51,30 @@ export function Icon({ name, size = 16 }: { name: keyof typeof PATHS; size?: num
   );
 }
 
+/** A button that asks for a second click instead of a pop-up before doing something destructive. */
+export function ConfirmButton({ label, confirmLabel, onConfirm, className = 'danger ghost', icon }: { label: string; confirmLabel: string; onConfirm(): void | Promise<void>; className?: string; icon?: ReactNode }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      type="button"
+      className={`${className} ${armed ? 'armed' : ''}`}
+      onClick={async () => {
+        if (!armed) return setArmed(true);
+        setArmed(false);
+        await onConfirm();
+      }}
+    >
+      {icon}
+      {armed ? confirmLabel : label}
+    </button>
+  );
+}
+
 export function StatusPill({ status, company }: { status: ModelStatus; company?: CompanyId }) {
   return <span className={`pill st-${status}`}>{statusLabel(status, company)}</span>;
 }

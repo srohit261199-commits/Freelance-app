@@ -299,6 +299,7 @@ input[type='range'] {
 }
 .content {
   overflow-y: auto;
+  min-width: 0;
 }
 .page {
   padding: 22px 26px 40px;
@@ -1007,7 +1008,7 @@ select.cx.unset {
 }
 .suggestions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr));
   gap: 12px;
 }
 .suggestion {
@@ -1023,7 +1024,7 @@ select.cx.unset {
 /* earnings */
 .company-money {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr));
   gap: 16px;
 }
 .money-row {
@@ -1169,5 +1170,86 @@ select.cx.unset {
   }
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+button.armed {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+
+/* Narrow windows and phones: the sidebar becomes a scrolling bar on top and everything stacks. */
+@media (max-width: 760px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .side {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .brand small,
+  .brand strong,
+  .side-foot small {
+    display: none;
+  }
+  .nav {
+    flex-direction: row;
+    gap: 4px;
+  }
+  .nav button {
+    padding: 6px 10px;
+  }
+  .side-foot {
+    margin-top: 0;
+    flex-direction: row;
+    padding: 0;
+  }
+  .page {
+    padding: 16px 16px 32px;
+  }
+  .page-head {
+    flex-direction: column;
+  }
+  .actions {
+    flex-wrap: wrap;
+  }
+  .kpis,
+  .kpis.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grid2,
+  .grid3,
+  .money-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .search {
+    width: 100%;
+  }
+  .company-money,
+  .suggestions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .drawer {
+    width: 100vw;
+  }
+  .facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gallery {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .toasts {
+    left: 16px;
+    right: 16px;
   }
 }

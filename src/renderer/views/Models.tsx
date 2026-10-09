@@ -4,7 +4,7 @@ import { COMPANY_STATUSES, COMPLEXITY_LABELS, isComplete, statusLabel } from '..
 import { formatMoney, tierFee } from '../../shared/money';
 import { waveinkQueue } from '../../shared/planner';
 import { hub } from '../hub';
-import { Drawer, Empty, Field, Icon, Modal, Progress, StatusPicker, Thumb, fmtDate, relTime, useApp } from '../ui';
+import { ConfirmButton, Drawer, Empty, Field, Icon, Modal, Progress, StatusPicker, Thumb, fmtDate, relTime, useApp } from '../ui';
 import { PortalImport } from './PortalImport';
 
 type Sort = 'queue' | 'name' | 'updated' | 'status';
@@ -497,17 +497,15 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
         </ul>
       )}
       {m.source !== 'catalog' && (
-        <button
-          type="button"
-          className="danger ghost"
-          onClick={async () => {
-            if (!confirm(`Delete "${m.name}"?`)) return;
+        <ConfirmButton
+          icon={<Icon name="trash" />}
+          label="Delete model"
+          confirmLabel="Click again to delete"
+          onConfirm={async () => {
             await hub.remove('models', m.id);
             onClose();
           }}
-        >
-          <Icon name="trash" /> Delete model
-        </button>
+        />
       )}
     </Drawer>
   );

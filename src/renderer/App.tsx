@@ -43,7 +43,14 @@ export function App() {
 
   useEffect(() => {
     const theme = state?.settings.theme ?? 'system';
-    document.documentElement.dataset.theme = theme;
+    const root = document.documentElement;
+    if (theme !== 'system') {
+      root.dataset.theme = theme;
+      root.dataset.themeSetBy = 'app';
+    } else if (root.dataset.themeSetBy === 'app') {
+      delete root.dataset.theme;
+      delete root.dataset.themeSetBy;
+    }
   }, [state?.settings.theme]);
 
   const counts = useMemo(() => {

@@ -5,3 +5,4 @@ release/
 .DS_Store
 # client source files stay out of git; only the trimmed seed is committed
 *.xlsx
+dist-preview/

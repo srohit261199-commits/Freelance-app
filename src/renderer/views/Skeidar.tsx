@@ -3,7 +3,7 @@ import type { AppState, FolderEntry, SkeidarJob } from '../../shared/types';
 import { formatMoney, jobOutputs } from '../../shared/money';
 import { uid } from '../../shared/ops';
 import { hub } from '../hub';
-import { Empty, Field, Icon, Modal, Progress, fmtDate, relTime, useApp } from '../ui';
+import { ConfirmButton, Empty, Field, Icon, Modal, Progress, fmtDate, relTime, useApp } from '../ui';
 
 export function Skeidar({ state, now, openId }: { state: AppState; now: Date; openId?: string }) {
   const { toast } = useApp();
@@ -290,18 +290,14 @@ function JobEditor({ job, prefill, rate, onClose }: { job?: SkeidarJob; prefill?
       footer={
         <>
           {job && (
-            <button
-              type="button"
-              className="danger ghost"
-              onClick={async () => {
-                if (confirm(`Delete job "${job.name}"?`)) {
-                  await hub.remove('skeidarJobs', job.id);
-                  onClose();
-                }
+            <ConfirmButton
+              label="Delete"
+              confirmLabel="Click again to delete"
+              onConfirm={async () => {
+                await hub.remove('skeidarJobs', job.id);
+                onClose();
               }}
-            >
-              Delete
-            </button>
+            />
           )}
           <span className="grow" />
           <button type="button" onClick={onClose}>

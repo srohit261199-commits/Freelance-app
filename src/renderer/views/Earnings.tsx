@@ -3,7 +3,7 @@ import type { AppState, CompanyId, Currency, Payment } from '../../shared/types'
 import { allEarnings, convert, formatMoney, monthKey, monthLabel, ordinal, tierFee, type CompanyEarnings } from '../../shared/money';
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
 import { hub } from '../hub';
-import { CompanyDot, Field, Icon, Modal, fmtDate, useApp } from '../ui';
+import { ConfirmButton, CompanyDot, Field, Icon, Modal, fmtDate, useApp } from '../ui';
 
 function payTerms(state: AppState, id: CompanyId): string {
   const c = state.companies.find(x => x.id === id)!;
@@ -254,18 +254,14 @@ function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: 
       footer={
         <>
           {payment.id && (
-            <button
-              type="button"
-              className="danger ghost"
-              onClick={async () => {
-                if (confirm('Delete this payment?')) {
-                  await hub.remove('payments', payment.id!);
-                  onClose();
-                }
+            <ConfirmButton
+              label="Delete"
+              confirmLabel="Click again to delete"
+              onConfirm={async () => {
+                await hub.remove('payments', payment.id!);
+                onClose();
               }}
-            >
-              Delete
-            </button>
+            />
           )}
           <span className="grow" />
           <button type="button" onClick={onClose}>

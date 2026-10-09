@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import type { RawMail } from '../shared/mail';
+import type { CalEventLike } from '../shared/ingest';
 
 const SCOPES = [
   'openid',
@@ -267,20 +268,7 @@ export async function gmailMessage(id: string, full: boolean): Promise<RawMail> 
   };
 }
 
-export interface CalEvent {
-  id: string;
-  summary?: string;
-  description?: string;
-  location?: string;
-  htmlLink?: string;
-  hangoutLink?: string;
-  start: { dateTime?: string; date?: string };
-  end?: { dateTime?: string; date?: string };
-  organizer?: { email?: string };
-  attendees?: { email?: string }[];
-  conferenceData?: { entryPoints?: { entryPointType: string; uri: string }[] };
-  status?: string;
-}
+export type CalEvent = CalEventLike;
 
 export async function calendarEvents(from: Date, to: Date): Promise<CalEvent[]> {
   const body = await api<{ items?: CalEvent[] }>('https://www.googleapis.com/calendar/v3/calendars/primary/events', {

@@ -245,7 +245,7 @@ describe('excel export', () => {
 
 describe('subscription matching', () => {
   it('matches renewal receipts to the right existing plan', async () => {
-    const { findSubscription } = await import('../src/main/sync');
+    const { findSubscription } = await import('../src/shared/ingest');
     const subs = fresh().subscriptions;
     const pick = (name: string, vendor: string) => findSubscription(subs, { name, vendor })?.name;
     expect(pick('Google AI Pro (5 TB) (Google One)', 'Google Ireland')).toBe('Google AI Pro (5 TB)');
@@ -253,5 +253,26 @@ describe('subscription matching', () => {
     expect(pick('LinkedIn: Job Search & Network', 'LinkedIn')).toBe('LinkedIn Premium');
     expect(pick('Tripo AI', 'Tripo AI')).toBe('Tripo AI Starter (annual)');
     expect(pick('Substance 3D Painter', 'Adobe')).toBeUndefined();
+  });
+});
+
+describe('calendar', () => {
+  it('files the Waveink Weekly Demo under Waveink even though it comes from personal Gmail addresses', async () => {
+    const { calendarMeetings } = await import('../src/shared/ingest');
+    const [m] = calendarMeetings(
+      [
+        {
+          id: 'wd',
+          summary: 'Weekly Demo',
+          start: { dateTime: '2026-10-14T19:30:00+05:30' },
+          end: { dateTime: '2026-10-14T20:30:00+05:30' },
+          organizer: { email: 'danial.aftab.01@gmail.com' },
+          attendees: [{ email: 'sibiabin92@gmail.com' }, { email: 's.rohit.261199@gmail.com' }],
+          conferenceData: { entryPoints: [{ entryPointType: 'video', uri: 'https://meet.google.com/emh-yjnj-xmi' }] },
+        },
+      ],
+      fresh(),
+    );
+    expect(m).toMatchObject({ company: 'waveink', start: '2026-10-14T14:00:00.000Z', joinUrl: 'https://meet.google.com/emh-yjnj-xmi' });
   });
 });

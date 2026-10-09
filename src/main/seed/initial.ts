@@ -31,7 +31,13 @@ export const COMPANIES: CompanyConfig[] = [
     color: '#2563eb',
     currency: 'AED',
     pay: { kind: 'retainer', amount: 3000, startDate: '2026-09-01', payday: 1 },
-    match: { domains: ['waveink.ae'], names: ['Sibi', 'Ahmed Abudaff'], keywords: ['waveink'] },
+    match: {
+      domains: ['waveink.ae'],
+      // The Weekly Demo invite comes from the team's personal Gmail addresses.
+      emails: ['sibiabin92@gmail.com', 'ahmedjayx@gmail.com', 'danial.aftab.01@gmail.com', 'faisalam.005@gmail.com'],
+      names: ['Sibi', 'Ahmed Abudaff'],
+      keywords: ['waveink', 'weekly demo'],
+    },
     links: [
       { label: 'Tech catalog (Excel)', url: 'https://docs.google.com/spreadsheets/d/1yIwb69mBOttfKM2mpl812XXOKyR9kS0L/edit' },
       { label: 'GLB Task Tracker', url: 'https://docs.google.com/spreadsheets/d/1XfMQxFp7etSaG-8aHMvjEPfE9HGoDlM-2_y7KKtE0hY/edit' },
@@ -41,7 +47,7 @@ export const COMPANIES: CompanyConfig[] = [
     notes:
       'Retainer 3,000 AED a month from 1 Sep 2026, paid around the 1st (Sibi mails a transfer reference). ' +
       'Deliver GLB / glTF 2.0, PBR textured, browser-ready; upload to the shared Drive folder named by Jasani code. ' +
-      'Fill the Daily Update Log and send it to Sibi every Friday EOD. Contacts: Sibi Iype (co-founder), Ahmed Abudaff.',
+      'Fill the Daily Update Log and send it to Sibi every Friday EOD. Weekly Demo on Google Meet, Wednesdays 7:30 PM IST. Contacts: Sibi Iype (co-founder), Ahmed Abudaff.',
   },
   {
     id: 'metaztech',

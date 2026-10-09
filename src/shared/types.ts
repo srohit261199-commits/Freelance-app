@@ -189,7 +189,8 @@ export interface CompanyConfig {
   currency: Currency;
   pay: PayRule;
   /** Used to sort mail, Teams notifications and meetings into this company. */
-  match: { domains: string[]; names: string[]; keywords: string[] };
+  /** Mail domains, exact addresses (for people who write from personal Gmail), sender names and subject words. */
+  match: { domains: string[]; emails?: string[]; names: string[]; keywords: string[] };
   links: { label: string; url: string }[];
   notes: string;
 }
