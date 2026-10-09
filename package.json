@@ -1,0 +1,74 @@
+{
+  "name": "freelance-hub",
+  "productName": "Freelance Hub",
+  "version": "1.0.0",
+  "description": "Rohit's freelance tracker: Waveink, Metaztech, Skeidar, portfolio, payments and subscriptions.",
+  "author": "Rohit Sharma",
+  "private": true,
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build:main": "node scripts/build-main.mjs",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "dev": "node scripts/dev.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "dist:win": "npm run build && electron-builder --win --publish never",
+    "seed": "python3 scripts/make_seed.py",
+    "dist:win:linux": "npm run build && electron-builder --win portable --publish never -c.win.signAndEditExecutable=false"
+  },
+  "build": {
+    "appId": "com.rohitsharma.freelancehub",
+    "productName": "Freelance Hub",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "FreelanceHub-Setup-${version}.exe"
+    },
+    "portable": {
+      "artifactName": "FreelanceHub-Portable-${version}.exe"
+    }
+  },
+  "dependencies": {
+    "exceljs": "4.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "electron": "44.6.0",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.3"
+  }
+}
