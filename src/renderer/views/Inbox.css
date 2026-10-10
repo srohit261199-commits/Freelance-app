@@ -282,7 +282,7 @@
 }
 .mail-page .mail-edit input,
 .mail-page .mail-edit select {
-  background: var(--panel);
+  background-color: var(--panel);
   border-color: var(--line);
   width: 100%;
 }

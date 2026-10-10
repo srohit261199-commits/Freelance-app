@@ -349,3 +349,19 @@
     gap: 12px;
   }
 }
+
+/* Dark: the progress tile joins the tinted family of the other two */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .pf-page .pf-kpi.prog {
+    background: var(--c-tint);
+  }
+  :root:not([data-theme='light']) .pf-page .pf-kpi.prog :is(.kpi-top, .kpi-num, .pf-kpi-sub) {
+    color: var(--c-deep);
+  }
+}
+:root[data-theme='dark'] .pf-page .pf-kpi.prog {
+  background: var(--c-tint);
+}
+:root[data-theme='dark'] .pf-page .pf-kpi.prog :is(.kpi-top, .kpi-num, .pf-kpi-sub) {
+  color: var(--c-deep);
+}

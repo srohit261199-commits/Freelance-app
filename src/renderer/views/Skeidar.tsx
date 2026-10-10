@@ -250,7 +250,7 @@ export function Skeidar({ state, now, openId }: { state: AppState; now: Date; op
                   </span>
                   <span className="sk-past-txt">
                     <b>
-                      {j.name} · {j.images.length} × {j.fabrics.length}
+                      {j.name} · {j.images.length} × {j.fabrics.length}
                     </b>
                     <small>
                       Delivered {shortDate(j.deliveredAt ?? j.receivedAt, now)} · {o.done === o.total ? plural(o.done, 'image') : `${o.done} of ${o.total} images`}
@@ -402,7 +402,7 @@ function JobHero({
           </button>
         </div>
         <p className="sk-meta">
-          {plural(job.images.length, 'master image')} × {plural(job.fabrics.length, 'fabric')}
+          <span className="nowrap">{plural(job.images.length, 'master image')} × {plural(job.fabrics.length, 'fabric')}</span>
           {job.folder && (
             <>
               {' · '}

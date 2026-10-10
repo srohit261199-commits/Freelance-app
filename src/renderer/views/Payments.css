@@ -500,6 +500,7 @@
   .pay .pay-tx td,
   .pay .pay-tx tbody tr:hover td {
     padding: 0;
+    height: auto;
     background: none;
     border-radius: 0;
   }

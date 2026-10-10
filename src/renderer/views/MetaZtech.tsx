@@ -455,26 +455,22 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
                         </span>
                       </span>
                       <span className="mz-c-cx" role="cell" onClick={e => e.stopPropagation()}>
-                        {m.complexity ? (
-                          <span title={COMPLEXITY_LABELS[m.complexity]}>
-                            {CX_SHORT[m.complexity]}
-                            {fee && <small className="mz-fee-inline">{fee}</small>}
-                          </span>
-                        ) : (
-                          <select
-                            className="mz-cx"
-                            aria-label={`Complexity of ${m.name}`}
-                            value=""
-                            onChange={e => e.target.value && hub.patchModel(m.id, { complexity: e.target.value as Complexity })}
-                          >
-                            <option value="">Set…</option>
-                            {Object.entries(COMPLEXITY_LABELS).map(([k, v]) => (
-                              <option key={k} value={k}>
-                                {v}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+                        {/* Always a select, so an upgraded complexity is one click to fix; a set value reads as text until hovered. */}
+                        <select
+                          className={`mz-cx ${m.complexity ? 'set' : ''}`}
+                          aria-label={`Complexity of ${m.name}`}
+                          title={m.complexity ? COMPLEXITY_LABELS[m.complexity] : undefined}
+                          value={m.complexity ?? ''}
+                          onChange={e => e.target.value && hub.patchModel(m.id, { complexity: e.target.value as Complexity })}
+                        >
+                          {!m.complexity && <option value="">Set…</option>}
+                          {(Object.keys(CX_SHORT) as Complexity[]).map(k => (
+                            <option key={k} value={k}>
+                              {CX_SHORT[k]}
+                            </option>
+                          ))}
+                        </select>
+                        {fee && <small className="mz-fee-inline">{fee}</small>}
                       </span>
                       <span className="mz-c-st" role="cell">
                         <StatusPicker status={m.status} company="metaztech" onPick={s => set([m.id], s)} />

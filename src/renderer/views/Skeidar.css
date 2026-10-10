@@ -601,3 +601,9 @@
     border-radius: 20px;
   }
 }
+
+@media (max-width: 760px) {
+  .sk-page .sk-head {
+    align-items: flex-start;
+  }
+}

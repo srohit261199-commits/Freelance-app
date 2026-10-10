@@ -384,6 +384,13 @@
 .mz-page .mz-fee-inline {
   display: none;
 }
+.mz-page select.mz-cx.set:not(:hover):not(:focus) {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+  padding-left: 0;
+  font-weight: 600;
+}
 .mz-page select.mz-cx {
   height: 32px;
   max-width: 100%;
@@ -961,5 +968,21 @@
   }
   .mz-page .drawer .gallery {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Laptop-height windows: give the Teams messages room and let the page scroll instead */
+@media (min-width: 1100px) and (max-height: 1000px) {
+  .mz-page {
+    height: auto;
+  }
+  .mz-page .mz-teams {
+    flex: none;
+    height: 380px;
+  }
+}
+@media (max-width: 760px) {
+  .mz-page .mz-head {
+    align-items: flex-start;
   }
 }

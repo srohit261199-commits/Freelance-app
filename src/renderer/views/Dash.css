@@ -145,6 +145,7 @@
   white-space: nowrap;
 }
 .dash-tile-sub {
+  min-height: calc(2em * 1.35);
   margin-top: 2px;
   font-size: 13px;
   font-weight: 500;

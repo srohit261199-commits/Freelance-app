@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ActionTarget } from '../shared/planner';
 import { nextActions } from '../shared/planner';
 import { isComplete } from '../shared/status';
 import { hub, useAppState, useNow } from './hub';
 import { AppCtx, Icon, relTime, type Route } from './ui';
 import { Omni, type Screen } from './Omni';
-import { allEarnings } from '../shared/money';
-import { Today } from './views/Today';
+import { allEarnings, localDate } from '../shared/money';
+import { Today, readDone } from './views/Today';
 import { Waveink } from './views/Waveink';
 import { MetaZtech } from './views/MetaZtech';
 import { Skeidar } from './views/Skeidar';
@@ -73,11 +73,21 @@ export function App() {
     }
   }, [state?.settings.theme]);
 
+  // Rows ticked off on the dashboard today don't count toward its badge.
+  const [doneTick, bumpDone] = useReducer((x: number) => x + 1, 0);
+  useEffect(() => {
+    addEventListener('fh-dash-done', bumpDone);
+    return () => removeEventListener('fh-dash-done', bumpDone);
+  }, []);
+
   const counts = useMemo(() => {
     if (!state) return null;
     const by = (c: string) => state.models.filter(m => m.company === c);
     return {
-      today: nextActions(state, now).length,
+      today: (() => {
+        const done = readDone(localDate(now));
+        return nextActions(state, now).filter(a => !done.includes(a.id)).length;
+      })(),
       // Tech catalog progress, as on the Waveink screen and dashboard tile
       waveink: `${by('waveink').filter(m => m.group === 'Tech' && isComplete(m.status)).length}/${by('waveink').filter(m => m.group === 'Tech' && m.status !== 'skipped').length}`,
       metaztech: by('metaztech').filter(m => m.status === 'revision').length,
@@ -87,7 +97,7 @@ export function App() {
       subs: state.subscriptions.filter(s => s.status === 'active' || s.status === 'trial').length,
       portfolio: state.portfolioTasks.filter(t => !t.done).length,
     };
-  }, [state, now]);
+  }, [state, now, doneTick]);
 
   if (!state || !counts) return <div className="boot">Loading…</div>;
 

@@ -255,12 +255,13 @@ function Photo({ urls }: { urls: string[] }) {
   );
 }
 
-export function WaveinkDetail({ m, state, now, inDrawer, onDeleted }: { m: Model; state: AppState; now: Date; inDrawer?: boolean; onDeleted(): void }) {
+export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m: Model; state: AppState; now: Date; inDrawer?: boolean; onDeleted(): void; onPin?(): void }) {
   const { toast } = useApp();
   const [notes, setNotes] = useState(m.notes ?? '');
   const [glb, setGlb] = useState(m.glbFile ?? '');
   const [more, setMore] = useState(false);
-  const patch = (p: Partial<Model>) => hub.patchModel(m.id, p);
+  // Acting on the auto-shown model pins it, so the re-sorted list doesn't swap the panel to another model.
+  const patch = (p: Partial<Model>) => (onPin?.(), hub.patchModel(m.id, p));
   // Typed fields save shortly after typing stops, on blur, and when the model changes or the panel closes.
   const pending = useRef<{ id: string; patch: Partial<Model> } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -271,6 +272,7 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted }: { m: Model
     if (p && Object.keys(p.patch).length) hub.patchModel(p.id, p.patch);
   }, []);
   const edit = (key: 'notes' | 'glbFile', value: string) => {
+    onPin?.();
     const next = { ...pending.current?.patch };
     if (value === (m[key] ?? '')) delete next[key];
     else next[key] = value;
@@ -289,7 +291,7 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted }: { m: Model
     if (pending.current?.patch.glbFile === undefined) setGlb(m.glbFile ?? '');
   }, [m.glbFile]);
 
-  const set = (to: ModelStatus) => hub.setStatus([m.id], to).then(() => toast(`${modelLabel(m)} → ${statusLabel(to, 'waveink')}`));
+  const set = (to: ModelStatus) => (onPin?.(), hub.setStatus([m.id], to)).then(() => toast(`${modelLabel(m)} → ${statusLabel(to, 'waveink')}`));
   const done = isComplete(m.status);
   const folder = glbFolderUrl(state);
   const prio = modelPriority(m, state, now);

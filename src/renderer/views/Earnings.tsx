@@ -87,6 +87,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   const sum = (k: keyof Pick<CompanyEarnings, 'earned' | 'received' | 'outstanding' | 'pipeline' | 'thisMonth'>) =>
     earnings.reduce((s, e) => s + toBase(e[k], e.currency), 0);
   const today = localDate(now);
+  // Late means past pay day plus 3 days' grace, as in money.ts (overdue banner, sidebar badge, dashboard)
+  const lateCut = localDate(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 3));
   const nowMonth = today.slice(0, 7);
   const thisYear = now.getFullYear();
   const cfg = (id: CompanyId) => state.companies.find(c => c.id === id)!;
@@ -100,8 +102,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   const receivedFY = fyPayments.reduce((s, p) => s + toBase(p.amount, p.currency), 0);
 
   const companies = earnings.map(e => {
-    const months = monthStatus(e, nowMonth, today);
-    const lateLines = months.filter(l => l.state !== 'paid' && l.state !== 'accruing' && l.due && l.due < today);
+    const months = monthStatus(e, nowMonth, lateCut);
+    const lateLines = months.filter(l => l.state !== 'paid' && l.state !== 'accruing' && l.due && l.due < lateCut);
     const late = lateLines.reduce((s, l) => s + l.net - l.paid, 0);
     return { e, months, late, lateMonths: lateLines.length };
   });
@@ -134,7 +136,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
     for (const l of months) {
       const left = l.net - l.paid;
       if (l.state === 'paid' || left < 0.5) continue;
-      const late = l.state !== 'accruing' && !!l.due && l.due < today;
+      const late = l.state !== 'accruing' && !!l.due && l.due < lateCut;
       const window = c.pay.kind === 'tiered' && l.due ? `${c.pay.payoutFrom}–${shortDate(l.due, now)}` : l.due ? shortDate(l.due, now) : '';
       const name = monthName(l.month, +l.month.slice(0, 4) !== thisYear);
       txs.push({

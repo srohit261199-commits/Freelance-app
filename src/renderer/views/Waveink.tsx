@@ -162,7 +162,7 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
     if (wide) next.click();
   };
 
-  const detail = current && <WaveinkDetail m={current} state={state} now={now} inDrawer={!wide} onDeleted={() => setSel(undefined)} />;
+  const detail = current && <WaveinkDetail m={current} state={state} now={now} inDrawer={!wide} onDeleted={() => setSel(undefined)} onPin={() => !sel && setSel(current.id)} />;
 
   return (
     <div className="page wi-page c-waveink">
@@ -238,9 +238,6 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
               </>
             )}
           </Pop>
-          <button type="button" className="lg" onClick={() => go({ view: 'settings' })}>
-            <Icon name="fileUp" size={18} /> Import catalog
-          </button>
           <button type="button" className="lg primary" onClick={exportNow}>
             <Icon name="excel" size={18} /> Export Excel
           </button>

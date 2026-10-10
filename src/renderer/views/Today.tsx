@@ -40,7 +40,7 @@ function readLayout(): Layout {
   }
 }
 /** Rows ticked off for today that have nothing to record (a meeting, a mail, a reminder). */
-function readDone(today: string): string[] {
+export function readDone(today: string): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(DONE_KEY) ?? 'null') as { date: string; ids: string[] } | null;
     return v?.date === today && Array.isArray(v.ids) ? v.ids : [];
@@ -107,7 +107,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
 
   // ----- figures -----
   const wi = state.models.filter(m => m.company === 'waveink' && m.status !== 'skipped');
-  const wiTech = wi.filter(m => m.group !== 'Apparel');
+  const wiTech = wi.filter(m => m.group === 'Tech');
   const wiApparel = wi.filter(m => m.group === 'Apparel');
   const doneCount = (l: Model[]) => l.filter(m => isComplete(m.status)).length;
   const mz = state.models.filter(m => m.company === 'metaztech');
@@ -209,6 +209,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
   const setLocal = (ids: string[]) => {
     setLocalDone({ date: today, ids });
     saveDone(today, ids);
+    window.dispatchEvent(new Event('fh-dash-done'));
   };
   const remember = (a: NextAction, undo: () => Promise<unknown>) =>
     setChecked(c => new Map(c).set(a.id, { action: a, index: actions.findIndex(x => x.id === a.id), undo }));

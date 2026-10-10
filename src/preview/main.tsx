@@ -2,7 +2,7 @@
 import { onNotice, resetPreview } from './mockHub';
 import '../renderer/fonts.css';
 import '../renderer/styles.css';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '../renderer/App';
 import { ConfirmButton } from '../renderer/ui';
@@ -10,9 +10,20 @@ import './preview.css';
 
 function PreviewBar() {
   const [note, setNote] = useState<{ text: string; link?: string } | null>(null);
+  const bar = useRef<HTMLDivElement>(null);
   useEffect(() => onNotice((text, link) => setNote({ text, link })), []);
+  // Dialogs dim the app below this banner, so tell the app's CSS how tall it is.
+  useEffect(() => {
+    const el = bar.current;
+    if (!el) return;
+    const set = () => document.documentElement.style.setProperty('--app-top', `${el.offsetHeight}px`);
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    set();
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="preview-bar">
+    <div className="preview-bar" ref={bar}>
       <div className="pv-main">
         <strong>Browser preview</strong>
         <span>

@@ -312,22 +312,6 @@
 }
 
 /* add / edit dialog */
-.subs-page .modal > header {
-  padding: 28px 28px 0;
-  align-items: center;
-}
-.subs-page .modal > header .icon-btn {
-  width: 38px;
-  height: 38px;
-}
-.subs-page .modal-body {
-  padding: 16px 28px 4px;
-  gap: 16px;
-}
-.subs-page .modal > footer {
-  padding: 22px 28px 28px;
-  flex-wrap: nowrap;
-}
 .subs-page .subs-lede {
   font-size: 13px;
   color: var(--muted);
@@ -340,20 +324,9 @@
   border-radius: 14px;
   font-weight: 600;
 }
-.subs-page .modal input:focus,
-.subs-page .modal select:focus {
-  background: var(--fill);
-  border-color: transparent;
-  box-shadow: 0 0 0 2px var(--ink);
-}
 .subs-page .modal textarea {
   min-height: 66px;
   border-radius: 14px;
-}
-.subs-page .modal textarea:focus {
-  background: var(--fill);
-  border-color: transparent;
-  box-shadow: 0 0 0 2px var(--ink);
 }
 .subs-page .modal input[type='date'] {
   padding-right: 10px;
