@@ -1,0 +1,603 @@
+/* Skeidar: the current job as a hero, its master image × fabric grid, past jobs and the project folder. Bundled before styles.css, so every rule is scoped under .sk-page. */
+
+/* ---------- header ---------- */
+.sk-page .sk-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.sk-page .sk-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+.sk-page .sk-title h1 {
+  line-height: 1;
+}
+.sk-page .sk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.sk-page .sk-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.sk-page .sk-chip.c-soft {
+  background: var(--c-tint);
+  color: var(--c-deep);
+  font-weight: 700;
+}
+.sk-page .sk-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.sk-page .sk-actions button {
+  padding: 0 18px;
+}
+.sk-page .sk-tabs .tab {
+  max-width: 360px;
+}
+
+/* ---------- hero ---------- */
+.sk-page .sk-hero {
+  border-radius: 28px;
+  background: var(--c-tint);
+  padding: 24px 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px 32px;
+  flex-wrap: wrap;
+  scroll-margin: 12px;
+}
+.sk-page .sk-hero.flash {
+  animation: sk-flash 1.8s ease;
+}
+@keyframes sk-flash {
+  0%,
+  45% {
+    box-shadow: 0 0 0 3px var(--c);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+.sk-page .sk-hero-empty {
+  justify-content: space-between;
+}
+.sk-page .sk-hero-empty .empty {
+  flex: 1 1 320px;
+  border-color: color-mix(in srgb, var(--c-deep) 25%, transparent);
+}
+.sk-page .sk-ring {
+  --deg: 0deg;
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: conic-gradient(var(--ink) 0 var(--deg), var(--panel) var(--deg) 360deg);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.sk-page .sk-ring > div {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  background: var(--c-tint);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.sk-page .sk-ring b {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.sk-page .sk-ring b.sm {
+  font-size: 24px;
+}
+.sk-page .sk-ring b.xs {
+  font-size: 19px;
+}
+.sk-page .sk-ring span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--c-deep);
+}
+.sk-page .sk-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 300px;
+  min-width: 0;
+}
+.sk-page .sk-info-top {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+.sk-page .sk-badge {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--c-deep);
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.sk-page .sk-info-top .flag {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--panel);
+}
+.sk-page .sk-badge.ok {
+  color: var(--st-ok);
+}
+.sk-page .sk-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.sk-page .sk-name h2 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-name .icon-btn {
+  color: var(--muted);
+  flex: none;
+}
+.sk-page .sk-name .icon-btn:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+.sk-page .sk-meta {
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-path {
+  display: inline;
+  font-size: 14px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-notes {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sk-page .sk-stats {
+  display: flex;
+  gap: 32px;
+}
+.sk-page .sk-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 22px;
+  border-radius: 20px;
+  background: var(--panel);
+  min-width: 128px;
+}
+.sk-page .sk-stat span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sk-page .sk-stat b {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sk-page .sk-hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 166px;
+}
+.sk-page .sk-hero-actions button {
+  justify-content: flex-start;
+  padding: 0 20px;
+}
+.sk-page .sk-hero-actions .sk-scan {
+  font-size: 13px;
+  box-shadow: none;
+}
+
+/* ---------- variations ---------- */
+.sk-page .sk-var {
+  padding: 22px 24px;
+}
+.sk-page .sk-var-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+.sk-page .sk-var-head h2 {
+  font-size: 18px;
+}
+.sk-page .sk-var-head p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sk-page .sk-grid-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+  margin: -4px;
+  padding: 4px;
+}
+.sk-page .sk-grid {
+  --sk-tile: 96px;
+  --sk-master: 200px;
+  display: grid;
+  grid-template-columns: var(--sk-master) repeat(var(--n), var(--sk-tile));
+  column-gap: 10px;
+  row-gap: 14px;
+  align-items: center;
+  width: max-content;
+}
+.sk-page .sk-corner,
+.sk-page .sk-master {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--panel);
+  box-shadow: 10px 0 0 var(--panel);
+  align-self: stretch;
+}
+.sk-page .sk-fab {
+  align-self: end;
+  height: auto;
+  padding: 0 2px 2px;
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  white-space: normal;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-fab:hover {
+  background: var(--hover);
+}
+.sk-page .sk-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow:
+    0 0 0 3px var(--panel),
+    0 0 0 4px var(--line);
+}
+.sk-page .sk-master {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sk-page .sk-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  flex: none;
+  color: var(--muted);
+}
+.sk-page .sk-master > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.sk-page .sk-master b {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-master small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sk-page .sk-tile {
+  width: var(--sk-tile);
+  height: var(--sk-tile);
+  padding: 0;
+  border-radius: 20px;
+  background: var(--hover);
+  border: 2px dashed color-mix(in srgb, var(--faint) 45%, var(--panel));
+  box-shadow: none;
+  color: var(--faint);
+}
+.sk-page .sk-tile:hover {
+  background: var(--fill);
+  border-color: var(--faint);
+  color: var(--muted);
+}
+.sk-page .sk-tile.on {
+  border: 0;
+}
+.sk-page .sk-tile.on:hover {
+  filter: brightness(0.94);
+}
+.sk-page .sk-check {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #16171d;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* ---------- past jobs ---------- */
+.sk-page .sk-past-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sk-page .sk-past {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.sk-page .sk-past-card {
+  height: auto;
+  min-width: 0;
+  padding: 18px 20px;
+  border-radius: 24px;
+  background: var(--panel);
+  box-shadow: none;
+  justify-content: flex-start;
+  gap: 14px;
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+}
+.sk-page .sk-past-card:hover {
+  background: var(--panel);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.sk-page .sk-past-card.on {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.sk-page .sk-past-ic {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: var(--st-ok-bg);
+  color: var(--st-ok);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.sk-page .sk-past-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sk-page .sk-past-txt b {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-past-txt small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.sk-page .sk-past-amt {
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.sk-page .sk-more {
+  align-self: flex-start;
+}
+
+/* ---------- project folder ---------- */
+.sk-page .sk-folder-head {
+  display: flex;
+  align-items: center;
+  gap: 12px 16px;
+  flex-wrap: wrap;
+}
+.sk-page .sk-folder-head > div:first-child {
+  flex: 1 1 260px;
+}
+.sk-page .sk-folder-head h2 {
+  font-size: 18px;
+}
+.sk-page .sk-folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr));
+  gap: 10px;
+}
+.sk-page .sk-folders li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--hover);
+  min-width: 0;
+}
+.sk-page .sk-folders li > div {
+  display: flex;
+  flex-direction: column;
+}
+.sk-page .sk-folders b {
+  font-weight: 600;
+}
+.sk-page .sk-folders small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sk-page .sk-f-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--c-tint);
+  color: var(--c-deep);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+/* ---------- narrower windows ---------- */
+@media (max-width: 1360px) {
+  .sk-page .sk-info {
+    flex-basis: calc(100% - 164px);
+  }
+  .sk-page .sk-hero-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+}
+@media (max-width: 1100px) {
+  .sk-page .sk-past {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .sk-page .sk-head .client-tile {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+  }
+  .sk-page .sk-actions {
+    width: 100%;
+  }
+  .sk-page .sk-actions button {
+    flex: 1;
+    height: 40px;
+    padding: 0 14px;
+  }
+  .sk-page .sk-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .sk-page .sk-hero {
+    padding: 18px;
+    border-radius: 22px;
+    gap: 16px 18px;
+  }
+  .sk-page .sk-ring {
+    width: 96px;
+    height: 96px;
+  }
+  .sk-page .sk-ring > div {
+    width: 76px;
+    height: 76px;
+  }
+  .sk-page .sk-ring b {
+    font-size: 22px;
+  }
+  .sk-page .sk-ring b.sm {
+    font-size: 18px;
+  }
+  .sk-page .sk-ring b.xs {
+    font-size: 14px;
+  }
+  .sk-page .sk-ring span {
+    font-size: 11px;
+  }
+  .sk-page .sk-info {
+    flex-basis: 180px;
+  }
+  .sk-page .sk-name h2 {
+    font-size: 22px;
+  }
+  .sk-page .sk-stats {
+    width: 100%;
+    gap: 10px;
+  }
+  .sk-page .sk-stat {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 16px;
+  }
+  .sk-page .sk-stat b {
+    font-size: 20px;
+  }
+  .sk-page .sk-hero-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+  .sk-page .sk-hero-actions button {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+  .sk-page .sk-var {
+    padding: 18px 16px;
+  }
+  .sk-page .sk-grid {
+    --sk-tile: 76px;
+    --sk-master: 116px;
+    row-gap: 10px;
+    column-gap: 8px;
+  }
+  .sk-page .sk-corner,
+  .sk-page .sk-master {
+    box-shadow: 8px 0 0 var(--panel);
+  }
+  .sk-page .sk-master {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 6px;
+  }
+  .sk-page .sk-thumb {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+  .sk-page .sk-tile {
+    border-radius: 18px;
+  }
+  .sk-page .sk-check {
+    width: 26px;
+    height: 26px;
+  }
+  .sk-page .sk-past {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .sk-page .sk-past-card {
+    padding: 14px 16px;
+    border-radius: 20px;
+  }
+}

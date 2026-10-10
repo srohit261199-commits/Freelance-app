@@ -78,7 +78,8 @@ export function App() {
     const by = (c: string) => state.models.filter(m => m.company === c);
     return {
       today: nextActions(state, now).length,
-      waveink: `${by('waveink').filter(m => isComplete(m.status)).length}/${by('waveink').filter(m => m.status !== 'skipped').length}`,
+      // Tech catalog progress, as on the Waveink screen and dashboard tile
+      waveink: `${by('waveink').filter(m => m.group === 'Tech' && isComplete(m.status)).length}/${by('waveink').filter(m => m.group === 'Tech' && m.status !== 'skipped').length}`,
       metaztech: by('metaztech').filter(m => m.status === 'revision').length,
       skeidar: state.skeidarJobs.filter(j => j.status === 'open').length,
       inbox: state.suggestions.length,

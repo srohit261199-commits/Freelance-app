@@ -52,7 +52,7 @@
   --st-live: #2f4fb8;
   /* priority flags */
   --p-urgent: #d63a26;
-  --p-high: #b85f08;
+  --p-high: #b05a06;
   --p-normal: #3a63d8;
   --p-low: #7c7f8c;
   /* accents */
@@ -464,7 +464,7 @@ select {
   flex-direction: column;
 }
 .topbar {
-  height: 52px;
+  height: 48px;
   flex: none;
   display: flex;
   align-items: center;
@@ -1056,6 +1056,21 @@ main.content {
 .pill-btn.st-on_hold:hover,
 .pill-btn.st-skipped:hover {
   background: var(--st-todo-bg);
+}
+.pill-btn.st-in_progress:hover {
+  background: var(--st-prog-bg);
+}
+.pill-btn.st-review:hover {
+  background: var(--st-rev-bg);
+}
+.pill-btn.st-revision:hover {
+  background: var(--st-bad-bg);
+}
+.pill-btn.st-done:hover {
+  background: var(--st-ok-bg);
+}
+.pill-btn.st-live:hover {
+  background: var(--st-live-bg);
 }
 .caret {
   font-size: 9px;

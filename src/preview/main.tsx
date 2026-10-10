@@ -1,11 +1,11 @@
 // mockHub installs window.hub, so it must load before anything that imports the app.
 import { onNotice, resetPreview } from './mockHub';
+import '../renderer/fonts.css';
+import '../renderer/styles.css';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from '../renderer/App';
 import { ConfirmButton } from '../renderer/ui';
-import '../renderer/fonts.css';
-import '../renderer/styles.css';
 import './preview.css';
 
 function PreviewBar() {
