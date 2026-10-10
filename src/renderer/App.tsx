@@ -4,8 +4,11 @@ import { nextActions } from '../shared/planner';
 import { isComplete } from '../shared/status';
 import { hub, useAppState, useNow } from './hub';
 import { AppCtx, Icon, relTime, type Route } from './ui';
+import { Omni, type Screen } from './Omni';
+import { allEarnings } from '../shared/money';
 import { Today } from './views/Today';
-import { Models } from './views/Models';
+import { Waveink } from './views/Waveink';
+import { MetaZtech } from './views/MetaZtech';
 import { Skeidar } from './views/Skeidar';
 import { Inbox } from './views/Inbox';
 import { Earnings } from './views/Earnings';
@@ -51,7 +54,7 @@ export function App() {
   useEffect(() => {
     main.current?.scrollTo(0, 0);
     const bar = side.current;
-    const on = bar?.querySelector<HTMLElement>('.nav .on');
+    const on = bar?.querySelector<HTMLElement>('.nav-item.on');
     if (!bar || !on || bar.scrollWidth <= bar.clientWidth) return;
     const a = bar.getBoundingClientRect();
     const b = on.getBoundingClientRect();
@@ -73,13 +76,13 @@ export function App() {
   const counts = useMemo(() => {
     if (!state) return null;
     const by = (c: string) => state.models.filter(m => m.company === c);
-    const open = (c: string) => by(c).filter(m => m.status === 'in_progress' || m.status === 'revision').length;
     return {
-      today: nextActions(state, now).filter(a => a.priority === 1).length,
+      today: nextActions(state, now).length,
       waveink: `${by('waveink').filter(m => isComplete(m.status)).length}/${by('waveink').filter(m => m.status !== 'skipped').length}`,
-      metaztech: open('metaztech'),
+      metaztech: by('metaztech').filter(m => m.status === 'revision').length,
       skeidar: state.skeidarJobs.filter(j => j.status === 'open').length,
-      inbox: state.emails.filter(e => e.unread && e.company !== 'other').length + state.suggestions.length,
+      inbox: state.suggestions.length,
+      late: allEarnings(state, now).filter(e => e.overdue).length,
       subs: state.subscriptions.filter(s => s.status === 'active' || s.status === 'trial').length,
       portfolio: state.portfolioTasks.filter(t => !t.done).length,
     };
@@ -100,62 +103,101 @@ export function App() {
     else toast(r.error ?? 'Sync failed', 'error');
   };
 
-  const color = (id: string) => state.companies.find(c => c.id === id)?.color;
-  const nav: { route: Route; label: string; icon: Parameters<typeof Icon>[0]['name']; badge?: string | number; dot?: string }[] = [
-    { route: { view: 'today' }, label: 'Today', icon: 'dashboard', badge: counts.today || undefined },
-    { route: { view: 'company', company: 'waveink' }, label: 'Waveink', icon: 'cube', badge: counts.waveink, dot: color('waveink') },
-    { route: { view: 'company', company: 'metaztech' }, label: 'MetaZtech', icon: 'cube', badge: counts.metaztech || undefined, dot: color('metaztech') },
-    { route: { view: 'skeidar' }, label: 'Skeidar', icon: 'image', badge: counts.skeidar || undefined, dot: color('skeidar') },
-    { route: { view: 'portfolio' }, label: 'Portfolio', icon: 'globe', badge: counts.portfolio || undefined },
-    { route: { view: 'inbox' }, label: 'Inbox & meetings', icon: 'mail', badge: counts.inbox || undefined },
-    { route: { view: 'earnings' }, label: 'Earnings', icon: 'money' },
-    { route: { view: 'subscriptions' }, label: 'Subscriptions', icon: 'repeat', badge: counts.subs },
-    { route: { view: 'settings' }, label: 'Settings', icon: 'gear' },
+  const screens: (Screen & { section: string; badge?: string | number })[] = [
+    { section: 'Menu', route: { view: 'today' }, label: 'Dashboard', icon: 'dashboard', badge: counts.today || undefined },
+    { section: 'Clients', route: { view: 'company', company: 'waveink' }, label: 'Waveink', icon: 'cube', client: 'waveink', badge: counts.waveink },
+    { section: 'Clients', route: { view: 'company', company: 'metaztech' }, label: 'MetaZtech', icon: 'cubeFocus', client: 'metaztech', badge: counts.metaztech || undefined },
+    { section: 'Clients', route: { view: 'skeidar' }, label: 'Skeidar', icon: 'brush', client: 'skeidar', badge: counts.skeidar || undefined },
+    { section: 'Money', route: { view: 'earnings' }, label: 'Payments', icon: 'wallet', badge: counts.late || undefined },
+    { section: 'Money', route: { view: 'subscriptions' }, label: 'Subscriptions', icon: 'repeat', badge: counts.subs || undefined },
+    { section: 'Tools', route: { view: 'inbox' }, label: 'Mail scan', icon: 'mail', badge: counts.inbox || undefined },
+    { section: 'Tools', route: { view: 'settings' }, label: 'Settings & import', icon: 'gear' },
+    { section: 'Tools', route: { view: 'portfolio' }, label: 'Portfolio', icon: 'globe', badge: counts.portfolio || undefined },
   ];
   const active = (r: Route) => r.view === route.view && (r.view !== 'company' || (route.view === 'company' && r.company === route.company));
+  const title = screens.find(s => active(s.route))?.label ?? '';
   const g = state.settings.google;
+  const sections = [...new Set(screens.map(s => s.section))];
+
+  const found = state.suggestions.length;
+  const kinds = (['payment', 'subscription'] as const)
+    .map(k => [k, state.suggestions.filter(s => s.kind === k).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([k, n]) => (k === 'payment' ? (n === 1 ? 'a payment' : `${n} payments`) : n === 1 ? 'a subscription' : `${n} subscriptions`));
+  const card = found
+    ? { title: `${found} new ${found === 1 ? 'thing' : 'things'} found in Gmail`, body: `Check ${kinds.join(' and ')} before ${found === 1 ? 'it goes' : 'they go'} into your records.`, cta: 'Review now', act: () => setRoute({ view: 'inbox' }) }
+    : !g.connected
+      ? { title: 'Connect Gmail', body: 'Find payouts, receipts, client mail and meetings without copying anything by hand.', cta: 'Set up', act: () => setRoute({ view: 'settings' }) }
+      : { title: 'All caught up', body: g.lastSync ? `Last checked ${relTime(g.lastSync, now)}. Nothing new to review.` : 'Nothing new to review.', cta: syncing ? 'Syncing…' : 'Check now', act: sync };
+  const led = syncing ? 'busy' : !g.connected ? 'off' : g.lastError ? 'err' : '';
+  const syncText = syncing ? 'Syncing…' : !g.connected ? 'Google not connected' : g.lastError ? 'Sync failed · retry' : g.lastSync ? `Synced ${relTime(g.lastSync, now)}` : 'Not synced yet';
 
   return (
     <AppCtx.Provider value={{ go, toast }}>
       <div className="shell">
-        <nav className="side" ref={side}>
+        <header className="topbar">
           <div className="brand">
-            <span className="logo">FH</span>
-            <div>
-              <strong>Freelance Hub</strong>
-              <small>Rohit Sharma</small>
-            </div>
+            <span className="mark" aria-hidden="true">
+              FH
+            </span>
+            <span className="name">Freelance Hub</span>
+            {title && <span className="where">— {title}</span>}
           </div>
-          <div className="nav">
-            {nav.map(n => (
-              <button key={n.label} type="button" className={active(n.route) ? 'on' : ''} onClick={() => setRoute(n.route)}>
-                {n.dot ? <span className="cdot" style={{ background: n.dot }} /> : <Icon name={n.icon} />}
-                <span className="grow">{n.label}</span>
-                {n.badge !== undefined && <span className="count">{n.badge}</span>}
-              </button>
-            ))}
-          </div>
-          <div className="side-foot">
-            <button type="button" className="sync-btn" onClick={sync} disabled={syncing}>
-              <Icon name="sync" />
-              {syncing ? 'Syncing…' : 'Sync Gmail & Calendar'}
+          <Omni state={state} screens={screens} onGo={go} />
+          <div className="sync-status">
+            <button type="button" onClick={sync} disabled={syncing} title={g.lastError ?? 'Sync Gmail, Calendar and Drive now'}>
+              <span className={`led ${led}`} />
+              <span className="txt">{syncText}</span>
             </button>
-            <small className="muted">
-              {g.connected ? (g.lastSync ? `Last sync ${relTime(g.lastSync, now)}` : 'Not synced yet') : 'Google not connected'}
-              {g.lastError && <span className="err-dot" title={g.lastError}> · error</span>}
-            </small>
           </div>
-        </nav>
-        <main className="content" ref={main}>
-          {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
-          {route.view === 'company' && <Models key={route.company} state={state} company={route.company} openId={route.modelId} now={now} />}
-          {route.view === 'skeidar' && <Skeidar state={state} now={now} openId={route.jobId} />}
-          {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} />}
-          {route.view === 'earnings' && <Earnings state={state} now={now} />}
-          {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
-          {route.view === 'portfolio' && <Portfolio state={state} now={now} />}
-          {route.view === 'settings' && <Settings state={state} now={now} />}
-        </main>
+        </header>
+        <div className="body">
+          <nav className="side" ref={side} aria-label="Screens">
+            <button type="button" className="profile" onClick={() => setRoute({ view: 'settings' })} title="Settings">
+              <span className="avatar">RS</span>
+              <span className="who">
+                <b>Rohit Sharma</b>
+                <small>Freelance 3D artist</small>
+              </span>
+              <Icon name="caretUpDown" />
+            </button>
+            {sections.map(sec => (
+              <div key={sec} className="nav-sec">
+                <h4>{sec}</h4>
+                {screens
+                  .filter(s => s.section === sec)
+                  .map(s => (
+                    <button key={s.label} type="button" className={`nav-item ${active(s.route) ? 'on' : ''}`} aria-current={active(s.route) ? 'page' : undefined} onClick={() => setRoute(s.route)}>
+                      {s.client ? <span className={`swatch c-${s.client} c-fill`} /> : <Icon name={s.icon} size={20} />}
+                      <span className="label">{s.label}</span>
+                      {s.badge !== undefined && <span className="badge">{s.badge}</span>}
+                    </button>
+                  ))}
+              </div>
+            ))}
+            <div className="side-card">
+              <span className="tile-ic">
+                <Icon name="mailOpen" size={20} weight="fill" />
+              </span>
+              <b>{card.title}</b>
+              <p>{card.body}</p>
+              <button type="button" className="primary" onClick={card.act} disabled={syncing && card.cta === 'Syncing…'}>
+                {card.cta}
+              </button>
+            </div>
+          </nav>
+          <main className="content" ref={main}>
+            {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
+            {route.view === 'company' && route.company === 'waveink' && <Waveink state={state} openId={route.modelId} now={now} />}
+            {route.view === 'company' && route.company === 'metaztech' && <MetaZtech state={state} openId={route.modelId} now={now} />}
+            {route.view === 'skeidar' && <Skeidar state={state} now={now} openId={route.jobId} />}
+            {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} />}
+            {route.view === 'earnings' && <Earnings state={state} now={now} />}
+            {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
+            {route.view === 'portfolio' && <Portfolio state={state} now={now} />}
+            {route.view === 'settings' && <Settings state={state} now={now} />}
+          </main>
+        </div>
       </div>
       <div className="toasts" role="status" aria-atomic="false">
         {toasts.map(t => (

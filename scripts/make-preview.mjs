@@ -4,8 +4,10 @@ import { execSync } from 'node:child_process';
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-execSync('npx vite build --config vite.preview.mts', { stdio: 'inherit' });
-const assets = path.join('dist-preview', 'assets');
+// Optional output folder, so several builds can run side by side: node scripts/make-preview.mjs /tmp/pv-a
+const dir = path.resolve(process.argv[2] ?? 'dist-preview');
+execSync(`npx vite build --config vite.preview.mts --outDir "${dir}" --emptyOutDir`, { stdio: 'inherit' });
+const assets = path.join(dir, 'assets');
 const files = readdirSync(assets);
 const css = files.filter(f => f.endsWith('.css')).map(f => readFileSync(path.join(assets, f), 'utf8')).join('\n');
 const js = files.filter(f => f.endsWith('.js')).map(f => readFileSync(path.join(assets, f), 'utf8')).join('\n');
@@ -17,6 +19,6 @@ const html = [
   `<script type="module">${js.replace(/<\/script/gi, '<\\/script').replace(/\uFFFD/g, '\\uFFFD')}</script>`,
   '',
 ].join('\n');
-const out = path.join('dist-preview', 'freelance-hub-preview.html');
+const out = path.join(dir, 'freelance-hub-preview.html');
 writeFileSync(out, html);
 console.log(`wrote ${out} (${(html.length / 1024).toFixed(0)} KB) from ${files.join(', ')}`);

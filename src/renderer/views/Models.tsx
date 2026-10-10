@@ -8,7 +8,7 @@ import { ConfirmButton, Drawer, Empty, Field, Icon, Modal, Progress, StatusPicke
 import { PortalImport } from './PortalImport';
 
 type Sort = 'queue' | 'name' | 'updated' | 'status';
-const NEXT: Partial<Record<ModelStatus, { to: ModelStatus; label: string }>> = {
+export const NEXT: Partial<Record<ModelStatus, { to: ModelStatus; label: string }>> = {
   todo: { to: 'in_progress', label: 'Start' },
   in_progress: { to: 'review', label: 'Submit' },
   revision: { to: 'review', label: 'Resubmit' },
@@ -354,7 +354,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
   );
 }
 
-function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppState; onClose(): void }) {
+export function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppState; onClose(): void }) {
   const { toast } = useApp();
   const cfg = state.companies.find(c => c.id === m.company)!;
   const [notes, setNotes] = useState(m.notes ?? '');
@@ -550,14 +550,14 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
   );
 }
 
-function progressText(h: StatusEvent): string {
+export function progressText(h: StatusEvent): string {
   const note = h.note ?? '';
   if (h.field === 'glb') return `GLB: ${note.replace(/^GLB /, '')}`;
   if (h.field === 'notes') return `Note: ${note}`;
   return note.replace(/ done$/, '');
 }
 
-function AddModel({ company, groups, onClose }: { company: 'waveink' | 'metaztech'; groups: string[]; onClose(): void }) {
+export function AddModel({ company, groups, onClose }: { company: 'waveink' | 'metaztech'; groups: string[]; onClose(): void }) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [group, setGroup] = useState(company === 'waveink' ? 'Tech' : groups[0] ?? '');

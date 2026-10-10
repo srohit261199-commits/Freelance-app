@@ -97,7 +97,7 @@ export function Inbox({ state, now, onSync, syncing }: { state: AppState; now: D
                 <li key={e.id} className={e.unread ? 'unread' : ''}>
                   <button type="button" onClick={() => hub.openUrl(e.url)} title="Open in Gmail">
                     <span className="row-top">
-                      <CompanyDot color={company(e.company)?.color ?? '#9ca3af'} />
+                      <CompanyDot company={e.company} />
                       <strong>{e.fromName}</strong>
                       {e.kind === 'teams' && <span className="tag">Teams</span>}
                       {e.kind === 'invite' && <span className="tag">invite</span>}

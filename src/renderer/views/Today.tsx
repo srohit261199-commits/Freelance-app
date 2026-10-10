@@ -86,7 +86,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
       <section className="kpis">
         <button type="button" className="kpi" onClick={() => go({ view: 'company', company: 'waveink' })}>
           <div className="kpi-top">
-            <CompanyDot color={company('waveink')!.color} /> Waveink
+            <CompanyDot company="waveink" /> Waveink
           </div>
           <div className="kpi-num">
             {wiDone}
@@ -99,7 +99,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
         </button>
         <button type="button" className="kpi" onClick={() => go({ view: 'company', company: 'metaztech' })}>
           <div className="kpi-top">
-            <CompanyDot color={company('metaztech')!.color} /> MetaZtech
+            <CompanyDot company="metaztech" /> MetaZtech
           </div>
           <div className="kpi-num">
             {mzApprovedMonth}
@@ -113,7 +113,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
         </button>
         <button type="button" className="kpi" onClick={() => go({ view: 'skeidar' })}>
           <div className="kpi-top">
-            <CompanyDot color={company('skeidar')!.color} /> Skeidar
+            <CompanyDot company="skeidar" /> Skeidar
           </div>
           <div className="kpi-num">
             {skLeft}
@@ -148,7 +148,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
                   <span className="prio" title={a.priority === 1 ? 'Today' : a.priority === 2 ? 'Soon' : 'Queue'} />
                   <button type="button" className="action-main" onClick={() => a.target && go(a.target)}>
                     <span className="action-title">
-                      {c && <CompanyDot color={c.color} />}
+                      {c && <CompanyDot company={c.id} />}
                       {a.title}
                     </span>
                     {a.detail && <span className="muted small clamp">{a.detail}</span>}
@@ -201,7 +201,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
                 <li key={e.id} className={e.unread ? 'unread' : ''}>
                   <button type="button" className="link-row" onClick={() => hub.openUrl(e.url)}>
                     <span className="row-top">
-                      <CompanyDot color={company(e.company)?.color ?? '#999'} />
+                      <CompanyDot company={e.company} />
                       <strong>{e.fromName}</strong>
                       <span className="muted small push">{relTime(e.date, now)}</span>
                     </span>

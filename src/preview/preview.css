@@ -8,10 +8,9 @@
   min-height: 0;
 }
 .preview-bar {
-  background: var(--warn-bg);
+  background: var(--st-prog-bg);
   color: var(--text);
-  border-bottom: 1px solid var(--line);
-  padding: 8px 16px;
+  padding: 8px 20px;
   font-size: 12.5px;
   display: flex;
   flex-direction: column;
@@ -33,14 +32,16 @@
   justify-content: space-between;
   gap: 10px;
   background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 6px 10px;
+  border-radius: 12px;
+  padding: 6px 6px 6px 12px;
 }
 .pv-note a {
   word-break: break-all;
 }
 @media (max-width: 760px) {
+  .preview-bar {
+    padding: 8px 16px;
+  }
   .pv-main span {
     flex-basis: 100%;
     order: 3;

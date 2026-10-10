@@ -96,7 +96,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
           return (
             <section key={e.company} className="card">
               <h2>
-                <CompanyDot color={c.color} /> {c.name}
+                <CompanyDot company={c.id} /> {c.name}
               </h2>
               <p className="muted small">{payTerms(state, e.company)}</p>
               <div className="money-row">
@@ -225,7 +225,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                       <tr key={p.id}>
                         <td>{fmtDate(p.date)}</td>
                         <td>
-                          <CompanyDot color={c?.color ?? '#999'} /> {c?.name}
+                          <CompanyDot company={c?.id ?? 'other'} /> {c?.name}
                         </td>
                         <td>{p.period ? monthLabel(p.period) : ''}</td>
                         <td className="num">{formatMoney(p.amount, p.currency, p.amount % 1 ? 2 : 0)}</td>
