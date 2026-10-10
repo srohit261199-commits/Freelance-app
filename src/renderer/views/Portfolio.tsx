@@ -1,8 +1,18 @@
 import { useState } from 'react';
-import type { AppState } from '../../shared/types';
+import type { AppState, PortfolioTask } from '../../shared/types';
 import { uid } from '../../shared/ops';
 import { hub } from '../hub';
-import { ConfirmButton, Field, Icon, Progress, fmtDate, useApp } from '../ui';
+import { ConfirmButton, Empty, Field, Icon, Progress, fmtDate, relTime, useApp } from '../ui';
+import './Portfolio.css';
+
+const siteLabel = (url: string) => {
+  try {
+    const u = new URL(url);
+    return (u.host + u.pathname).replace(/\/$/, '');
+  } catch {
+    return url;
+  }
+};
 
 export function Portfolio({ state, now }: { state: AppState; now: Date }) {
   const { toast } = useApp();
@@ -13,109 +23,175 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
   const tasks = state.portfolioTasks;
   const done = tasks.filter(t => t.done).length;
   const groups = [...new Set(tasks.map(t => t.group))];
+  const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
+  const url = state.settings.portfolioUrl;
+  const entries = [...state.portfolioLog].reverse();
+  const last = entries[0];
 
   const add = async () => {
-    if (!title.trim()) return;
+    if (!title.trim()) return toast('Write what still needs doing first.', 'error');
     await hub.upsert('portfolioTasks', { id: uid('pf'), title: title.trim(), group: group.trim() || 'Other', done: false, createdAt: new Date().toISOString() });
     setTitle('');
   };
   const addLog = async () => {
-    if (!log.trim()) return;
+    if (!log.trim()) return toast('Write what changed first.', 'error');
     await hub.upsert('portfolioLog', { id: uid('log'), date: new Date().toISOString(), text: log.trim() });
     setLog('');
     toast('Logged');
   };
+  const toggle = (t: PortfolioTask) => hub.upsert('portfolioTasks', { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : undefined });
 
   return (
-    <div className="page">
+    <div className="page pf-page">
       <header className="page-head">
-        <div>
-          <h1>Portfolio website</h1>
-          <p className="muted">
-            {done}/{tasks.length} done · built in a Claude chat as an artifact
-          </p>
-          <Progress value={done} total={tasks.length} color="#16a34a" />
+        <div className="pf-title">
+          <span className="client-tile pf-mark" aria-hidden="true">
+            <Icon name="globe" size={30} weight="fill" />
+          </span>
+          <div>
+            <h1>Portfolio</h1>
+            {url ? (
+              <button type="button" className="link-btn pf-link" onClick={() => hub.openUrl(url)} title={url}>
+                <Icon name="link" size={15} />
+                <span className="ellipsis">{siteLabel(url)}</span>
+              </button>
+            ) : (
+              <p>Add the site address in Settings &amp; import.</p>
+            )}
+          </div>
         </div>
         <div className="actions">
-          <button type="button" className="primary" onClick={() => hub.openUrl(state.settings.portfolioUrl)}>
-            <Icon name="external" /> Open the site
+          <button type="button" className="primary lg" disabled={!url} onClick={() => hub.openUrl(url)}>
+            <Icon name="external" size={18} /> Open the site
           </button>
         </div>
       </header>
 
+      <section className="kpis three pf-kpis" aria-label="Progress">
+        <div className="kpi c-money c-fill pf-kpi">
+          <div className="kpi-top">Progress</div>
+          <div className="kpi-num">{pct}%</div>
+          <Progress value={done} total={tasks.length} />
+          <div className="small pf-kpi-sub">
+            {done} of {tasks.length} done · built in a Claude chat as an artifact
+          </div>
+        </div>
+        <div className="kpi pf-kpi todo">
+          <div className="kpi-top">Still to do</div>
+          <div className="kpi-num">{tasks.length - done}</div>
+          <div className="small pf-kpi-sub">
+            across {groups.filter(g => tasks.some(t => t.group === g && !t.done)).length} of {groups.length} groups
+          </div>
+        </div>
+        <div className="kpi pf-kpi logged">
+          <div className="kpi-top">Last update</div>
+          <div className="kpi-num">{last ? relTime(last.date, now) : 'None yet'}</div>
+          <div className="small pf-kpi-sub ellipsis">{last ? last.text : 'Log what changed after each Claude session.'}</div>
+        </div>
+      </section>
+
       <div className="cols">
-        <div className="grow">
-          {groups.map(g => {
-            const list = tasks.filter(t => t.group === g && (showDone || !t.done));
-            if (!list.length) return null;
-            return (
-              <section key={g} className="card">
-                <h2>{g}</h2>
-                <ul className="checklist">
-                  {list.map(t => (
-                    <li key={t.id} className={t.done ? 'done' : ''}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={t.done}
-                          onChange={() => hub.upsert('portfolioTasks', { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : undefined })}
-                        />
-                        <span style={{ overflowWrap: 'anywhere' }}>
-                          <strong>{t.title}</strong>
-                          {t.detail && <span className="muted small block">{t.detail}</span>}
-                          {t.done && t.doneAt && <span className="muted small block">Done {fmtDate(t.doneAt)}</span>}
-                        </span>
-                      </label>
-                      <ConfirmButton className="mini ghost" icon={<Trash label={`Delete ${t.title}`} />} label="" confirmLabel="Delete?" onConfirm={() => hub.remove('portfolioTasks', t.id)} />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            );
-          })}
-          <label className="check">
-            <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} /> Show finished items
-          </label>
-          <section className="card">
-            <h2>Add pending work</h2>
-            <div className="row gap wrap">
-              <input className="grow" style={{ flexBasis: 220 }} placeholder="e.g. Add Waveink GLB viewer page" value={title} onChange={e => setTitle(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
-              <input list="pf-groups" aria-label="Group" style={{ flex: '0 1 140px' }} value={group} onChange={e => setGroup(e.target.value)} />
+        <div className="grow pf-main">
+          <section className="panel" aria-labelledby="pf-add-h">
+            <div className="panel-head">
+              <h2 id="pf-add-h">Add pending work</h2>
+              {done > 0 && (
+                <button type="button" className={`chip end ${showDone ? 'on' : ''}`} aria-pressed={showDone} onClick={() => setShowDone(!showDone)}>
+                  Show finished <span className="n">{done}</span>
+                </button>
+              )}
+            </div>
+            <div className="pf-add">
+              <input
+                className="pf-add-title"
+                aria-label="What still needs doing"
+                placeholder="e.g. Add Waveink GLB viewer page"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && add()}
+              />
+              <input className="pf-add-group" list="pf-groups" aria-label="Group" value={group} onChange={e => setGroup(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()} />
               <datalist id="pf-groups">
                 {groups.map(g => (
                   <option key={g} value={g} />
                 ))}
               </datalist>
               <button type="button" className="primary" onClick={add}>
-                Add
+                <Icon name="plus" size={16} /> Add
               </button>
             </div>
           </section>
+
+          {!tasks.length && <Empty title="No portfolio work yet">Add what the site still needs above.</Empty>}
+          {groups.map(g => {
+            const all = tasks.filter(t => t.group === g);
+            const list = all.filter(t => showDone || !t.done);
+            if (!list.length) return null;
+            const left = all.filter(t => !t.done).length;
+            return (
+              <section key={g} className="panel pf-group" aria-label={g}>
+                <div className="panel-head">
+                  <h2>{g}</h2>
+                  <span className={`tag ${left ? '' : 'ok'}`}>{left ? `${left} to do` : 'All done'}</span>
+                  <span className="pf-group-n end muted small">
+                    {all.length - left}/{all.length}
+                  </span>
+                </div>
+                <ul className="pf-tasks">
+                  {list.map(t => (
+                    <li key={t.id} className={`pf-task ${t.done ? 'done' : ''}`}>
+                      <label className="pf-chk">
+                        <input type="checkbox" checked={t.done} onChange={() => toggle(t)} aria-label={t.title} />
+                        <Icon name="check" size={13} weight="bold" />
+                      </label>
+                      <div className="pf-task-t">
+                        <span className="t">{t.title}</span>
+                        {t.detail && <span className="d">{t.detail}</span>}
+                        {t.done && t.doneAt && <span className="d">Done {fmtDate(t.doneAt)}</span>}
+                      </div>
+                      <ConfirmButton
+                        className="ghost icon-btn pf-del"
+                        icon={<Trash label={`Delete ${t.title}`} />}
+                        label=""
+                        confirmLabel="Delete?"
+                        onConfirm={() => hub.remove('portfolioTasks', t.id)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
         </div>
+
         <aside className="side-col">
-          <section className="card">
-            <h2>Update log</h2>
-            <p className="muted small">
-              Claude chats can't be read by another app, so jot down what changed after each session (or paste Claude's summary). It keeps a dated history of the site.
+          <section className="panel" aria-labelledby="pf-log-h">
+            <h2 id="pf-log-h">Update log</h2>
+            <p className="muted small pf-note">
+              Claude chats can’t be read by another app, so jot down what changed after each session (or paste Claude’s summary). It keeps a dated history of the site.
             </p>
             <Field label="What changed today?">
               <textarea rows={3} value={log} onChange={e => setLog(e.target.value)} />
             </Field>
-            <button type="button" className="mini primary" onClick={addLog}>
-              Add to log
+            <button type="button" className="primary pf-log-btn" onClick={addLog}>
+              <Icon name="plus" size={16} /> Add to log
             </button>
-            <ul className="list log">
-              {[...state.portfolioLog].reverse().map(l => (
-                <li key={l.id}>
-                  <div style={{ overflowWrap: 'anywhere' }}>
-                    <div className="muted small">{fmtDate(l.date, true)}</div>
-                    <div>{l.text}</div>
-                  </div>
-                  <ConfirmButton className="mini ghost" icon={<Trash label="Delete log entry" />} label="" confirmLabel="Delete?" onConfirm={() => hub.remove('portfolioLog', l.id)} />
-                </li>
-              ))}
-            </ul>
-            {!state.portfolioLog.length && <p className="muted small">No entries yet ({fmtDate(now.toISOString())}).</p>}
+            {entries.length ? (
+              <ul className="pf-log">
+                {entries.map(l => (
+                  <li key={l.id}>
+                    <span className="pf-log-dot" aria-hidden="true" />
+                    <div className="pf-log-t">
+                      <span className="when">{fmtDate(l.date, true)}</span>
+                      <span>{l.text}</span>
+                    </div>
+                    <ConfirmButton className="ghost icon-btn pf-del" icon={<Trash label="Delete log entry" />} label="" confirmLabel="Delete?" onConfirm={() => hub.remove('portfolioLog', l.id)} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="muted small">No entries yet.</p>
+            )}
           </section>
         </aside>
       </div>
@@ -127,7 +203,7 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
 function Trash({ label }: { label: string }) {
   return (
     <span className="row" role="img" aria-label={label} title={label}>
-      <Icon name="trash" size={13} />
+      <Icon name="trash" size={16} />
     </span>
   );
 }

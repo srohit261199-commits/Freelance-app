@@ -1,0 +1,258 @@
+.pf-page .page-head > .pf-title {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+.pf-page .pf-title > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pf-page .pf-mark {
+  background: var(--lav);
+  color: var(--st-rev);
+}
+.pf-page .pf-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--link);
+  min-width: 0;
+}
+.pf-page .pf-link:hover {
+  color: var(--text);
+}
+
+.pf-page .pf-kpi {
+  gap: 10px;
+}
+.pf-page .pf-kpi .kpi-top {
+  font-size: 14px;
+  color: var(--text);
+}
+.pf-page .pf-kpi .kpi-num {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pf-page .pf-kpi-sub {
+  color: var(--text-2);
+  font-weight: 500;
+}
+.pf-page .pf-kpi.c-fill .pf-kpi-sub {
+  color: var(--on-pastel-2);
+}
+.pf-page .pf-kpi .progress {
+  margin: 2px 0;
+}
+.pf-page .pf-kpi.todo {
+  background: var(--wi-tint);
+}
+.pf-page .pf-kpi.logged {
+  background: var(--lav);
+}
+
+.pf-page .pf-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.pf-page .pf-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pf-page .pf-add-title {
+  flex: 1 1 260px;
+}
+.pf-page .pf-add-group {
+  flex: 0 1 180px;
+}
+.pf-page .panel-head .chip {
+  flex: none;
+}
+.pf-page .pf-group .panel-head h2 {
+  font-size: 18px;
+}
+.pf-page .pf-group-n {
+  font-variant-numeric: tabular-nums;
+}
+.pf-page .pf-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -10px;
+}
+.pf-page .pf-task {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  padding: 10px;
+  border-radius: 16px;
+  transition: background 0.15s ease;
+}
+.pf-page .pf-task:hover {
+  background: var(--hover);
+}
+.pf-page .pf-chk {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.pf-page .pf-chk input {
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--faint) 55%, var(--panel));
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.pf-page .pf-chk input:hover {
+  box-shadow: inset 0 0 0 2px var(--muted);
+}
+.pf-page .pf-chk input:checked {
+  background: var(--ink);
+  box-shadow: none;
+}
+.pf-page .pf-chk input:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+.pf-page .pf-chk .icon {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+.pf-page .pf-chk input:hover + .icon {
+  color: var(--faint);
+}
+.pf-page .pf-chk input:checked + .icon {
+  color: var(--on-ink);
+}
+.pf-page .pf-task-t {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pf-page .pf-task-t .t {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.pf-page .pf-task-t .d {
+  font-size: 13px;
+  color: var(--muted);
+}
+.pf-page .pf-task.done .pf-task-t {
+  opacity: 0.55;
+}
+.pf-page .pf-task.done .t {
+  text-decoration: line-through;
+}
+.pf-page .pf-del {
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+  margin-top: -4px;
+}
+.pf-page .pf-del:hover {
+  color: var(--st-bad);
+}
+.pf-page .pf-del.armed {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--st-bad);
+}
+
+.pf-page .pf-note {
+  line-height: 1.5;
+}
+.pf-page .pf-log-btn {
+  align-self: flex-start;
+}
+.pf-page .pf-log {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+}
+.pf-page .pf-log > li {
+  position: relative;
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 10px 0;
+  align-items: start;
+}
+.pf-page .pf-log > li + li::before {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: -12px;
+  height: 28px;
+  width: 2px;
+  background: var(--line);
+}
+.pf-page .pf-log-dot {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: inset 0 0 0 3px var(--st-rev);
+}
+.pf-page .pf-log-t {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+.pf-page .pf-log-t .when {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .pf-page .pf-mark {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+  }
+  .pf-page .page-head .actions,
+  .pf-page .page-head .actions button {
+    width: 100%;
+  }
+  .pf-page .pf-kpi .kpi-num {
+    font-size: 26px;
+  }
+  .pf-page .pf-add-group {
+    flex: 1 1 120px;
+  }
+  .pf-page .pf-tasks {
+    margin: 0 -6px;
+  }
+  .pf-page .pf-task {
+    padding: 10px 6px;
+    gap: 12px;
+  }
+}

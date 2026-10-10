@@ -1,0 +1,571 @@
+/* Subscriptions. Every rule sits under .subs-page: this file loads before styles.css. */
+.subs-page {
+  min-height: 100%;
+}
+.subs-page .page-head > div:first-child {
+  gap: 4px;
+}
+.subs-page .page-head .actions button.lg {
+  padding: 0 18px;
+}
+.subs-page .page-head .actions button.primary.lg {
+  padding: 0 20px;
+}
+.subs-page .subs-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--st-rev-bg);
+  color: var(--st-rev);
+}
+
+/* stat tiles */
+.subs-page .subs-kpi {
+  gap: 12px;
+}
+.subs-page .subs-kpi .kpi-top {
+  font-size: 14px;
+  color: var(--text);
+}
+.subs-page .subs-kpi-note {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.subs-page .subs-kpi .kpi-num {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.subs-page .subs-kpi.month {
+  background: var(--wi-tint);
+}
+.subs-page .subs-kpi.year {
+  background: var(--lav);
+}
+.subs-page .subs-kpi.trial {
+  background: var(--st-bad-bg);
+}
+.subs-page .subs-kpi.soon {
+  background: var(--money-tint);
+}
+.subs-page .subs-kpi.cancel {
+  background: var(--st-prog-bg);
+}
+
+/* table + the next-30-days list */
+.subs-page .subs-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 20px;
+  align-items: stretch;
+}
+.subs-page .subs-table {
+  padding: 12px 18px;
+  gap: 8px;
+}
+.subs-page .subs-table table {
+  table-layout: fixed;
+  min-width: 900px;
+}
+.subs-page .subs-table th {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 12px 7px;
+}
+.subs-page .subs-table td {
+  border-top: 0;
+  padding: 12px 7px;
+  font-size: 14px;
+}
+.subs-page .subs-table th:first-child,
+.subs-page .subs-table td:first-child {
+  padding-left: 10px;
+}
+.subs-page .subs-table th:last-child,
+.subs-page .subs-table td:last-child {
+  padding-right: 6px;
+}
+.subs-page .subs-table tbody tr {
+  cursor: pointer;
+}
+.subs-page .subs-table tr.ended td {
+  color: var(--muted);
+}
+.subs-page .subs-table tr.ended .subs-tile {
+  opacity: 0.6;
+}
+.subs-page .subs-table .c-sw {
+  width: 25%;
+}
+.subs-page .subs-table .c-st {
+  width: 116px;
+}
+.subs-page .subs-table .c-cy {
+  width: 96px;
+}
+.subs-page .subs-table .c-amt {
+  width: 116px;
+}
+.subs-page .subs-table .c-mo {
+  width: 104px;
+}
+.subs-page .subs-table .c-nx {
+  width: 168px;
+}
+.subs-page .subs-table .c-mn {
+  width: 44px;
+  text-align: right;
+}
+.subs-page .subs-app {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.subs-page .subs-tile {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+.subs-page .subs-app-t {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.subs-page .subs-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subs-page .subs-sub {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.subs-page .subs-mob {
+  display: none;
+}
+.subs-page .subs-next {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.subs-page .subs-next > span {
+  font-weight: 600;
+}
+.subs-page .subs-next small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.subs-page .subs-next small.bad-text {
+  color: var(--st-bad);
+}
+.subs-page .subs-next small.warn-text {
+  color: var(--st-prog);
+}
+.subs-page .subs-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.subs-page .subs-src > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.subs-page button.subs-src:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+.subs-page .subs-src .icon {
+  flex: none;
+}
+.subs-page .subs-dots {
+  width: 32px;
+  height: 32px;
+  color: var(--muted);
+}
+.subs-page .subs-menu .menu {
+  min-width: 190px;
+  z-index: 40;
+}
+.subs-page .subs-menu .menu button {
+  gap: 10px;
+}
+.subs-page .subs-menu .menu button.armed {
+  background: var(--st-bad-bg);
+  color: var(--st-bad);
+}
+.subs-page .subs-foot {
+  display: flex;
+  padding: 4px 10px 8px;
+}
+
+.subs-page .subs-soon {
+  gap: 16px;
+}
+.subs-page .subs-soon h2 {
+  font-size: 18px;
+}
+.subs-page .subs-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.subs-page .subs-date-row {
+  width: 100%;
+  height: auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  justify-content: stretch;
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 16px;
+}
+.subs-page .subs-date-row:hover {
+  background: transparent;
+}
+.subs-page .subs-date-row:hover .subs-date-t b {
+  text-decoration: underline;
+}
+.subs-page .subs-day {
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+.subs-page .subs-day small {
+  font-size: 11px;
+  font-weight: 700;
+}
+.subs-page .subs-day b {
+  font-size: 19px;
+  font-weight: 800;
+}
+.subs-page .subs-date-t {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+  min-width: 0;
+}
+.subs-page .subs-date-t b {
+  font-size: 14px;
+  font-weight: 700;
+}
+.subs-page .subs-date-t span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.subs-page .subs-alert {
+  margin-top: auto;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--st-bad-bg);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.subs-page .subs-alert .icon {
+  color: var(--st-bad);
+  flex: none;
+}
+.subs-page .subs-alert p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+/* add / edit dialog */
+.subs-page .modal > header {
+  padding: 28px 28px 0;
+  align-items: center;
+}
+.subs-page .modal > header .icon-btn {
+  width: 38px;
+  height: 38px;
+}
+.subs-page .modal-body {
+  padding: 16px 28px 4px;
+  gap: 16px;
+}
+.subs-page .modal > footer {
+  padding: 22px 28px 28px;
+  flex-wrap: nowrap;
+}
+.subs-page .subs-lede {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: -10px;
+}
+.subs-page .modal input,
+.subs-page .modal select,
+.subs-page .subs-static {
+  height: 46px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+.subs-page .modal input:focus,
+.subs-page .modal select:focus {
+  background: var(--fill);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.subs-page .modal textarea {
+  min-height: 66px;
+  border-radius: 14px;
+}
+.subs-page .modal textarea:focus {
+  background: var(--fill);
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+.subs-page .modal input[type='date'] {
+  padding-right: 10px;
+}
+.subs-page .subs-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.subs-page .subs-row.amt {
+  grid-template-columns: minmax(0, 1fr) 130px;
+}
+.subs-page .subs-static {
+  background: var(--fill);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 14px;
+  font-size: 14px;
+  color: var(--text);
+}
+.subs-page .subs-static .icon {
+  color: var(--muted);
+}
+.subs-page .subs-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.subs-page .subs-pills button {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--fill);
+  box-shadow: none;
+}
+.subs-page .subs-pills button:hover {
+  background: var(--line);
+}
+.subs-page .subs-pills button.on {
+  font-weight: 700;
+}
+.subs-page .subs-pills button.on.ink {
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 600;
+}
+.subs-page .subs-pills button.on.st-ok {
+  background: var(--st-ok-bg);
+}
+.subs-page .subs-pills button.on.st-bad {
+  background: var(--st-bad-bg);
+}
+.subs-page .subs-pills button.on.st-warn {
+  background: var(--st-prog-bg);
+}
+.subs-page .subs-pills button.on.st-neutral {
+  background: var(--st-todo-bg);
+  box-shadow: inset 0 0 0 1.5px var(--st-todo);
+}
+.subs-page .subs-more > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.subs-page .subs-more > summary::-webkit-details-marker {
+  display: none;
+}
+.subs-page .subs-more > summary:hover {
+  color: var(--text);
+}
+.subs-page .subs-more > summary .icon {
+  transition: transform 0.15s ease;
+}
+.subs-page .subs-more[open] > summary .icon {
+  transform: rotate(90deg);
+}
+.subs-page .subs-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+.subs-page .modal > footer button.subs-btn {
+  flex: 1;
+  height: 48px;
+  font-size: 14px;
+}
+.subs-page .modal > footer .danger {
+  height: 48px;
+}
+
+/* below ~1760px the table needs the full width; the dates sit underneath as cards */
+@media (max-width: 1760px) {
+  .subs-page .subs-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .subs-page .subs-dates {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px 20px;
+  }
+  .subs-page .subs-alert {
+    margin-top: 0;
+  }
+}
+
+/* narrow windows and phones: each row stacks inside its own cell */
+@media (max-width: 1100px) {
+  .subs-page .subs-table {
+    padding: 8px;
+  }
+  .subs-page .subs-table table {
+    min-width: 0;
+    table-layout: auto;
+  }
+  .subs-page .subs-table thead {
+    display: none;
+  }
+  .subs-page .subs-table table,
+  .subs-page .subs-table tbody,
+  .subs-page .subs-table tr {
+    display: block;
+  }
+  .subs-page .subs-table tr {
+    position: relative;
+  }
+  .subs-page .subs-table tr + tr {
+    border-top: 1px solid var(--line-2);
+  }
+  .subs-page .subs-table td {
+    display: none;
+  }
+  .subs-page .subs-table td.c-sw {
+    display: block;
+    width: auto;
+    padding: 12px 44px 12px 8px;
+    border-radius: 16px;
+  }
+  .subs-page .subs-table td.c-mn {
+    display: block;
+    position: absolute;
+    top: 10px;
+    right: 4px;
+    width: auto;
+    padding: 0;
+    background: transparent;
+  }
+  .subs-page .subs-app {
+    align-items: flex-start;
+  }
+  .subs-page .subs-mob {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  .subs-page .subs-mob .pill {
+    height: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .subs-page .page-head .actions {
+    width: 100%;
+  }
+  .subs-page .page-head .actions button {
+    flex: 1;
+  }
+  .subs-page .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .subs-page .subs-kpi {
+    padding: 16px;
+    border-radius: 20px;
+    gap: 6px;
+  }
+  .subs-page .subs-kpi .kpi-top {
+    font-size: 13px;
+  }
+  .subs-page .subs-kpi-note {
+    display: none;
+  }
+  .subs-page .subs-kpi .kpi-num {
+    font-size: 22px;
+  }
+  .subs-page .modal > header {
+    padding: 20px 18px 0 20px;
+  }
+  .subs-page .modal-body {
+    padding: 14px 20px 4px;
+  }
+  .subs-page .modal > footer {
+    padding: 18px 20px 20px;
+    flex-wrap: wrap;
+  }
+  .subs-page .subs-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .subs-page .subs-row.amt {
+    grid-template-columns: minmax(0, 1fr) 110px;
+  }
+}
