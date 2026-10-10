@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState, Complexity, Model, ModelStatus, StatusEvent } from '../../shared/types';
-import { COMPANY_STATUSES, COMPLEXITY_LABELS, isComplete, isOpen, lastWorked, statusEvents, statusLabel } from '../../shared/status';
+import { statusesFor, COMPLEXITY_LABELS, isComplete, isOpen, lastWorked, statusEvents, statusLabel } from '../../shared/status';
 import { formatMoney, tierFee } from '../../shared/money';
 import { modelLabel, waveinkQueue } from '../../shared/planner';
 import { hub } from '../hub';
@@ -57,7 +57,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
 
   const shown = useMemo(() => {
     let list = matching.filter(m => status === 'all' || (status === 'open' ? isOpen(m.status) : m.status === status));
-    const order = COMPANY_STATUSES[company];
+    const order = statusesFor(company);
     if (sort === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
     else if (sort === 'updated') list = [...list].sort((a, b) => (lastWorked(b) ?? '').localeCompare(lastWorked(a) ?? ''));
     else if (sort === 'status') list = [...list].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
@@ -172,7 +172,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
       <div className="filters">
         <input className="search" placeholder="Search name, code, brand, notes…" value={query} onChange={e => setQuery(e.target.value)} />
         <div className="chips">
-          {(['all', 'open', ...COMPANY_STATUSES[company]] as const).map(s => (
+          {(['all', 'open', ...statusesFor(company)] as const).map(s => (
             <button key={s} type="button" className={`chip ${status === s ? 'on' : ''}`} onClick={() => setStatus(s)}>
               {s === 'all' ? 'All' : s === 'open' ? 'Open' : statusLabel(s, company)}
               <span className="n">{counts[s] ?? 0}</span>
@@ -212,7 +212,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
         <div className="bulk">
           <strong>{picked.length} selected</strong>
           <span className="muted">Set status:</span>
-          {COMPANY_STATUSES[company].map(s => (
+          {statusesFor(company).map(s => (
             <button
               key={s}
               type="button"
@@ -626,7 +626,7 @@ export function AddModel({ company, groups, onClose }: { company: 'waveink' | 'm
         )}
         <Field label="Status">
           <select value={status} onChange={e => setStatus(e.target.value as ModelStatus)}>
-            {COMPANY_STATUSES[company].map(s => (
+            {statusesFor(company).map(s => (
               <option key={s} value={s}>
                 {statusLabel(s, company)}
               </option>

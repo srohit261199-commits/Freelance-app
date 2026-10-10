@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import * as P from '@phosphor-icons/react';
 import type { CompanyId, ModelStatus } from '../shared/types';
-import { COMPANY_STATUSES, statusLabel } from '../shared/status';
+import { statusesFor, statusLabel } from '../shared/status';
 import type { ActionTarget } from '../shared/planner';
 
 export type Route =
   | { view: 'today' }
-  | { view: 'company'; company: 'waveink' | 'metaztech'; modelId?: string }
-  | { view: 'skeidar'; jobId?: string }
+  | { view: 'company'; company: CompanyId; modelId?: string }
+  | { view: 'skeidar'; company?: CompanyId; jobId?: string }
   | { view: 'inbox'; emailId?: string }
   | { view: 'earnings' }
   | { view: 'subscriptions' }
@@ -180,7 +180,7 @@ export function StatusPicker({ status, company, onPick }: { status: ModelStatus;
       </button>
       {open && (
         <div className={`menu ${up ? 'up' : ''}`} role="menu">
-          {COMPANY_STATUSES[company].map(s => (
+          {statusesFor(company).map(s => (
             <button
               key={s}
               type="button"

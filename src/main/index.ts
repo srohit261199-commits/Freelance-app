@@ -10,6 +10,8 @@ import { runSync } from './sync';
 import { openPortal, pullPortal } from './portal';
 import { folderImageCount, scanFolder } from './files';
 import { exportExcel } from './exporter';
+import * as assets from './assets';
+import * as accounts from './accounts';
 import { localDate } from '../shared/money';
 import { newMail, tick } from './notify';
 
@@ -87,7 +89,7 @@ function newModel(input: NewModel, now: string): Model {
     source: 'manual',
     history: [],
     ...input,
-    id: input.id ?? uid(input.company === 'waveink' ? 'wm' : input.company === 'metaztech' ? 'mz' : 'sk'),
+    id: input.id ?? uid(input.company === 'waveink' ? 'wm' : input.company === 'metaztech' ? 'mz' : input.company === 'skeidar' ? 'sk' : 'cm'),
     createdAt: now,
     updatedAt: now,
   };
@@ -257,6 +259,56 @@ const handlers: HubApi = {
   },
   async appInfo() {
     return { version: app.getVersion(), dataDir: dataDir() };
+  },
+  async listAssets(folder) {
+    try {
+      return await assets.listAssets(folder);
+    } catch (err) {
+      return { error: (err as NodeJS.ErrnoException).code === 'ENOENT' ? `Folder not found: ${folder}` : String(err) };
+    }
+  },
+  async readJobFolder(folder) {
+    try {
+      return await assets.readJobFolder(folder);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  async syncJobFolders(company) {
+    try {
+      return await assets.syncJobFolders(company, getState, update);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  async thumbnail(file, size) {
+    return assets.thumbnail(file, size);
+  },
+  async accountOpen(id) {
+    const a = getState().accounts.find(x => x.id === id);
+    if (a) accounts.openAccount(a);
+  },
+  async accountRead(id) {
+    const a = getState().accounts.find(x => x.id === id);
+    if (!a) return { error: 'That account is no longer in the list.' };
+    try {
+      const got = await accounts.readAccount(a);
+      update(s => {
+        const x = s.accounts.find(y => y.id === id);
+        if (x) {
+          x.lastRead = new Date().toISOString();
+          delete x.lastError;
+        }
+      });
+      return got;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      update(s => {
+        const x = s.accounts.find(y => y.id === id);
+        if (x) x.lastError = msg;
+      });
+      return { error: msg };
+    }
   },
 };
 

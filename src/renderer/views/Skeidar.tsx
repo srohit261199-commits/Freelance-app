@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import type { AppState, Currency, FolderEntry, SkeidarJob } from '../../shared/types';
+import type { AppState, Currency, FolderEntry, SkeidarJob, CompanyId } from '../../shared/types';
 import { formatMoney, jobOutputs, localDate } from '../../shared/money';
 import { uid } from '../../shared/ops';
 import { hub } from '../hub';
@@ -44,7 +44,8 @@ function shortDate(iso: string, now: Date): string {
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-export function Skeidar({ state, now, openId }: { state: AppState; now: Date; openId?: string }) {
+export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: AppState; now: Date; openId?: string; company?: CompanyId }) {
+  void company;
   const { toast } = useApp();
   const cfg = state.companies.find(c => c.id === 'skeidar')!;
   const rate = cfg.pay.kind === 'per-item' ? cfg.pay.rate : 5;

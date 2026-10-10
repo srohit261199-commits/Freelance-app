@@ -136,6 +136,21 @@ export function importPortalRows(state: AppState, rows: PortalRow[], now: string
   return counts;
 }
 
+/** Fills in what older saved data lacks: new lists, and new fields on the built-in clients. */
+export function upgradeState(state: AppState, seed: AppState): AppState {
+  if (!Array.isArray(state.accounts)) state.accounts = [];
+  for (const c of state.companies) {
+    const def = seed.companies.find(x => x.id === c.id);
+    if (!def) continue;
+    c.builtIn ??= def.builtIn;
+    c.workflow ??= def.workflow;
+    c.startDate ??= def.startDate;
+    c.expectations ??= def.expectations;
+    c.folder ??= c.id === 'skeidar' ? state.settings.skeidarFolder || def.folder : def.folder;
+  }
+  return state;
+}
+
 /** Undoes data written by older versions: salary "Re:" replies that an earlier sync recorded as a second payment. */
 export function repairState(state: AppState): AppState {
   state.payments = state.payments.filter(p => !(p.source === 'email' && /^\s*(re|fw|fwd|aw)\s*:/i.test(p.note ?? '')));

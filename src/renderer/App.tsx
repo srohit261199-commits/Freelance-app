@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { ActionTarget } from '../shared/planner';
+import type { CompanyConfig } from '../shared/types';
 import { nextActions } from '../shared/planner';
 import { isComplete } from '../shared/status';
 import { hub, useAppState, useNow } from './hub';
@@ -9,6 +10,8 @@ import { allEarnings, localDate } from '../shared/money';
 import { Today, readDone } from './views/Today';
 import { Waveink } from './views/Waveink';
 import { MetaZtech } from './views/MetaZtech';
+import { Client } from './views/Client';
+import { AddClient } from './views/JobDetails';
 import { Skeidar } from './views/Skeidar';
 import { Inbox } from './views/Inbox';
 import { Earnings } from './views/Earnings';
@@ -24,6 +27,9 @@ interface Toast {
 
 export function App() {
   const state = useAppState();
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const [addingClient, setAddingClient] = useState(false);
   const now = useNow();
   const [route, setRoute] = useState<Route>({ view: 'today' });
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -47,6 +53,8 @@ export function App() {
       return;
     }
     if (r.view === 'company' && r.company === 'skeidar') setRoute({ view: 'skeidar' });
+    else if (r.view === 'company' && stateRef.current?.companies.find(c => c.id === r.company)?.workflow === 'variations')
+      setRoute({ view: 'skeidar', company: r.company });
     else setRoute(r as Route);
   }, []);
 
@@ -119,13 +127,28 @@ export function App() {
     { section: 'Clients', route: { view: 'company', company: 'waveink' }, label: 'Waveink', icon: 'cube', client: 'waveink', badge: counts.waveink },
     { section: 'Clients', route: { view: 'company', company: 'metaztech' }, label: 'MetaZtech', icon: 'cubeFocus', client: 'metaztech', badge: counts.metaztech || undefined },
     { section: 'Clients', route: { view: 'skeidar' }, label: 'Skeidar', icon: 'brush', client: 'skeidar', badge: counts.skeidar || undefined },
+    ...state.companies
+      .filter(c => !c.builtIn && !c.archived)
+      .map(c => ({
+        section: 'Clients',
+        route: (c.workflow === 'variations' ? { view: 'skeidar', company: c.id } : { view: 'company', company: c.id }) as Route,
+        label: c.name,
+        icon: (c.workflow === 'variations' ? 'brush' : 'cube') as Screen['icon'],
+        client: c.id,
+        badge:
+          (c.workflow === 'variations'
+            ? state.skeidarJobs.filter(j => j.company === c.id && j.status === 'open').length
+            : state.models.filter(m => m.company === c.id && (m.status === 'in_progress' || m.status === 'revision')).length) || undefined,
+      })),
     { section: 'Money', route: { view: 'earnings' }, label: 'Payments', icon: 'wallet', badge: counts.late || undefined },
     { section: 'Money', route: { view: 'subscriptions' }, label: 'Subscriptions', icon: 'repeat', badge: counts.subs || undefined },
     { section: 'Tools', route: { view: 'inbox' }, label: 'Mail scan', icon: 'mail', badge: counts.inbox || undefined },
     { section: 'Tools', route: { view: 'settings' }, label: 'Settings & import', icon: 'gear' },
     { section: 'Tools', route: { view: 'portfolio' }, label: 'Portfolio', icon: 'globe', badge: counts.portfolio || undefined },
   ];
-  const active = (r: Route) => r.view === route.view && (r.view !== 'company' || (route.view === 'company' && r.company === route.company));
+  const active = (r: Route) =>
+    r.view === route.view &&
+    (r.view === 'company' ? route.view === 'company' && r.company === route.company : r.view === 'skeidar' ? route.view === 'skeidar' && (r.company ?? 'skeidar') === (route.company ?? 'skeidar') : true);
   const title = screens.find(s => active(s.route))?.label ?? '';
   const g = state.settings.google;
   const sections = [...new Set(screens.map(s => s.section))];
@@ -184,6 +207,12 @@ export function App() {
                       {s.badge !== undefined && <span className="badge">{s.badge}</span>}
                     </button>
                   ))}
+                {sec === 'Clients' && (
+                  <button type="button" className="nav-item add" onClick={() => setAddingClient(true)}>
+                    <Icon name="plus" size={20} />
+                    <span className="label">Add client</span>
+                  </button>
+                )}
               </div>
             ))}
             <div className="side-card">
@@ -201,7 +230,10 @@ export function App() {
             {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
             {route.view === 'company' && route.company === 'waveink' && <Waveink state={state} openId={route.modelId} now={now} />}
             {route.view === 'company' && route.company === 'metaztech' && <MetaZtech state={state} openId={route.modelId} now={now} />}
-            {route.view === 'skeidar' && <Skeidar state={state} now={now} openId={route.jobId} />}
+            {route.view === 'company' && route.company !== 'waveink' && route.company !== 'metaztech' && (
+              <Client key={route.company} state={state} company={route.company} openId={route.modelId} now={now} />
+            )}
+            {route.view === 'skeidar' && <Skeidar key={route.company ?? 'skeidar'} state={state} now={now} openId={route.jobId} company={route.company ?? 'skeidar'} />}
             {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} emailId={route.emailId} />}
             {route.view === 'earnings' && <Earnings state={state} now={now} />}
             {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
@@ -210,6 +242,9 @@ export function App() {
           </main>
         </div>
       </div>
+      {/* Clients added by hand get the same --c / --c-tint / --c-deep variables the built-in ones have in styles.css */}
+      <style>{clientColours(state.companies)}</style>
+      {addingClient && <AddClient state={state} onClose={() => setAddingClient(false)} />}
       <div className="toasts" role="status" aria-atomic="false">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.kind}`} onClick={() => dismiss(t.id)} title="Click to dismiss">
@@ -222,4 +257,12 @@ export function App() {
       </div>
     </AppCtx.Provider>
   );
+}
+
+/** CSS variables for clients added by hand, mixed from their colour so tints work in both themes. */
+function clientColours(companies: CompanyConfig[]): string {
+  return companies
+    .filter(c => !c.builtIn && /^[a-z0-9-]+$/i.test(c.id) && /^#[0-9a-f]{3,8}$/i.test(c.color))
+    .map(c => `.c-${c.id}{--c:${c.color};--c-tint:color-mix(in srgb,${c.color} 22%,var(--panel));--c-deep:color-mix(in srgb,${c.color} 62%,var(--text))}`)
+    .join('');
 }

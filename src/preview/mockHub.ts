@@ -6,9 +6,11 @@
 import type { Hub, NewModel } from '../shared/api';
 import type { AppState, Collection, Model, SyncResult } from '../shared/types';
 import { initialState } from '../main/seed/initial';
-import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, repairState, uid } from '../shared/ops';
+import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, repairState, uid, upgradeState } from '../shared/ops';
 import { applySync, calendarMeetings, driveGlbs, ingestMail } from '../shared/ingest';
 import { localDate } from '../shared/money';
+import * as mockAssets from './mockAssets';
+import * as mockAccounts from './mockAccounts';
 import { RECEIPT_IDS, SAMPLE_FOLDER, SAMPLE_PORTAL, SNAPSHOT_DRIVE, SNAPSHOT_EVENTS, SNAPSHOT_MAIL } from './snapshot';
 
 declare global {
@@ -39,7 +41,7 @@ function load(): AppState {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as AppState;
-      if (Array.isArray(s.models) && s.settings) return repairState(s);
+      if (Array.isArray(s.models) && s.settings) return repairState(upgradeState(s, fresh()));
     }
   } catch {}
   return fresh();
@@ -94,6 +96,8 @@ function openLink(url: string) {
   } catch {}
   if (!opened) notice('The app opens this link in your browser:', url);
 }
+
+const ctx: mockAssets.MockCtx = { state: () => state, commit, notice };
 
 const hub: Hub = {
   async getState() {
@@ -240,6 +244,44 @@ const hub: Hub = {
   },
   async appInfo() {
     return { version: '1.0.0 (browser preview)', dataDir: 'this browser (the app uses %APPDATA%\\Freelance Hub)' };
+  },
+  async listAssets(folder) {
+    return mockAssets.listAssets(ctx, folder);
+  },
+  async readJobFolder(folder) {
+    try {
+      return await mockAssets.readJobFolder(ctx, folder);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  async syncJobFolders(company) {
+    try {
+      return await mockAssets.syncJobFolders(ctx, company);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  async thumbnail(file) {
+    return mockAssets.thumbnail(ctx, file);
+  },
+  async accountOpen(id) {
+    return mockAccounts.accountOpen(ctx, id);
+  },
+  async accountRead(id) {
+    try {
+      const got = await mockAccounts.accountRead(ctx, id);
+      commit(s => {
+        const a = s.accounts.find(x => x.id === id);
+        if (a) {
+          a.lastRead = new Date().toISOString();
+          delete a.lastError;
+        }
+      });
+      return got;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
   },
 };
 

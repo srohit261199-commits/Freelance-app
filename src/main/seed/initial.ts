@@ -48,6 +48,16 @@ export const COMPANIES: CompanyConfig[] = [
       'Retainer 3,000 AED a month from 1 Sep 2026, paid around the 1st (Sibi mails a transfer reference). ' +
       'Deliver GLB / glTF 2.0, PBR textured, browser-ready; upload to the shared Drive folder named by Jasani code. ' +
       'Fill the Daily Update Log and send it to Sibi every Friday EOD. Weekly Demo on Google Meet, Wednesdays 7:30 PM IST. Contacts: Sibi Iype (co-founder), Ahmed Abudaff.',
+    builtIn: true,
+    workflow: 'models',
+    startDate: '2026-09-01',
+    expectations: {
+      deadlines: [
+        { id: 'wi-demo', label: 'Weekly Demo on Google Meet', weekday: 3, time: '19:30' },
+        { id: 'wi-report', label: 'Daily Update Log to Sibi', weekday: 5, time: '18:00' },
+      ],
+      notes: 'GLB / glTF 2.0, PBR, browser-ready. Upload to the shared Drive folder, named by Jasani code.',
+    },
   },
   {
     id: 'metaztech',
@@ -76,6 +86,12 @@ export const COMPANIES: CompanyConfig[] = [
       '1% TDS. Paid monthly between the 3rd and 10th. PM: Sharon Rosalia; team lead on Teams: Ritu Agrawal. ' +
       'From Teams: work on rejections first, upload SPP, aim for 1–2 files a day, super complex jobs were put on hold on 27 Sep, ' +
       'and management said it will remove low performers after 10 Oct.',
+    builtIn: true,
+    workflow: 'models',
+    expectations: {
+      target: { count: 2, per: 'day', unit: 'files', counts: 'submitted' },
+      notes: 'Fix rejections first; upload the SPP with every file. Super complex jobs on hold since 27 Sep.',
+    },
   },
   {
     id: 'skeidar',
@@ -87,6 +103,12 @@ export const COMPANIES: CompanyConfig[] = [
     match: { domains: ['skeidar.no'], names: [], keywords: ['skeidar', 'skediar'] },
     links: [{ label: 'Microsoft Teams', url: 'https://teams.microsoft.com' }],
     notes: 'Each job: 2 source images and a list of fabrics; make every image in every fabric. 5 AED per finished image. Files live in D:\\Files\\Projects\\Skediar\\genrativeAI.',
+    builtIn: true,
+    workflow: 'variations',
+    folder: 'D:\\Files\\Projects\\Skediar\\genrativeAI',
+    expectations: {
+      notes: 'Each job: master photos and a fabric sheet. Every photo in every fabric; leg finishes and other options don\'t need their own images.',
+    },
   },
 ];
 
@@ -230,6 +252,7 @@ export function initialState(now: string): AppState {
     companies: COMPANIES,
     models,
     skeidarJobs: [],
+    accounts: [],
     payments: [
       {
         id: 'pay-wi-2026-09',

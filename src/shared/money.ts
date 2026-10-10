@@ -178,10 +178,27 @@ export function companyEarnings(state: AppState, company: CompanyId, now: Date):
       }
     }
     months.push(...[...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)));
+  } else if (cfg.pay.kind === 'per-item' && (cfg.workflow ?? (company === 'skeidar' ? 'variations' : 'models')) === 'models') {
+    // Per finished model, for clients added by hand that work like Waveink/MetaZtech.
+    const pay = cfg.pay;
+    const byMonth = new Map<string, MonthLine>();
+    for (const m of state.models) {
+      if (m.company !== company) continue;
+      if (isComplete(m.status)) {
+        const mk = localMonth(m.completedAt ?? m.updatedAt);
+        const line = byMonth.get(mk) ?? { month: mk, gross: 0, net: 0, units: 0, due: '' };
+        line.gross += pay.rate;
+        line.net += pay.rate;
+        line.units++;
+        byMonth.set(mk, line);
+      } else if (m.status !== 'on_hold' && m.status !== 'skipped') pipeline += pay.rate;
+    }
+    months.push(...[...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month)));
   } else {
     const pay = cfg.pay;
     const byMonth = new Map<string, MonthLine>();
     for (const job of state.skeidarJobs) {
+      if ((job.company ?? 'skeidar') !== company) continue;
       const { total, done } = jobOutputs(job);
       pipeline += (total - done) * pay.rate;
       if (!done) continue;

@@ -761,6 +761,10 @@ select {
   background: var(--panel);
   color: var(--text);
 }
+.nav-item.add {
+  color: var(--muted);
+  font-weight: 500;
+}
 .nav-item.on {
   background: var(--ink);
   color: var(--on-ink);

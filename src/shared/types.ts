@@ -1,4 +1,7 @@
-export type CompanyId = 'waveink' | 'metaztech' | 'skeidar';
+/** The three clients the app was built around; more can be added by hand. */
+export type BuiltInCompanyId = 'waveink' | 'metaztech' | 'skeidar';
+/** A client ("job"). Built-in ids keep their own screens; any other string is a client added by hand. */
+export type CompanyId = BuiltInCompanyId | (string & {});
 export type Currency = 'INR' | 'AED' | 'USD';
 
 /** One status vocabulary for every company; each company shows its own labels for it. */
@@ -80,6 +83,8 @@ export interface Model {
 
 export interface SkeidarJob {
   id: string;
+  /** Client the job belongs to; missing means Skeidar. */
+  company?: CompanyId;
   name: string;
   receivedAt: string;
   /** Labels of the source images (usually two). */
@@ -92,6 +97,18 @@ export interface SkeidarJob {
   status: 'open' | 'delivered';
   deliveredAt?: string;
   createdAt: string;
+  /** Set when the job was built from a folder: the product named in the client's sheet. */
+  product?: string;
+  /** Path of the sheet the fabrics came from. */
+  sheet?: string;
+  /** Item numbers per fabric (one per leg finish or other option), from the sheet. */
+  itemIds?: Record<string, string[]>;
+  /** Other options in the sheet that don't need their own images, e.g. leg finishes. */
+  options?: string[];
+  /** Master photo file for each entry in `images`, same order. */
+  imageFiles?: string[];
+  /** Finished image found in the output folder for a `${fabricIndex}:${imageIndex}` key. */
+  outputs?: Record<string, string>;
 }
 
 export interface Payment {
@@ -127,8 +144,97 @@ export interface Subscription {
   paymentMethod?: string;
   category: 'work' | 'personal';
   notes?: string;
-  source: 'email' | 'manual' | 'seed';
+  source: 'email' | 'manual' | 'seed' | 'account';
   emailId?: string;
+  /** Software account (Autodesk, Adobe, Chaos…) this plan was read from or belongs to. */
+  accountId?: string;
+  /** How the software is licensed; missing means a normal subscription. */
+  licence?: 'subscription' | 'perpetual' | 'education' | 'free' | 'trial';
+  seats?: number;
+}
+
+export type VendorId = 'autodesk' | 'adobe' | 'chaos' | (string & {});
+
+/** A vendor account the app signs in to (in its own window) to read the plans page. */
+export interface SoftwareAccount {
+  id: string;
+  vendor: VendorId;
+  label: string;
+  email?: string;
+  /** Page that lists the account's plans and renewal dates. */
+  plansUrl: string;
+  lastRead?: string;
+  lastError?: string;
+  createdAt: string;
+}
+
+/** A plan read from a vendor's account page or mail, before it becomes a Subscription. */
+export interface FoundPlan {
+  product: string;
+  plan?: string;
+  amount?: number;
+  currency?: Currency;
+  cycle?: Subscription['cycle'];
+  renews?: string;
+  ends?: string;
+  status?: SubStatus;
+  licence?: Subscription['licence'];
+  /** The text the plan was read from, shown so Rohit can check it. */
+  raw: string;
+}
+
+/** A file in a client's or job's folder. */
+export interface AssetFile {
+  path: string;
+  name: string;
+  /** Path relative to the folder that was listed. */
+  rel: string;
+  kind: 'sheet' | 'image' | 'pdf' | 'model' | 'doc' | 'archive' | 'other';
+  size: number;
+  modified: string;
+}
+
+/** One row of a client's product sheet (e.g. Skeidar's supplier template). */
+export interface SheetVariant {
+  itemId?: string;
+  product: string;
+  /** Row description, e.g. "Tekstil Kiara 851 Beige med sorte ben". */
+  text: string;
+  fabric: string;
+  /** What else varies, e.g. the leg finish. */
+  option?: string;
+}
+
+export interface ParsedSheet {
+  path: string;
+  product?: string;
+  variants: SheetVariant[];
+  /** Unique fabrics in sheet order with every item number and option they come in. */
+  fabrics: { name: string; itemIds: string[]; options: string[] }[];
+  warnings: string[];
+}
+
+/** What the app found in one job folder. */
+export interface JobFolderInfo {
+  folder: string;
+  name: string;
+  files: AssetFile[];
+  /** Photos to make variations of (images outside the output folder). */
+  masters: AssetFile[];
+  /** Finished images (in a subfolder named output, done, final, renders or delivered). */
+  outputs: AssetFile[];
+  sheet?: ParsedSheet;
+}
+
+/** Weekly expectations for a client, used to decide what is urgent. */
+export interface Expectations {
+  /** e.g. 5 models a week, or 2 files a day. */
+  target?: { count: number; per: 'day' | 'week'; unit: string; counts: 'done' | 'submitted' | 'images' };
+  /** Recurring deadlines; weekday 0 = Sunday … 6 = Saturday; time "HH:MM" local. */
+  deadlines?: { id: string; label: string; weekday: number; time?: string }[];
+  /** Days that count as working days when pacing a weekly target (default Monday–Friday). */
+  workdays?: number[];
+  notes?: string;
 }
 
 export type EmailCompany = CompanyId | 'other';
@@ -206,6 +312,17 @@ export interface CompanyConfig {
   match: { domains: string[]; emails?: string[]; names: string[]; keywords: string[] };
   links: { label: string; url: string }[];
   notes: string;
+  /** 'models': a list of models with statuses (Waveink, MetaZtech). 'variations': fabric/variation jobs (Skeidar). */
+  workflow?: 'models' | 'variations';
+  /** When the engagement started (and ended, if it has). */
+  startDate?: string;
+  endDate?: string;
+  expectations?: Expectations;
+  /** Watched folder: each subfolder is a job, other files are the client's assets. */
+  folder?: string;
+  archived?: boolean;
+  /** One of the three clients the app ships with; can't be removed. */
+  builtIn?: boolean;
 }
 
 export interface PortalMapping {
@@ -253,6 +370,7 @@ export interface AppState {
   suggestions: Suggestion[];
   /** Email ids already turned into a payment, subscription or dismissed suggestion. */
   handledEmails: string[];
+  accounts: SoftwareAccount[];
   settings: Settings;
 }
 
@@ -263,7 +381,8 @@ export type Collection =
   | 'subscriptions'
   | 'portfolioTasks'
   | 'portfolioLog'
-  | 'companies';
+  | 'companies'
+  | 'accounts';
 
 export interface PortalTable {
   source: string;

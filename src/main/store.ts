@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { AppState } from '../shared/types';
 import { initialState, SEED_VERSION } from './seed/initial';
-import { repairState } from '../shared/ops';
+import { repairState, upgradeState } from '../shared/ops';
 
 const FILE = 'freelance-hub.json';
 const KEEP_BACKUPS = 14;
@@ -57,7 +57,7 @@ function migrate(saved: AppState, seed: AppState): AppState {
     for (const m of seed.models) if (!have.has(m.id)) out.models.push(m);
     out.version = SEED_VERSION;
   }
-  return repairState(out);
+  return repairState(upgradeState(out, seed));
 }
 
 export function getState(): AppState {

@@ -1,11 +1,18 @@
-import type { CompanyId, Complexity, Model, ModelStatus, StatusEvent } from './types';
+import type { BuiltInCompanyId, CompanyId, Complexity, Model, ModelStatus, StatusEvent } from './types';
 
 /** Statuses each company uses, in workflow order. */
-export const COMPANY_STATUSES: Record<CompanyId, ModelStatus[]> = {
+export const COMPANY_STATUSES: Record<BuiltInCompanyId, ModelStatus[]> = {
   waveink: ['todo', 'in_progress', 'review', 'revision', 'done', 'live', 'skipped'],
   metaztech: ['todo', 'in_progress', 'review', 'revision', 'done', 'on_hold'],
   skeidar: ['todo', 'in_progress', 'done'],
 };
+
+/** Statuses for clients added by hand. */
+const DEFAULT_STATUSES: ModelStatus[] = ['todo', 'in_progress', 'review', 'revision', 'done', 'on_hold'];
+
+export function statusesFor(company: CompanyId): ModelStatus[] {
+  return (COMPANY_STATUSES as Record<string, ModelStatus[] | undefined>)[company] ?? DEFAULT_STATUSES;
+}
 
 const LABELS: Record<ModelStatus, string> = {
   todo: 'To do',
