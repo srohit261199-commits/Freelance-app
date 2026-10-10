@@ -192,7 +192,7 @@ export function App() {
             {route.view === 'company' && route.company === 'waveink' && <Waveink state={state} openId={route.modelId} now={now} />}
             {route.view === 'company' && route.company === 'metaztech' && <MetaZtech state={state} openId={route.modelId} now={now} />}
             {route.view === 'skeidar' && <Skeidar state={state} now={now} openId={route.jobId} />}
-            {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} />}
+            {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} emailId={route.emailId} />}
             {route.view === 'earnings' && <Earnings state={state} now={now} />}
             {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
             {route.view === 'portfolio' && <Portfolio state={state} now={now} />}

@@ -1,0 +1,730 @@
+/* Mail scan: summary banner, cards to review, what the scan already matched, watched senders, client mail and meetings. Scoped under .mail-page. */
+
+/* ---------- header ---------- */
+.mail-page .mail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mail-page .mail-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-right: auto;
+  min-width: 0;
+}
+.mail-page .mail-title p {
+  font-size: 14px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.mail-page .mail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mail-page .mail-scan .icon {
+  transition: transform 0.15s ease;
+}
+.mail-page .mail-scan.busy .icon {
+  animation: mail-spin 1s linear infinite;
+}
+@keyframes mail-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.mail-page .mail-more {
+  width: 44px;
+  height: 44px;
+}
+
+/* ---------- summary banner ---------- */
+.mail-page .mail-banner {
+  border-radius: 26px;
+  padding: 22px 26px;
+  background: var(--lav);
+  display: flex;
+  align-items: center;
+  gap: 16px 40px;
+  flex-wrap: wrap;
+}
+.mail-page .mail-banner-ic {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: var(--panel);
+  color: var(--st-rev);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.mail-page .mail-stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mail-page .mail-stat b {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.mail-page .mail-stat span {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lav-text);
+}
+.mail-page .mail-next {
+  margin-left: auto;
+  width: 320px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mail-page .mail-next:has(> button) {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.mail-page .mail-next-txt {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  flex: 1;
+}
+.mail-page .mail-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.mail-page .mail-bar > div {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--st-rev);
+  transition: width 0.4s ease;
+}
+.mail-page .mail-bar.busy > div {
+  width: 35%;
+  animation: mail-slide 1.1s ease-in-out infinite;
+}
+@keyframes mail-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+/* ---------- layout ---------- */
+.mail-page .mail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 480px;
+  gap: 20px;
+  align-items: start;
+}
+.mail-page .mail-main,
+.mail-page .mail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.mail-page .mail-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+.mail-page .mail-panel-head h2,
+.mail-page .mail-review > h2,
+.mail-page .mail-side h2 {
+  font-size: 18px;
+}
+.mail-page .mail-head-note {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ---------- to review ---------- */
+.mail-page .mail-review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.mail-page .mail-card {
+  background: var(--panel);
+  border-radius: 24px;
+  padding: 20px 22px;
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+.mail-page .mail-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.mail-page .mail-card-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mail-page .mail-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mail-page .mail-kind {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.mail-page .mail-card-date {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mail-page .mail-card-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.mail-page .mail-card-from {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 100%;
+  align-self: flex-start;
+}
+.mail-page .mail-card-from > .icon {
+  flex: none;
+}
+.mail-page .mail-card-ext {
+  display: inline-flex;
+  flex: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.mail-page .mail-card-from:hover .mail-card-ext,
+.mail-page .mail-card-from:focus-visible .mail-card-ext {
+  opacity: 1;
+}
+.mail-page .mail-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mail-page .mail-cchip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--fill);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.mail-page .mail-cchip.st-ok {
+  background: var(--st-ok-bg);
+  color: var(--st-ok);
+}
+.mail-page .mail-cchip.st-bad {
+  background: var(--st-bad-bg);
+  color: var(--st-bad);
+}
+.mail-page button.mail-edit-btn {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-2);
+}
+.mail-page button.mail-edit-btn:hover {
+  background: var(--fill);
+}
+.mail-page .mail-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 14px 16px;
+  margin-top: 4px;
+  border-radius: 18px;
+  background: var(--hover);
+}
+.mail-page .mail-edit .field {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.mail-page .mail-edit input,
+.mail-page .mail-edit select {
+  background: var(--panel);
+  border-color: var(--line);
+  width: 100%;
+}
+.mail-page .mail-card-acts {
+  width: 180px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mail-page .mail-card-acts button {
+  height: 40px;
+  font-size: 13px;
+  padding: 0 14px;
+}
+.mail-page .mail-card.done .mail-card-acts {
+  width: auto;
+  min-width: 180px;
+}
+.mail-page .mail-done {
+  height: 40px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--st-ok-bg);
+  color: var(--st-ok);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  animation: mail-pop 0.2s ease;
+}
+@keyframes mail-pop {
+  from {
+    transform: scale(0.96);
+    opacity: 0.4;
+  }
+}
+.mail-page .mail-caught {
+  background: var(--panel);
+  border-radius: 24px;
+  padding: 20px 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.mail-page .mail-caught b {
+  font-size: 16px;
+  font-weight: 800;
+}
+.mail-page .mail-caught p {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ---------- client mail ---------- */
+.mail-page .mail-unread-only {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.mail-page .mail-filters .chip {
+  height: 34px;
+}
+.mail-page .mail-filters .chip.on .n {
+  opacity: 0.8;
+}
+.mail-page .mail-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0 -10px;
+}
+.mail-page .mail-list li + li {
+  border-top: 1px solid var(--line-2);
+}
+.mail-page .mail-list li:has(+ li > .mail-row:hover),
+.mail-page .mail-list li:hover + li {
+  border-color: transparent;
+}
+.mail-page .mail-row {
+  width: 100%;
+  height: auto;
+  padding: 12px 10px;
+  border-radius: 16px;
+  background: none;
+  box-shadow: none;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  text-align: left;
+  white-space: normal;
+  font-weight: 400;
+}
+.mail-page .mail-row:hover {
+  background: var(--hover);
+}
+.mail-page .mail-row-ic.plain {
+  background: var(--fill);
+  color: var(--text-2);
+}
+.mail-page .mail-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mail-page .mail-row-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 24px;
+}
+.mail-page .mail-row-top b {
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.mail-page .mail-row-top .tag {
+  height: 22px;
+  font-size: 11px;
+  font-weight: 700;
+  align-self: center;
+}
+.mail-page .mail-row-time {
+  margin-left: auto;
+  padding-left: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.mail-page .mail-row-line {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.mail-page .mail-row-snip {
+  font-size: 13px;
+  color: var(--muted);
+}
+.mail-page .mail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--link);
+  flex: none;
+}
+.mail-page .unread .mail-row-top b {
+  font-weight: 800;
+}
+.mail-page .unread .mail-row-line {
+  font-weight: 700;
+  color: var(--text);
+}
+.mail-page .mail-list li.flash .mail-row {
+  animation: mail-flash 1.8s ease;
+}
+@keyframes mail-flash {
+  0%,
+  45% {
+    box-shadow: inset 0 0 0 2px var(--st-rev);
+    background: var(--lav);
+  }
+}
+.mail-page .mail-more-list {
+  align-self: center;
+}
+
+/* ---------- already matched ---------- */
+.mail-page .mail-matched,
+.mail-page .mail-senders,
+.mail-page .mail-meet {
+  gap: 12px;
+}
+.mail-page .mail-matched ul {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mail-page .mail-matched li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  min-width: 0;
+}
+.mail-page .mail-m-date {
+  width: 52px;
+  flex: none;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mail-page .mail-m-src {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+}
+.mail-page .mail-m-arrow {
+  display: inline-flex;
+  color: var(--faint);
+  flex: none;
+}
+.mail-page button.mail-m-to {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: none;
+  max-width: 190px;
+  flex: none;
+  display: inline-flex;
+}
+.mail-page button.mail-m-to:hover {
+  filter: brightness(0.96);
+}
+.mail-page .mail-m-all {
+  align-self: flex-start;
+}
+
+/* ---------- senders ---------- */
+.mail-page .mail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.mail-page .mail-chip {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--fill);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mail-page .mail-chip.c-soft {
+  background: var(--c-tint);
+  color: var(--c-deep);
+}
+.mail-page button.mail-people {
+  box-shadow: none;
+}
+.mail-page button.mail-people:hover {
+  filter: brightness(0.96);
+}
+.mail-page button.mail-add {
+  background: transparent;
+  box-shadow: none;
+  border: 1.5px dashed color-mix(in srgb, var(--faint) 60%, transparent);
+  color: var(--text);
+}
+.mail-page button.mail-add:hover {
+  background: var(--fill);
+}
+.mail-page .mail-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- meetings ---------- */
+.mail-page .mail-meets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mail-page .mail-meets li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.mail-page .mail-date {
+  width: 48px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  flex: none;
+}
+.mail-page .mail-date.plain {
+  background: var(--fill);
+  color: var(--text-2);
+}
+.mail-page .mail-date small {
+  font-size: 11px;
+  font-weight: 700;
+}
+.mail-page .mail-date b {
+  font-size: 17px;
+  font-weight: 800;
+}
+.mail-page .mail-meet-t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.mail-page .mail-meet-t b {
+  font-size: 14px;
+  font-weight: 700;
+}
+.mail-page .mail-meet-t > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.mail-page .mail-meets .mini {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 700;
+  flex: none;
+}
+.mail-page .mail-meets .mini.mail-ib {
+  width: 32px;
+  padding: 0;
+}
+.mail-page .mail-meets.past .mail-meet-t b {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.mail-page .mail-sub {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* ---------- narrower windows ---------- */
+@media (max-width: 1500px) {
+  .mail-page .mail-grid {
+    grid-template-columns: minmax(0, 1fr) 400px;
+  }
+  .mail-page .mail-matched li {
+    gap: 10px;
+  }
+  .mail-page button.mail-m-to {
+    max-width: 150px;
+  }
+}
+@media (max-width: 1100px) {
+  .mail-page .mail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .mail-page .mail-next {
+    margin-left: 0;
+    flex: 1 1 100%;
+    width: auto;
+  }
+}
+@media (max-width: 700px) {
+  .mail-page .mail-banner {
+    padding: 18px;
+    gap: 14px 20px;
+    align-items: flex-start;
+  }
+  .mail-page .mail-banner-ic {
+    display: none;
+  }
+  .mail-page .mail-stat {
+    flex: 1 1 0;
+  }
+  .mail-page .mail-stat b {
+    font-size: 24px;
+  }
+  .mail-page .mail-stat span {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+  .mail-page .mail-card,
+  .mail-page .mail-caught {
+    padding: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .mail-page .mail-tile {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+  }
+  .mail-page .mail-card-body {
+    flex: 1 1 calc(100% - 54px);
+  }
+  .mail-page .mail-card-title {
+    font-size: 17px;
+  }
+  .mail-page .mail-card-acts,
+  .mail-page .mail-card.done .mail-card-acts {
+    width: 100%;
+    flex-direction: row;
+  }
+  .mail-page .mail-card-acts > * {
+    flex: 1;
+  }
+  .mail-page .mail-unread-only {
+    margin-left: 0;
+  }
+  .mail-page .mail-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -22px;
+    padding: 0 22px 2px;
+    scrollbar-width: none;
+  }
+  .mail-page .mail-filters .chip {
+    flex: none;
+  }
+  .mail-page .mail-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .mail-page .mail-row-ic {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+  .mail-page .mail-row-top {
+    flex-wrap: wrap;
+  }
+  .mail-page .mail-m-date {
+    width: 44px;
+  }
+  .mail-page button.mail-m-to {
+    max-width: 130px;
+  }
+}

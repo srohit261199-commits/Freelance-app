@@ -1,4 +1,4 @@
-/* Subscriptions. Every rule sits under .subs-page: this file loads before styles.css. */
+/* Subscriptions */
 .subs-page {
   min-height: 100%;
 }

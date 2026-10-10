@@ -122,7 +122,7 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
         <div className="kpi subs-kpi month">
           <div className="kpi-top">
             Per month
-            {work > 0 && <span className="subs-kpi-note">{work === monthly ? 'all work tools' : `${formatMoney(work, base)} for work`}</span>}
+            {work > 0 && work < monthly && <span className="subs-kpi-note">{formatMoney(work, base)} for work</span>}
           </div>
           <div className="kpi-num">{formatMoney(monthly, base)}</div>
         </div>
@@ -337,19 +337,26 @@ function RowMenu({ sub, onEdit }: { sub: Subscription; onEdit(): void }) {
   useEffect(() => {
     if (!pos) return;
     const out = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setPos(null);
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopPropagation();
-      close(true);
+    const keys = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        close(true);
+      } else if (e.key === 'Tab') setPos(null);
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const list = [...(ref.current?.querySelectorAll<HTMLButtonElement>('.menu button') ?? [])];
+        const i = list.indexOf(document.activeElement as HTMLButtonElement);
+        list[(i + (e.key === 'ArrowDown' ? 1 : -1) + list.length) % list.length]?.focus();
+      }
     };
     const away = () => setPos(null);
     document.addEventListener('mousedown', out);
-    document.addEventListener('keydown', esc, true);
+    document.addEventListener('keydown', keys, true);
     addEventListener('resize', away);
     addEventListener('scroll', away, true);
     return () => {
       document.removeEventListener('mousedown', out);
-      document.removeEventListener('keydown', esc, true);
+      document.removeEventListener('keydown', keys, true);
       removeEventListener('resize', away);
       removeEventListener('scroll', away, true);
     };

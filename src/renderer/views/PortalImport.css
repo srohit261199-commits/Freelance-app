@@ -1,0 +1,148 @@
+/* MetaZtech import dialog: pull, paste or a CSV file, column mapping, preview. Scoped under .pi. */
+.pi {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.pi .pi-intro {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.pi .pi-page {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.pi .field > span:first-child {
+  line-height: 1.4;
+}
+.pi textarea {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 13px;
+}
+
+/* the file being imported */
+.pi .pi-file {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px 12px 12px;
+  border-radius: 20px;
+  background: var(--hover);
+  min-width: 0;
+}
+.pi .pi-file-ic {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--mz-tint);
+  color: var(--mz-deep);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.pi .pi-file b {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+}
+.pi .pi-file small {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* section heads */
+.pi .pi-sec {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.pi .pi-sec h3 {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+/* mapping selects */
+.pi .pi-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px 14px;
+}
+.pi .pi-map select {
+  width: 100%;
+  height: 40px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pi .pi-map select.set {
+  color: var(--text);
+}
+
+/* preview */
+.pi .pi-preview {
+  max-height: 320px;
+  border-radius: 18px;
+  box-shadow: 0 0 0 1px var(--line);
+  padding: 0 6px 6px;
+}
+.pi .pi-preview th {
+  padding-top: 12px;
+}
+.pi .pi-preview td {
+  padding: 10px;
+  font-size: 13px;
+}
+.pi .pi-preview .pi-code {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.pi .pi-preview .pi-name {
+  font-weight: 600;
+  min-width: 180px;
+}
+.pi .nowrap {
+  white-space: nowrap;
+}
+
+/* status words */
+.pi .pi-words {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.pi .pi-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.pi .pi-word .icon {
+  color: var(--faint);
+}
+.pi .pi-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.pi .pi-note.warn-text {
+  color: var(--st-prog);
+}
+
+@media (max-width: 760px) {
+  .pi .pi-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .pi .pi-preview {
+    max-height: 280px;
+  }
+}

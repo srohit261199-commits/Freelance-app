@@ -107,6 +107,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   });
   const late = companies.reduce((s, c) => s + toBase(c.late, c.e.currency), 0);
   const lateMonths = companies.reduce((s, c) => s + c.lateMonths, 0);
+  // Piece work done this month is already in "earned"; only a retainer month still running is on top of it.
+  const accruing = earnings.reduce((s, e) => s + (cfg(e.company).pay.kind === 'retainer' ? toBase(e.thisMonth, e.currency) : 0), 0);
 
   const bars = monthsBetween(firstMonth, nowMonth).map(mk => {
     const segs = STACK.flatMap(cid => {
@@ -144,7 +146,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
         amount: left,
         currency: e.currency,
         status: late ? 'late' : l.state === 'part' ? 'part' : 'pending',
-        source: e.company === 'waveink' ? { icon: 'repeat', text: 'Retainer rule' } : e.company === 'metaztech' ? { icon: 'cubeFocus', text: 'Approved models' } : { icon: 'brush', text: 'Job tracker' },
+        source: e.company === 'waveink' ? { icon: 'repeat', text: 'Retainer rule' } : e.company === 'metaztech' ? { icon: 'hourglass', text: 'Waiting for payment advice' } : { icon: 'brush', text: 'Job tracker' },
         record: { date: localDate(new Date()), company: e.company, currency: e.currency, period: l.month, amount: Math.round(left * 100) / 100 },
       });
     }
@@ -212,7 +214,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
 
       <section className="kpis pay-tiles" aria-label="Totals">
         <Tile tone="ok" icon="arrowDownLeft" label="Received" value={formatMoney(receivedFY, base)} sub={`since 1 April · ${plural(fyPayments.length, 'payment')} recorded`} />
-        <Tile tone="info" icon="hourglass" label="Earned, not paid yet" value={formatMoney(sum('outstanding'), base)} sub={`+ ${formatMoney(sum('thisMonth'), base)} earning this month`} />
+        <Tile tone="info" icon="hourglass" label="Earned, not paid yet" value={formatMoney(sum('outstanding'), base)} sub={accruing > 0.5 ? `+ ${formatMoney(accruing, base)} accruing this month` : 'finished months and approved work'} />
         <Tile
           tone={late > 0.5 ? 'bad' : 'neutral'}
           icon="warning"

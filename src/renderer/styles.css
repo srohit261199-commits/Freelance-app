@@ -971,6 +971,14 @@ main.content {
   gap: 4px;
   min-width: 0;
 }
+.kpi.c-fill {
+  background: var(--c);
+  color: var(--on-pastel);
+}
+.kpi.c-soft {
+  background: var(--c-tint);
+  color: var(--c-deep);
+}
 .kpi.c-fill .muted,
 .kpi.c-fill .kpi-top {
   color: var(--on-pastel-2);

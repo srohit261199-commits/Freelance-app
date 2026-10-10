@@ -1,32 +1,62 @@
-.pf-page .page-head > .pf-title {
-  flex-direction: row;
+/* Portfolio */
+.pf-page .pf-head {
+  display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
-.pf-page .pf-title > div {
+.pf-page .pf-title {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 280px;
+}
+.pf-page .pf-title h1 {
+  line-height: 1;
+}
+.pf-page .pf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
   min-width: 0;
 }
-.pf-page .pf-mark {
-  background: var(--lav);
-  color: var(--st-rev);
-}
-.pf-page .pf-link {
+.pf-page .pf-chip {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--panel);
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 14px;
-  color: var(--link);
+  gap: 5px;
+  white-space: nowrap;
   min-width: 0;
+  max-width: 100%;
 }
-.pf-page .pf-link:hover {
-  color: var(--text);
+.pf-page .pf-chip.c-soft {
+  background: var(--c-tint);
+  color: var(--c-deep);
+  font-weight: 700;
+}
+.pf-page button.pf-chip:hover {
+  box-shadow: inset 0 0 0 1.5px currentColor;
+}
+.pf-page .pf-chip .icon {
+  flex: none;
+}
+.pf-page .pf-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
+/* stat tiles */
 .pf-page .pf-kpi {
-  gap: 10px;
+  gap: 8px;
 }
 .pf-page .pf-kpi .kpi-top {
   font-size: 14px;
@@ -38,22 +68,32 @@
   text-overflow: ellipsis;
 }
 .pf-page .pf-kpi-sub {
-  color: var(--text-2);
+  font-size: 13px;
   font-weight: 500;
+  color: var(--text-2);
+  min-width: 0;
 }
-.pf-page .pf-kpi.c-fill .pf-kpi-sub {
+.pf-page .pf-kpi.prog {
+  background: var(--c);
+}
+.pf-page .pf-kpi.prog .kpi-top,
+.pf-page .pf-kpi.prog .pf-kpi-sub {
   color: var(--on-pastel-2);
 }
+.pf-page .pf-kpi.prog .kpi-num {
+  color: var(--on-pastel);
+}
 .pf-page .pf-kpi .progress {
-  margin: 2px 0;
+  margin-top: auto;
 }
 .pf-page .pf-kpi.todo {
-  background: var(--wi-tint);
+  background: var(--c-tint);
 }
 .pf-page .pf-kpi.logged {
   background: var(--lav);
 }
 
+/* task groups */
 .pf-page .pf-main {
   display: flex;
   flex-direction: column;
@@ -70,14 +110,22 @@
 .pf-page .pf-add-group {
   flex: 0 1 180px;
 }
+.pf-page .pf-add-btn {
+  padding: 0 18px;
+}
 .pf-page .panel-head .chip {
   flex: none;
 }
-.pf-page .pf-group .panel-head h2 {
-  font-size: 18px;
-}
 .pf-page .pf-group-n {
-  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pf-page .pf-group-n .progress {
+  width: 90px;
 }
 .pf-page .pf-tasks {
   display: flex;
@@ -101,7 +149,6 @@
   position: relative;
   width: 24px;
   height: 24px;
-  margin-top: 1px;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -123,6 +170,7 @@
     box-shadow 0.15s ease;
 }
 .pf-page .pf-chk input:hover {
+  background: var(--panel);
   box-shadow: inset 0 0 0 2px var(--muted);
 }
 .pf-page .pf-chk input:checked {
@@ -149,6 +197,7 @@
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+  padding-top: 1px;
   overflow-wrap: anywhere;
 }
 .pf-page .pf-task-t .t {
@@ -161,7 +210,7 @@
   color: var(--muted);
 }
 .pf-page .pf-task.done .pf-task-t {
-  opacity: 0.55;
+  opacity: 0.45;
 }
 .pf-page .pf-task.done .t {
   text-decoration: line-through;
@@ -182,11 +231,19 @@
   color: var(--st-bad);
 }
 
+/* work log */
 .pf-page .pf-note {
+  font-size: 13px;
   line-height: 1.5;
+  color: var(--muted);
 }
 .pf-page .pf-log-btn {
   align-self: flex-start;
+  padding: 0 18px;
+}
+.pf-page .pf-none {
+  font-size: 13px;
+  color: var(--muted);
 }
 .pf-page .pf-log {
   display: flex;
@@ -216,7 +273,7 @@
   margin-top: 4px;
   border-radius: 50%;
   background: var(--panel);
-  box-shadow: inset 0 0 0 3px var(--st-rev);
+  box-shadow: inset 0 0 0 3px var(--c-deep);
 }
 .pf-page .pf-log-t {
   display: flex;
@@ -233,20 +290,56 @@
 }
 
 @media (max-width: 760px) {
-  .pf-page .pf-mark {
+  .pf-page .pf-head {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 12px 14px;
+  }
+  .pf-page .pf-title {
+    display: contents;
+  }
+  .pf-page .pf-chips,
+  .pf-page .pf-actions {
+    grid-column: 1 / -1;
+  }
+  .pf-page .pf-head .client-tile {
     width: 52px;
     height: 52px;
     border-radius: 18px;
   }
-  .pf-page .page-head .actions,
-  .pf-page .page-head .actions button {
+  .pf-page .pf-actions,
+  .pf-page .pf-actions button {
     width: 100%;
   }
+  .pf-page .pf-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .pf-page .pf-kpi {
+    padding: 16px;
+    border-radius: 20px;
+    gap: 6px;
+  }
+  .pf-page .pf-kpi.prog {
+    grid-column: 1 / -1;
+  }
+  .pf-page .pf-kpi .kpi-top {
+    font-size: 13px;
+  }
   .pf-page .pf-kpi .kpi-num {
-    font-size: 26px;
+    font-size: 24px;
+  }
+  .pf-page .pf-kpi-sub {
+    font-size: 12px;
   }
   .pf-page .pf-add-group {
     flex: 1 1 120px;
+  }
+  .pf-page .pf-group .panel-head {
+    flex-wrap: wrap;
+  }
+  .pf-page .pf-group-n .progress {
+    width: 56px;
   }
   .pf-page .pf-tasks {
     margin: 0 -6px;

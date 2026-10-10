@@ -13,9 +13,10 @@ const siteLabel = (url: string) => {
     return url;
   }
 };
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 export function Portfolio({ state, now }: { state: AppState; now: Date }) {
-  const { toast } = useApp();
+  const { toast, go } = useApp();
   const [title, setTitle] = useState('');
   const [group, setGroup] = useState('Content');
   const [log, setLog] = useState('');
@@ -23,6 +24,7 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
   const tasks = state.portfolioTasks;
   const done = tasks.filter(t => t.done).length;
   const groups = [...new Set(tasks.map(t => t.group))];
+  const openGroups = groups.filter(g => tasks.some(t => t.group === g && !t.done)).length;
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0;
   const url = state.settings.portfolioUrl;
   const entries = [...state.portfolioLog].reverse();
@@ -42,25 +44,33 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
   const toggle = (t: PortfolioTask) => hub.upsert('portfolioTasks', { ...t, done: !t.done, doneAt: !t.done ? new Date().toISOString() : undefined });
 
   return (
-    <div className="page pf-page">
-      <header className="page-head">
+    <div className="page pf-page c-portfolio">
+      <header className="pf-head">
+        <span className="client-tile c-fill" aria-hidden="true">
+          <Icon name="globe" size={30} weight="fill" />
+        </span>
         <div className="pf-title">
-          <span className="client-tile pf-mark" aria-hidden="true">
-            <Icon name="globe" size={30} weight="fill" />
-          </span>
-          <div>
-            <h1>Portfolio</h1>
+          <h1>Portfolio</h1>
+          <div className="pf-chips">
             {url ? (
-              <button type="button" className="link-btn pf-link" onClick={() => hub.openUrl(url)} title={url}>
-                <Icon name="link" size={15} />
+              <button type="button" className="pf-chip c-soft pf-link" onClick={() => hub.openUrl(url)} title={`Open ${url}`}>
+                <Icon name="link" size={14} />
                 <span className="ellipsis">{siteLabel(url)}</span>
               </button>
             ) : (
-              <p>Add the site address in Settings &amp; import.</p>
+              <button type="button" className="pf-chip pf-link" onClick={() => go({ view: 'settings' })}>
+                <Icon name="link" size={14} /> Add the site address in Settings &amp; import
+              </button>
+            )}
+            <span className="pf-chip">Built in a Claude chat as an artifact</span>
+            {tasks.length > 0 && (
+              <span className="pf-chip">
+                {plural(tasks.length, 'task')} in {plural(groups.length, 'group')}
+              </span>
             )}
           </div>
         </div>
-        <div className="actions">
+        <div className="pf-actions">
           <button type="button" className="primary lg" disabled={!url} onClick={() => hub.openUrl(url)}>
             <Icon name="external" size={18} /> Open the site
           </button>
@@ -68,25 +78,25 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
       </header>
 
       <section className="kpis three pf-kpis" aria-label="Progress">
-        <div className="kpi c-money c-fill pf-kpi">
+        <div className="kpi c-fill pf-kpi prog">
           <div className="kpi-top">Progress</div>
           <div className="kpi-num">{pct}%</div>
-          <Progress value={done} total={tasks.length} />
-          <div className="small pf-kpi-sub">
-            {done} of {tasks.length} done · built in a Claude chat as an artifact
+          <div className="pf-kpi-sub">
+            {done} of {plural(tasks.length, 'task')} done
           </div>
+          <Progress value={done} total={tasks.length} />
         </div>
         <div className="kpi pf-kpi todo">
           <div className="kpi-top">Still to do</div>
           <div className="kpi-num">{tasks.length - done}</div>
-          <div className="small pf-kpi-sub">
-            across {groups.filter(g => tasks.some(t => t.group === g && !t.done)).length} of {groups.length} groups
-          </div>
+          <div className="pf-kpi-sub">{groups.length ? `across ${openGroups} of ${plural(groups.length, 'group')}` : 'Nothing listed yet'}</div>
         </div>
         <div className="kpi pf-kpi logged">
           <div className="kpi-top">Last update</div>
           <div className="kpi-num">{last ? relTime(last.date, now) : 'None yet'}</div>
-          <div className="small pf-kpi-sub ellipsis">{last ? last.text : 'Log what changed after each Claude session.'}</div>
+          <div className="pf-kpi-sub ellipsis" title={last?.text}>
+            {last ? last.text : 'Log what changed after each Claude session.'}
+          </div>
         </div>
       </section>
 
@@ -116,13 +126,16 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
                   <option key={g} value={g} />
                 ))}
               </datalist>
-              <button type="button" className="primary" onClick={add}>
+              <button type="button" className="primary pf-add-btn" onClick={add}>
                 <Icon name="plus" size={16} /> Add
               </button>
             </div>
           </section>
 
           {!tasks.length && <Empty title="No portfolio work yet">Add what the site still needs above.</Empty>}
+          {tasks.length > 0 && done === tasks.length && !showDone && (
+            <Empty title="Everything on the list is done">Add the next thing above, or show the finished items.</Empty>
+          )}
           {groups.map(g => {
             const all = tasks.filter(t => t.group === g);
             const list = all.filter(t => showDone || !t.done);
@@ -132,9 +145,12 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
               <section key={g} className="panel pf-group" aria-label={g}>
                 <div className="panel-head">
                   <h2>{g}</h2>
-                  <span className={`tag ${left ? '' : 'ok'}`}>{left ? `${left} to do` : 'All done'}</span>
-                  <span className="pf-group-n end muted small">
-                    {all.length - left}/{all.length}
+                  <span className={`pill ${left ? 'st-neutral' : 'st-ok'}`}>{left ? `${left} to do` : 'All done'}</span>
+                  <span className="pf-group-n end">
+                    <span className="tabular">
+                      {all.length - left}/{all.length}
+                    </span>
+                    <Progress value={all.length - left} total={all.length} />
                   </span>
                 </div>
                 <ul className="pf-tasks">
@@ -165,13 +181,14 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
         </div>
 
         <aside className="side-col">
-          <section className="panel" aria-labelledby="pf-log-h">
-            <h2 id="pf-log-h">Update log</h2>
-            <p className="muted small pf-note">
-              Claude chats can’t be read by another app, so jot down what changed after each session (or paste Claude’s summary). It keeps a dated history of the site.
-            </p>
+          <section className="panel pf-logp" aria-labelledby="pf-log-h">
+            <div className="panel-head">
+              <h2 id="pf-log-h">Work log</h2>
+              {entries.length > 0 && <span className="pill st-neutral end">{entries.length === 1 ? '1 entry' : `${entries.length} entries`}</span>}
+            </div>
+            <p className="pf-note">Claude chats can’t be read by another app, so jot down what changed after each session (or paste Claude’s summary). It keeps a dated history of the site.</p>
             <Field label="What changed today?">
-              <textarea rows={3} value={log} onChange={e => setLog(e.target.value)} />
+              <textarea rows={3} value={log} onChange={e => setLog(e.target.value)} placeholder="e.g. Added the Skeidar Room Sets page" />
             </Field>
             <button type="button" className="primary pf-log-btn" onClick={addLog}>
               <Icon name="plus" size={16} /> Add to log
@@ -190,7 +207,7 @@ export function Portfolio({ state, now }: { state: AppState; now: Date }) {
                 ))}
               </ul>
             ) : (
-              <p className="muted small">No entries yet.</p>
+              <p className="pf-none">No entries yet.</p>
             )}
           </section>
         </aside>

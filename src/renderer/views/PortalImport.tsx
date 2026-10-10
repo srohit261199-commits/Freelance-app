@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppState, PortalField, PortalMapping, PortalTable } from '../../shared/types';
 import type { PortalRow } from '../../shared/ops';
-import { COMPLEXITY_LABELS, mapComplexity, mapPortalStatus, statusLabel } from '../../shared/status';
+import { COMPLEXITY_LABELS, mapComplexity, mapPortalStatus } from '../../shared/status';
 import { hub } from '../hub';
-import { Field, Modal, StatusPill, fmtDate, useApp } from '../ui';
+import { Field, Icon, Modal, StatusPill, fmtDate, useApp } from '../ui';
+import './PortalImport.css';
 
 const ID = /(^#$)|\b(id|code|no|number|ref)\b/i;
 const WHEN = /date|\b(on|at|time)\b/i;
 
 /** Header guesses per field, best first; a column matching `skip` is never guessed for that field. */
-const FIELDS: { key: PortalField; label: string; guess: RegExp[]; skip?: RegExp }[] = [
+export const FIELDS: { key: PortalField; label: string; guess: RegExp[]; skip?: RegExp }[] = [
   { key: 'id', label: 'Job / ID', guess: [ID, /^(job|ticket|sku)\b|#/i], skip: /serial|^(s|sr|sl)\.?\s*no\b|name|title/i },
   { key: 'name', label: 'Model name', guess: [/name|title/i, /model|product|item|asset/i], skip: new RegExp(`${ID.source}|project|client|customer|brand`, 'i') },
   { key: 'status', label: 'Status', guess: [/status|stage|state/i, /progress|approval/i], skip: WHEN },
@@ -20,7 +21,7 @@ const FIELDS: { key: PortalField; label: string; guess: RegExp[]; skip?: RegExp 
   { key: 'project', label: 'Project / client', guess: [/project|client|brand|batch/i] },
 ];
 
-function signature(t: PortalTable): string {
+export function signature(t: PortalTable): string {
   return t.headers.map(h => h.toLowerCase()).join('|');
 }
 
@@ -39,27 +40,44 @@ function guessFields(t: PortalTable, saved?: PortalMapping): Partial<Record<Port
   return out;
 }
 
-function parsePaste(text: string): PortalTable | null {
-  const lines = text.replace(/\r/g, '').split('\n').filter(l => l.trim());
-  if (lines.length < 2) return null;
-  const sep = lines[0].includes('\t') ? '\t' : lines[0].includes(';') && !lines[0].includes(',') ? ';' : ',';
-  const split = (l: string) => {
-    if (sep !== ',') return l.split(sep).map(c => c.trim());
-    const out: string[] = [];
+/** Reads a pasted or saved table. Tabs split plainly; commas and semicolons follow CSV quoting, so a quoted cell may hold the separator, "" or a line break. */
+export function parsePaste(text: string): PortalTable | null {
+  const clean = text.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+  const first = clean.split('\n').find(l => l.trim()) ?? '';
+  const sep = first.includes('\t') ? '\t' : first.includes(';') && !first.includes(',') ? ';' : ',';
+  const all: string[][] = [];
+  if (sep === '\t') for (const l of clean.split('\n')) all.push(l.split('\t').map(c => c.trim()));
+  else {
+    let row: string[] = [];
     let cur = '';
     let q = false;
-    for (const ch of l) {
-      if (ch === '"') q = !q;
-      else if (ch === ',' && !q) {
-        out.push(cur.trim());
+    for (let i = 0; i < clean.length; i++) {
+      const ch = clean[i];
+      if (q) {
+        if (ch !== '"') cur += ch;
+        else if (clean[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else q = false;
+      } else if (ch === '"' && !cur.trim()) {
+        q = true;
+        cur = '';
+      } else if (ch === sep) {
+        row.push(cur.trim());
+        cur = '';
+      } else if (ch === '\n') {
+        row.push(cur.trim());
+        all.push(row);
+        row = [];
         cur = '';
       } else cur += ch;
     }
-    out.push(cur.trim());
-    return out;
-  };
-  const headers = split(lines[0]);
-  const rows = lines.slice(1).map(split);
+    row.push(cur.trim());
+    all.push(row);
+  }
+  const lines = all.filter(r => r.some(Boolean));
+  if (lines.length < 2) return null;
+  const [headers, ...rows] = lines;
   return { source: 'Pasted table', headers, rows, links: rows.map(() => '') };
 }
 
@@ -84,9 +102,19 @@ function toDate(s: string): string | undefined {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 'pull' | 'paste'; onClose(): void }) {
+/** Portal status words and the status each becomes, shown under the preview. */
+const WORDS: [string, PortalRow['status']][] = [
+  ['approved', 'done'],
+  ['rejected / redo', 'revision'],
+  ['submitted / QC', 'review'],
+  ['in progress', 'in_progress'],
+  ['hold', 'on_hold'],
+  ['assigned / not started', 'todo'],
+];
+
+export function PortalImport({ state, mode, file, onClose }: { state: AppState; mode: 'pull' | 'paste' | 'file'; file?: PortalTable; onClose(): void }) {
   const { toast } = useApp();
-  const [tables, setTables] = useState<PortalTable[]>([]);
+  const [tables, setTables] = useState<PortalTable[]>(file ? [file] : []);
   const [pageInfo, setPageInfo] = useState('');
   const [loading, setLoading] = useState(mode === 'pull');
   const [error, setError] = useState('');
@@ -160,16 +188,19 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
     onClose();
   };
 
+  const saved = table && state.settings.portalMappings.some(m => m.signature === signature(table));
+  const title = mode === 'pull' ? 'Pull models from the MetaZtech portal' : mode === 'file' ? `Import ${file?.source ?? 'a table'} into MetaZtech` : 'Import a pasted table';
+
   return (
     <Modal
       wide
-      title={mode === 'pull' ? 'Pull models from the MetaZtech portal' : 'Import a pasted table'}
+      title={title}
       onClose={onClose}
       footer={
         <>
           {mode === 'pull' && (
             <button type="button" onClick={pull} disabled={loading}>
-              {loading ? 'Reading the page…' : 'Pull again'}
+              <Icon name="sync" /> {loading ? 'Reading the page…' : 'Pull again'}
             </button>
           )}
           <span className="grow" />
@@ -182,97 +213,127 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
         </>
       }
     >
-      {mode === 'pull' && (
-        <p className="muted small">
-          Reads the page open in the portal window. Log in there once (the session is kept), open the list of your assigned models (and the rejected / submitted lists if they are separate pages), and pull each one.
-          {pageInfo && (
-            <>
-              <br />
-              Page: {pageInfo}
-            </>
-          )}
-        </p>
-      )}
-      {mode === 'paste' && (
-        <Field label="Paste the table (select it in the portal or a sheet, Ctrl+C, then Ctrl+V here). First row must be the headers.">
-          <textarea rows={6} value={paste} onChange={e => setPaste(e.target.value)} placeholder={'Job ID\tModel\tComplexity\tStatus\nMZ-101\tOffice chair\tComplex\tRejected'} />
-        </Field>
-      )}
-      {error && <div className="banner warn">{error}</div>}
-      {tables.length > 1 && (
-        <Field label="Table on the page">
-          <select value={pick} onChange={e => setPick(Number(e.target.value))}>
-            {tables.map((t, i) => (
-              <option key={i} value={i}>
-                {t.source}: {t.rows.length} rows · {t.headers.slice(0, 5).join(', ')}
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
-      {table && (
-        <>
-          <h4>Which column is which?</h4>
-          <div className="grid3">
-            {FIELDS.map(f => (
-              <Field key={f.key} label={f.label}>
-                <select
-                  value={has(f.key) ? fields[f.key] : ''}
-                  onChange={e => setFields({ ...fields, [f.key]: e.target.value === '' ? -1 : Number(e.target.value) })}
-                >
-                  <option value="">—</option>
-                  {table.headers.map((h, i) => (
-                    <option key={i} value={i}>
-                      {h || `Column ${i + 1}`}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-            ))}
-          </div>
-          <h4>Preview</h4>
-          <div className="table-wrap small-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Portal status</th>
-                  <th>Becomes</th>
-                  <th>Complexity</th>
-                  <th>Rejections</th>
-                  {has('due') && <th>Due</th>}
-                  {has('approved') && <th>Approved on</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 10).map((r, i) => (
-                  <tr key={i}>
-                    <td>{r.code}</td>
-                    <td>{r.name}</td>
-                    <td className="muted">{r.statusText}</td>
-                    <td>
-                      <StatusPill status={r.status} company="metaztech" />
-                    </td>
-                    <td>{r.complexity ? COMPLEXITY_LABELS[r.complexity] : <span className="muted">not set</span>}</td>
-                    <td>{r.revisions ?? ''}</td>
-                    {has('due') && <td>{fmtDate(r.due)}</td>}
-                    {has('approved') && <td>{fmtDate(r.approvedOn)}</td>}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {rows.length > 10 && <p className="muted small">…and {rows.length - 10} more.</p>}
-          <p className="muted small">
-            Status words are matched automatically (approved → {statusLabel('done', 'metaztech')}, rejected / redo → {statusLabel('revision', 'metaztech')}, submitted / QC →{' '}
-            {statusLabel('review', 'metaztech')}, hold → On hold). Existing models are matched by job ID (by name only when there is no ID), so pulling again only updates them.
+      <div className="pi">
+        {mode === 'pull' && (
+          <p className="pi-intro">
+            Reads the page open in the portal window. Log in there once (the session is kept), open the list of your assigned models (and the rejected / submitted lists if they are separate pages), and pull each one.
+            {pageInfo && <span className="pi-page">Page: {pageInfo}</span>}
           </p>
-          {!has('approved') && rows.some(r => r.status === 'done') && (
-            <p className="muted small">No "Approved on" column picked: approved models new to the app count toward this month's earnings.</p>
-          )}
-        </>
-      )}
+        )}
+        {mode === 'paste' && (
+          <Field label="Paste the table (select it in the portal or a sheet, Ctrl+C, then Ctrl+V here). First row must be the headers.">
+            <textarea rows={6} value={paste} onChange={e => setPaste(e.target.value)} placeholder={'Job ID\tModel\tComplexity\tStatus\nMZ-101\tOffice chair\tComplex\tRejected'} />
+          </Field>
+        )}
+        {mode === 'file' && file && (
+          <div className="pi-file">
+            <span className="pi-file-ic" aria-hidden="true">
+              <Icon name="table" size={22} weight="fill" />
+            </span>
+            <div className="grow">
+              <b className="ellipsis">{file.source}</b>
+              <small>
+                {file.rows.length} row{file.rows.length === 1 ? '' : 's'} · {file.headers.length} columns
+              </small>
+            </div>
+          </div>
+        )}
+        {loading && !table && <p className="pi-intro">Reading the page…</p>}
+        {error && <div className="banner warn">{error}</div>}
+        {tables.length > 1 && (
+          <Field label="Table on the page">
+            <select value={pick} onChange={e => setPick(Number(e.target.value))}>
+              {tables.map((t, i) => (
+                <option key={i} value={i}>
+                  {t.source}: {t.rows.length} rows · {t.headers.slice(0, 5).join(', ')}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+        {table && (
+          <>
+            <div className="pi-sec">
+              <h3>Which column is which?</h3>
+              {saved && <span className="tag ok">Saved mapping</span>}
+            </div>
+            <div className="pi-map">
+              {FIELDS.map(f => (
+                <Field key={f.key} label={f.label}>
+                  <select
+                    className={has(f.key) ? 'set' : ''}
+                    value={has(f.key) ? fields[f.key] : ''}
+                    onChange={e => setFields({ ...fields, [f.key]: e.target.value === '' ? -1 : Number(e.target.value) })}
+                  >
+                    <option value="">—</option>
+                    {table.headers.map((h, i) => (
+                      <option key={i} value={i}>
+                        {h || `Column ${i + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ))}
+            </div>
+            <div className="pi-sec">
+              <h3>Preview</h3>
+              <span className="muted small">{rows.length > 10 ? `First 10 of ${rows.length} rows` : `${rows.length} row${rows.length === 1 ? '' : 's'}`}</span>
+            </div>
+            {rows.length ? (
+              <div className="table-wrap pi-preview">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Name</th>
+                      <th>Portal status</th>
+                      <th>Becomes</th>
+                      <th>Complexity</th>
+                      <th className="num">Rejections</th>
+                      {has('due') && <th>Due</th>}
+                      {has('approved') && <th>Approved on</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.slice(0, 10).map((r, i) => (
+                      <tr key={i}>
+                        <td className="pi-code">{r.code}</td>
+                        <td className="pi-name">{r.name}</td>
+                        <td className="muted">{r.statusText}</td>
+                        <td>
+                          <StatusPill status={r.status} company="metaztech" />
+                        </td>
+                        <td>{r.complexity ? COMPLEXITY_LABELS[r.complexity] : <span className="muted">not set</span>}</td>
+                        <td className="num">{r.revisions ?? ''}</td>
+                        {has('due') && <td className="nowrap">{fmtDate(r.due)}</td>}
+                        {has('approved') && <td className="nowrap">{fmtDate(r.approvedOn)}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="pi-intro">No rows yet: pick the column that holds the model name or the job ID.</p>
+            )}
+            <div className="pi-words" aria-label="How portal status words are read">
+              <span className="muted small">Status words are matched automatically:</span>
+              {WORDS.map(([w, st]) => (
+                <span key={w} className="pi-word">
+                  {w}
+                  <Icon name="arrowRight" size={12} />
+                  <StatusPill status={st} company="metaztech" />
+                </span>
+              ))}
+            </div>
+            <p className="pi-note">
+              Existing models are matched by job ID (by name only when there is no ID), so pulling again only updates them.
+            </p>
+            {!has('approved') && rows.some(r => r.status === 'done') && (
+              <p className="pi-note warn-text">No "Approved on" column picked: approved models new to the app count toward this month's earnings.</p>
+            )}
+          </>
+        )}
+      </div>
     </Modal>
   );
 }
