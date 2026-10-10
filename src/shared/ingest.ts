@@ -5,6 +5,7 @@
 import type { AppState, EmailItem, Meeting, Model, Payment, Subscription, Suggestion, SyncResult } from './types';
 import { classify, findJoinUrl, looksLikePayout, meetingFromInviteSubject, parseIcs, parseSubscription, parseWaveinkSalary, toEmailItem, type RawMail } from './mail';
 import { normaliseCode } from './status';
+import { localDate } from './money';
 
 const DAY = 86400000;
 const KEEP_EMAIL_DAYS = 90;
@@ -80,7 +81,7 @@ export function ingestMail(state: AppState, raws: RawMail[], receiptIds: Set<str
         emailUrl: item.url,
         title: `MetaZtech payment mail: ${raw.subject}`,
         detail: 'Enter the amount that reached your bank.',
-        payment: { company: 'metaztech', date: raw.date.slice(0, 10), currency: 'INR', note: raw.subject, source: 'email', emailId: raw.id },
+        payment: { company: 'metaztech', date: localDate(raw.date), currency: 'INR', note: raw.subject, source: 'email', emailId: raw.id },
         createdAt: nowIso,
       });
       continue;

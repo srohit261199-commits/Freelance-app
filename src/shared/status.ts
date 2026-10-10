@@ -64,6 +64,11 @@ export function setStatus(model: Model, to: ModelStatus, now: string, note?: str
   return next;
 }
 
+/** When work on the model last moved (status or progress), ignoring the status it was imported with. */
+export function lastWorked(model: Model): string | undefined {
+  return model.history.filter(h => h.kind !== 'import').at(-1)?.at;
+}
+
 /** Status changes only (not progress notes or the status a model was imported with). */
 export function statusEvents(model: Model): StatusEvent[] {
   return model.history.filter(h => !h.kind || h.kind === 'status');
@@ -86,7 +91,7 @@ export function mapPortalStatus(text: string): ModelStatus {
   if (/reject|not approved|disapprov|unapproved|redo|re-?work|revis|correction|changes? requested|returned|re-?open|\bfail/.test(t)) return 'revision';
   if (/not started|yet to start|not yet started|to ?do\b|unassigned|\bassigned\b|^new\b|\bopen\b|queued|allocated|^pending$|not submitted|backlog/.test(t)) return 'todo';
   if (/(pending|awaiting|waiting for|under|in|for)\s*(approval|review|qc|qa|check)|(approval|review|qc)\s*pending|submitted|\breview|\bqc\b|\bqa\b|uploaded|verification|checking/.test(t)) return 'review';
-  if (/incomplete|not complete|in ?progress|\bwip\b|working|started|ongoing|active|modell?ing|texturing/.test(t)) return 'in_progress';
+  if (/incomplete|not complete|partial|in ?progress|\bwip\b|working|started|ongoing|active|modell?ing|texturing/.test(t)) return 'in_progress';
   if (/approv|accepted|complete|\bdone\b|final|deliver|closed|publish|\blive\b|passed/.test(t)) return 'done';
   return 'todo';
 }
@@ -95,7 +100,7 @@ export function mapComplexity(text: string): Complexity | undefined {
   const t = text.toLowerCase().replace(/\s+/g, ' ').trim();
   if (!t) return undefined;
   // "Super Complex-1", "SC-1", "SC 2+", "Super Complex-3" (3 and up are paid at the 2+ rate)
-  const level = t.match(/(?:super ?complex|\bsc)\s*-?\s*(\d+|i{1,3})\s*(\+)?/);
+  const level = t.match(/(?:super[ -]?complex|\bsc)\s*-?\s*(\d+|i{1,3}\b)\s*(\+)?/);
   if (level) {
     const n = /^i+$/.test(level[1]) ? level[1].length : Number(level[1]);
     return n >= 2 ? 'super2' : n === 1 ? 'super1' : 'super';

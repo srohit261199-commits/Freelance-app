@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { CompanyId, ModelStatus } from '../shared/types';
 import { COMPANY_STATUSES, statusLabel } from '../shared/status';
 import type { ActionTarget } from '../shared/planner';
@@ -82,25 +82,44 @@ export function StatusPill({ status, company }: { status: ModelStatus; company?:
 /** Status pill that opens a menu of the company's statuses. */
 export function StatusPicker({ status, company, onPick }: { status: ModelStatus; company: CompanyId; onPick(s: ModelStatus): void }) {
   const [open, setOpen] = useState(false);
+  const [up, setUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const toggle = () => {
+    if (!open && btn.current) {
+      // Open upwards when the scroll box around the pill (table, drawer, dialog) has more room above than below.
+      const r = btn.current.getBoundingClientRect();
+      const box = btn.current.closest('.table-wrap, .drawer-body, .modal-body')?.getBoundingClientRect();
+      const below = Math.min(box?.bottom ?? innerHeight, innerHeight) - r.bottom;
+      const above = r.top - Math.max(box?.top ?? 0, 0);
+      setUp(below < 250 && above > below);
+    }
+    setOpen(!open);
+  };
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
+    // Capture phase, so the menu closes before the drawer or dialog around it sees the key.
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setOpen(false);
+      btn.current?.focus();
+    };
     document.addEventListener('mousedown', close);
-    document.addEventListener('keydown', esc);
+    document.addEventListener('keydown', esc, true);
     return () => {
       document.removeEventListener('mousedown', close);
-      document.removeEventListener('keydown', esc);
+      document.removeEventListener('keydown', esc, true);
     };
   }, [open]);
   return (
     <div className="picker" ref={ref} onClick={e => e.stopPropagation()}>
-      <button type="button" className={`pill st-${status} pill-btn`} onClick={() => setOpen(!open)} title="Change status">
+      <button ref={btn} type="button" className={`pill st-${status} pill-btn`} onClick={toggle} title="Change status" aria-haspopup="menu" aria-expanded={open}>
         {statusLabel(status, company)} <span className="caret">▾</span>
       </button>
       {open && (
-        <div className="menu" role="menu">
+        <div className={`menu ${up ? 'up' : ''}`} role="menu">
           {COMPANY_STATUSES[company].map(s => (
             <button
               key={s}
@@ -109,6 +128,7 @@ export function StatusPicker({ status, company, onPick }: { status: ModelStatus;
               className={s === status ? 'on' : ''}
               onClick={() => {
                 setOpen(false);
+                btn.current?.focus();
                 if (s !== status) onPick(s);
               }}
             >
@@ -122,17 +142,56 @@ export function StatusPicker({ status, company, onPick }: { status: ModelStatus;
   );
 }
 
-export function Modal({ title, onClose, children, wide, footer }: { title: string; onClose(): void; children: ReactNode; wide?: boolean; footer?: ReactNode }) {
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const dialogs: HTMLElement[] = [];
+
+/** Moves focus into a dialog, keeps Tab inside it, closes it on Escape and gives focus back on close. Only the top dialog reacts. */
+function useDialog<T extends HTMLElement>(onClose: () => void) {
+  const ref = useRef<T>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
+  const [opener] = useState(() => document.activeElement as HTMLElement | null);
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, [onClose]);
+    const el = ref.current!;
+    dialogs.push(el);
+    const focusables = (root: Element) => [...root.querySelectorAll<HTMLElement>(FOCUSABLE)].filter(n => n.getClientRects().length > 0);
+    if (!el.contains(document.activeElement)) {
+      const body = el.querySelector('.modal-body, .drawer-body');
+      (focusables(body ?? el)[0] ?? focusables(el)[0] ?? el).focus();
+    }
+    const key = (e: KeyboardEvent) => {
+      if (dialogs[dialogs.length - 1] !== el) return;
+      if (e.key === 'Escape') return close.current();
+      if (e.key !== 'Tab') return;
+      const list = focusables(el);
+      const at = document.activeElement;
+      if (!list.length) return e.preventDefault();
+      if (e.shiftKey && (at === list[0] || !el.contains(at))) {
+        e.preventDefault();
+        list[list.length - 1].focus();
+      } else if (!e.shiftKey && (at === list[list.length - 1] || !el.contains(at))) {
+        e.preventDefault();
+        list[0].focus();
+      }
+    };
+    document.addEventListener('keydown', key);
+    return () => {
+      document.removeEventListener('keydown', key);
+      dialogs.splice(dialogs.indexOf(el), 1);
+      if (opener?.isConnected) opener.focus();
+    };
+  }, [opener]);
+  return ref;
+}
+
+export function Modal({ title, onClose, children, wide, footer }: { title: string; onClose(): void; children: ReactNode; wide?: boolean; footer?: ReactNode }) {
+  const ref = useDialog<HTMLDivElement>(onClose);
+  const id = useId();
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title}>
+      <div ref={ref} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1}>
         <header>
-          <h3>{title}</h3>
+          <h3 id={id}>{title}</h3>
           <button type="button" className="ghost icon-btn" onClick={onClose} aria-label="Close">
             <Icon name="close" />
           </button>
@@ -145,17 +204,14 @@ export function Modal({ title, onClose, children, wide, footer }: { title: strin
 }
 
 export function Drawer({ onClose, children, title, subtitle }: { onClose(): void; children: ReactNode; title: ReactNode; subtitle?: ReactNode }) {
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', esc);
-    return () => document.removeEventListener('keydown', esc);
-  }, [onClose]);
+  const ref = useDialog<HTMLElement>(onClose);
+  const id = useId();
   return (
     <div className="drawer-wrap" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <aside className="drawer">
+      <aside ref={ref} className="drawer" role="dialog" aria-modal="true" aria-labelledby={id} tabIndex={-1}>
         <header>
           <div>
-            <h3>{title}</h3>
+            <h3 id={id}>{title}</h3>
             {subtitle && <div className="muted small">{subtitle}</div>}
           </div>
           <button type="button" className="ghost icon-btn" onClick={onClose} aria-label="Close">

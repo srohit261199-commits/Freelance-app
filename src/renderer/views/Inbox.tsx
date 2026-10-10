@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { AppState, Currency, EmailItem, Suggestion } from '../../shared/types';
-import { attentionMail } from '../../shared/planner';
+import { mailLine, needsAction } from '../../shared/planner';
 import { hub } from '../hub';
 import { CompanyDot, Empty, Field, Icon, fmtDate, relTime, useApp } from '../ui';
 
@@ -11,7 +11,6 @@ export function Inbox({ state, now, onSync, syncing }: { state: AppState; now: D
   const [filter, setFilter] = useState<Filter>('clients');
   const [unreadOnly, setUnreadOnly] = useState(false);
   const company = (id: string) => state.companies.find(c => c.id === id);
-  const attention = new Set(attentionMail(state.emails, now).map(e => e.id));
   const match = (e: EmailItem) => {
     switch (filter) {
       case 'clients':
@@ -21,7 +20,7 @@ export function Inbox({ state, now, onSync, syncing }: { state: AppState; now: D
       case 'receipts':
         return e.kind === 'receipt';
       case 'attention':
-        return attention.has(e.id) || (e.company !== 'other' && e.attention.length > 0 && e.unread);
+        return needsAction(e, now);
       case 'other':
         return e.company === 'other' && e.kind !== 'receipt';
       default:
@@ -92,23 +91,26 @@ export function Inbox({ state, now, onSync, syncing }: { state: AppState; now: D
           </div>
           {!emails.length && <Empty title={g.connected ? 'No mail here' : 'Connect Google to see mail'}>{g.connected ? 'Try another tab.' : 'Settings → Google account.'}</Empty>}
           <ul className="mail">
-            {emails.map(e => (
-              <li key={e.id} className={e.unread ? 'unread' : ''}>
-                <button type="button" onClick={() => hub.openUrl(e.url)} title="Open in Gmail">
-                  <span className="row-top">
-                    <CompanyDot color={company(e.company)?.color ?? '#9ca3af'} />
-                    <strong>{e.fromName}</strong>
-                    {e.kind === 'teams' && <span className="tag">Teams</span>}
-                    {e.kind === 'invite' && <span className="tag">invite</span>}
-                    {e.kind === 'payment' && <span className="tag ok">payment</span>}
-                    {attention.has(e.id) && <span className="tag warn">needs action</span>}
-                    <span className="muted small push">{relTime(e.date, now)}</span>
-                  </span>
-                  <span className="subject">{e.subject}</span>
-                  <span className="muted small clamp">{e.snippet}</span>
-                </button>
-              </li>
-            ))}
+            {emails.map(e => {
+              const line = mailLine(e);
+              return (
+                <li key={e.id} className={e.unread ? 'unread' : ''}>
+                  <button type="button" onClick={() => hub.openUrl(e.url)} title="Open in Gmail">
+                    <span className="row-top">
+                      <CompanyDot color={company(e.company)?.color ?? '#9ca3af'} />
+                      <strong>{e.fromName}</strong>
+                      {e.kind === 'teams' && <span className="tag">Teams</span>}
+                      {e.kind === 'invite' && <span className="tag">invite</span>}
+                      {e.kind === 'payment' && <span className="tag ok">payment</span>}
+                      {needsAction(e, now) && <span className="tag warn">needs action</span>}
+                      <span className="muted small push">{relTime(e.date, now)}</span>
+                    </span>
+                    <span className={line === e.subject ? 'subject' : 'subject clamp'}>{line}</span>
+                    {line === e.subject && <span className="muted small clamp">{e.snippet}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
 

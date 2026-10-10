@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { initialState } from '../src/main/seed/initial';
-import { companyEarnings, rollRenewal } from '../src/shared/money';
-import { attentionMail, dailyLog, nextActions } from '../src/shared/planner';
-import { applyStatus, importPortalRows, type PortalRow } from '../src/shared/ops';
-import { catalogStatusText, mapComplexity, mapPortalStatus, normaliseCode, setStatus } from '../src/shared/status';
-import { classify, meetingFromInviteSubject, parseIcs, parseSubscription, parseWaveinkSalary, teamsSenders, type RawMail } from '../src/shared/mail';
-import type { AppState } from '../src/shared/types';
+import { allocate, companyEarnings, localDate, paymentValue, rollRenewal, type MonthLine } from '../src/shared/money';
+import { attentionMail, dailyLog, mailLine, modelLabel, needsAction, nextActions } from '../src/shared/planner';
+import { acceptSuggestion, applyStatus, importPortalRows, patchModel, repairState, type PortalRow } from '../src/shared/ops';
+import { catalogStatusText, lastWorked, mapComplexity, mapPortalStatus, normaliseCode, setStatus, statusEvents, trackerStatusText } from '../src/shared/status';
+import { classify, meetingFromInviteSubject, parseIcs, parseSubscription, parseWaveinkSalary, teamsSenders, toEmailItem, type RawMail } from '../src/shared/mail';
+import { applySync, ingestMail } from '../src/shared/ingest';
+import type { AppState, SyncResult } from '../src/shared/types';
 
 const NOW = '2026-10-09T10:00:00.000Z';
 const fresh = (): AppState => initialState(NOW);
@@ -64,6 +65,34 @@ describe('status', () => {
     expect(catalogStatusText(s.models.find(m => m.revised)!)).toBe('done (R)');
     expect(normaliseCode('itwc_1203.glb')).toBe('ITWC 1203');
   });
+
+  it('reads negated and pending wording before the words it contains', () => {
+    expect(mapPortalStatus('Not started')).toBe('todo');
+    expect(mapPortalStatus('Not Started ⏳')).toBe('todo');
+    expect(mapPortalStatus('Approval pending')).toBe('review');
+    expect(mapPortalStatus('Not approved')).toBe('revision');
+    expect(mapPortalStatus('Incomplete')).toBe('in_progress');
+    expect(mapPortalStatus('Partially complete')).toBe('in_progress');
+    expect(mapPortalStatus('Approved')).toBe('done');
+    expect(mapPortalStatus('On hold')).toBe('on_hold');
+  });
+
+  it('reads SC-n and super complex levels above 2', () => {
+    expect(mapComplexity('SC-1')).toBe('super1');
+    expect(mapComplexity('SC 2+')).toBe('super2');
+    expect(mapComplexity('Super Complex-3')).toBe('super2');
+    expect(mapComplexity('Super Complex 2+')).toBe('super2');
+    expect(mapComplexity('Super Complex II')).toBe('super2');
+    expect(mapComplexity('Super-Complex-2')).toBe('super2');
+    expect(mapComplexity('Super Complex - Interior')).toBe('super');
+    expect(mapComplexity('Super Complex')).toBe('super');
+  });
+
+  it('reports a revision as in progress on the tracker, not under review', () => {
+    expect(trackerStatusText('revision')).toBe('In Progress 🔄');
+    expect(trackerStatusText('revision')).toBe(trackerStatusText('in_progress'));
+    expect(trackerStatusText('review')).toBe('Under Review 👀');
+  });
 });
 
 describe('money', () => {
@@ -111,6 +140,38 @@ describe('money', () => {
     expect(rollRenewal({ ...sub, nextRenewal: '2026-09-09' }, new Date(NOW))).toBe('2026-10-09');
     expect(rollRenewal({ ...sub, nextRenewal: '2026-01-31' }, new Date(NOW))).toBe('2026-10-31');
   });
+
+  it('puts a payment against the month it is for, spilling any excess to other months', () => {
+    const line = (month: string): MonthLine => ({ month, gross: 3000, net: 3000, units: 1, due: '' });
+    const lines = [line('2026-09'), line('2026-10')];
+    expect(allocate(lines, [{ period: '2026-10', value: 3000 }])).toEqual({ '2026-09': 0, '2026-10': 3000 });
+    expect(allocate(lines, [{ period: '2026-10', value: 4000 }])).toEqual({ '2026-09': 1000, '2026-10': 3000 });
+    expect(allocate(lines, [{ value: 4000 }])).toEqual({ '2026-09': 3000, '2026-10': 1000 });
+    expect(allocate(lines, [{ period: '2027-01', value: 500 }])).toEqual({ '2026-09': 500, '2026-10': 0 });
+
+    const s = fresh();
+    s.payments.push({ id: 'oct', company: 'waveink', date: '2026-11-02', amount: 3000, currency: 'AED', period: '2026-10', source: 'manual' });
+    const nov = new Date('2026-11-06T10:00:00Z');
+    expect(companyEarnings(s, 'waveink', nov)).toMatchObject({ outstanding: 0, overdue: undefined });
+    s.payments = s.payments.filter(p => p.id !== 'pay-wi-2026-09');
+    const e = companyEarnings(s, 'waveink', nov);
+    expect(e.paidByMonth).toMatchObject({ '2026-09': 0, '2026-10': 3000 });
+    expect(e.overdue).toMatchObject({ month: '2026-09', paid: 0, net: 3000 });
+  });
+
+  it('keeps a payment in another currency at the amount it was settled at when rates change', () => {
+    const s = fresh();
+    const i = s.payments.findIndex(p => p.id === 'pay-wi-2026-09');
+    s.payments[i] = { ...s.payments[i], amount: 72000, currency: 'INR', settledAmount: 3000 };
+    const p = s.payments[i];
+    s.settings.rates = { ...s.settings.rates, AED: 23 };
+    expect(paymentValue(p, 'AED', s.settings.rates)).toBe(3000);
+    expect(paymentValue({ ...p, settledAmount: undefined }, 'AED', s.settings.rates)).toBeCloseTo(3130.43, 1);
+    expect(paymentValue({ ...p, currency: 'AED', amount: 2500 }, 'AED', s.settings.rates)).toBe(2500);
+    const e = companyEarnings(s, 'waveink', new Date(NOW));
+    expect(e).toMatchObject({ received: 3000, outstanding: 0, overdue: undefined });
+    expect(e.paidByMonth['2026-09']).toBe(3000);
+  });
 });
 
 describe('portal import', () => {
@@ -123,6 +184,52 @@ describe('portal import', () => {
     const m = s.models.find(x => x.code === 'MZ-7')!;
     expect(m.status).toBe('revision');
     expect(m.complexity).toBe('complex');
+  });
+
+  it('keeps two jobs that share a name apart, and matches by name only when an ID is missing', () => {
+    const s = fresh();
+    const rows: PortalRow[] = [
+      { code: 'MZ-701', name: 'Office chair', status: 'todo', project: 'Project A', raw: {} },
+      { code: 'MZ-702', name: 'Office chair', status: 'done', complexity: 'complex', project: 'Project B', raw: {} },
+    ];
+    expect(importPortalRows(s, rows, NOW)).toEqual({ added: 2, updated: 0, unchanged: 0 });
+    expect(importPortalRows(s, rows, NOW)).toEqual({ added: 0, updated: 0, unchanged: 2 });
+    const chairs = s.models.filter(m => m.name === 'Office chair').map(m => [m.code, m.status, m.group]);
+    expect(chairs).toEqual([['MZ-701', 'todo', 'Project A'], ['MZ-702', 'done', 'Project B']]);
+
+    importPortalRows(s, [{ name: 'Desk', status: 'todo', raw: {} }], NOW);
+    expect(importPortalRows(s, [{ code: 'MZ-703', name: 'Desk', status: 'todo', raw: {} }], NOW)).toEqual({ added: 0, updated: 1, unchanged: 0 });
+    expect(s.models.filter(m => m.name === 'Desk').map(m => m.code)).toEqual(['MZ-703']);
+  });
+
+  it('does not count the status a row is imported with as work done today', () => {
+    const s = fresh();
+    importPortalRows(
+      s,
+      [
+        { code: 'A1', name: 'Sofa', status: 'done', complexity: 'complex', raw: {} },
+        { code: 'A2', name: 'Lamp', status: 'done', complexity: 'complex', approvedOn: '2026-09-15', raw: {} },
+        { code: 'A3', name: 'Desk', status: 'review', raw: {} },
+        { code: 'A4', name: 'Stool', status: 'todo', raw: {} },
+      ],
+      NOW,
+    );
+    const by = (code: string) => s.models.find(m => m.code === code)!;
+    expect(by('A1')).toMatchObject({ completedAt: NOW, completedAtApprox: true });
+    expect(by('A1').history).toEqual([expect.objectContaining({ kind: 'import', from: null, to: 'done' })]);
+    expect(statusEvents(by('A1'))).toEqual([]);
+    expect(localDate(by('A2').completedAt!)).toBe('2026-09-15');
+    expect(by('A2').completedAtApprox).toBeUndefined();
+    expect(dailyLog(s.models, 'metaztech')).toEqual([]);
+    expect(nextActions(s, new Date(NOW)).find(a => a.id.startsWith('mz-target'))?.title).toContain('(0 today)');
+    const e = companyEarnings(s, 'metaztech', new Date(NOW));
+    expect(e.months.map(l => [l.month, l.due])).toEqual([['2026-09', '2026-10-10'], ['2026-10', '2026-11-10']]);
+    expect(e.approxMonth).toBe(1);
+
+    // A later pull with the approval date moves the approximate one to its real month.
+    importPortalRows(s, [{ code: 'A1', name: 'Sofa', status: 'done', approvedOn: '2026-09-20', raw: {} }], NOW);
+    expect(by('A1').completedAtApprox).toBeUndefined();
+    expect(companyEarnings(s, 'metaztech', new Date(NOW))).toMatchObject({ approxMonth: 0, months: [expect.objectContaining({ month: '2026-09', units: 2 })] });
   });
 });
 
@@ -144,6 +251,33 @@ describe('mail', () => {
       3000,
     );
     expect(p).toMatchObject({ amount: 3000, currency: 'AED', period: '2026-09', reference: '33TF068381319' });
+  });
+
+  it('records a Waveink salary once, not again for the reply to it', () => {
+    const sibi = 'Sibi Iype <sibi@waveink.ae>';
+    const subject = 'Salary Transfer Reference – Rohit - September 2026';
+    const raws = [
+      mail({ id: 'sal', from: sibi, subject, snippet: 'Transfer reference: 33TF068381319 Kindly confirm receipt of the payment.', date: '2026-10-01T06:38:27Z' }),
+      mail({ id: 're', from: sibi, subject: `Re: ${subject}`, snippet: 'Dear Rohit, Thank you for the confirmation.', date: '2026-10-01T09:14:54Z' }),
+    ];
+    expect(parseWaveinkSalary(raws[1], 3000)).toBeNull();
+    expect(toEmailItem(raws[1], companies).kind).toBe('mail');
+    const sync = (s: AppState) => {
+      const result: SyncResult = { ok: true, newEmails: 0, meetings: 0, driveMatches: 0, newSuggestions: 0, newPayments: 0 };
+      applySync(s, ingestMail(s, raws, new Set(), new Set(raws.map(r => r.id)), NOW), [], null, Date.parse(NOW), result);
+      return result;
+    };
+
+    const empty = fresh();
+    empty.payments = [];
+    empty.handledEmails = [];
+    expect(sync(empty).newPayments).toBe(1);
+    expect(empty.payments).toEqual([expect.objectContaining({ period: '2026-09', reference: '33TF068381319', emailId: 'sal' })]);
+    expect(sync(empty).newPayments).toBe(0);
+
+    const seeded = fresh();
+    expect(sync(seeded).newPayments).toBe(0);
+    expect(companyEarnings(seeded, 'waveink', new Date(NOW)).received).toBe(3000);
   });
 
   it('reads Google Play, Stripe and cancellation receipts', () => {
@@ -214,6 +348,71 @@ describe('planner', () => {
     ];
     expect(attentionMail(s.emails, new Date(NOW)).map(e => e.id)).toEqual(['a']);
   });
+
+  it('flags unread client requests of any age, and shows what a Teams message says', () => {
+    const s = fresh();
+    const now = new Date(NOW);
+    const teams = 'Microsoft Teams <no-reply@teams.mail.microsoft>';
+    const old = toEmailItem(mail({ id: 'o', from: teams, subject: 'Ritu Agrawal sent 2 messages to your chat', snippet: 'EOD all complexity will upgrade', date: '2026-10-05T02:58:48Z' }), s.companies);
+    expect(needsAction(old, now)).toBe(true);
+    expect(needsAction({ ...old, unread: false }, now)).toBe(false);
+    expect(needsAction({ ...old, unread: false, date: '2026-10-08T10:00:00Z' }, now)).toBe(true);
+    expect(needsAction({ ...old, company: 'other' }, now)).toBe(false);
+    expect(needsAction({ ...old, attention: [] }, now)).toBe(false);
+    expect(attentionMail([old], now)).toEqual([old]);
+
+    const ritu = toEmailItem(mail({ id: 'r', from: teams, subject: 'Ritu Agrawal sent a message', snippet: 'please work on rejection' }), s.companies);
+    expect(ritu).toMatchObject({ kind: 'teams', fromName: 'Ritu Agrawal' });
+    expect(mailLine(ritu)).toBe('please work on rejection');
+    expect(mailLine({ ...ritu, snippet: '[Image] Hi, Ritu' })).toBe('Ritu Agrawal sent a message');
+    expect(mailLine({ ...ritu, kind: 'mail' })).toBe('Ritu Agrawal sent a message');
+    s.emails = [ritu];
+    expect(nextActions(s, now).map(a => a.title)).toContain('Ritu Agrawal: please work on rejection');
+  });
+
+  it('counts each model once per day by its net change: Done then undone is not completed', () => {
+    const s = fresh();
+    const [a, b] = s.models.filter(m => m.status === 'todo' && m.group === 'Tech').slice(0, 2);
+    applyStatus(s, [a.id], 'in_progress', '2026-10-08T06:00:00Z');
+    patchModel(s, a.id, { percent: 40 }, '2026-10-08T07:00:00Z');
+    applyStatus(s, [a.id, b.id], 'done', '2026-10-09T06:00:00Z');
+    applyStatus(s, [a.id], 'in_progress', '2026-10-09T07:00:00Z');
+    applyStatus(s, [b.id], 'todo', '2026-10-09T07:00:00Z');
+    const get = (id: string) => s.models.find(m => m.id === id)!;
+    expect(get(a.id)).toMatchObject({ status: 'in_progress', percent: 40 });
+    expect(get(b.id)).toMatchObject({ status: 'todo', percent: 0 });
+    expect([get(a.id).completedAt, get(b.id).completedAt]).toEqual([undefined, undefined]);
+    const log = dailyLog(s.models, 'waveink');
+    expect(log.map(r => r.date)).toEqual(['2026-10-08']);
+    expect(log[0]).toMatchObject({ started: 1, completed: 0 });
+
+    applyStatus(s, [b.id], 'done', '2026-10-10T06:00:00Z');
+    expect(dailyLog(s.models, 'waveink').at(-1)).toMatchObject({ date: '2026-10-10', started: 1, completed: 1 });
+  });
+
+  it('logs progress without a status change, and starts a model when work is logged on it', () => {
+    const s = fresh();
+    const m = s.models.find(x => x.company === 'waveink' && x.status === 'todo')!;
+    patchModel(s, m.id, { percent: 20 }, '2026-10-09T06:00:00Z');
+    patchModel(s, m.id, { percent: 60 }, '2026-10-09T08:00:00Z');
+    patchModel(s, m.id, { notes: 'Base mesh   done' }, '2026-10-09T09:00:00Z');
+    const after = s.models.find(x => x.id === m.id)!;
+    expect(after).toMatchObject({ status: 'in_progress', percent: 60, startedAt: '2026-10-09T06:00:00Z', updatedAt: '2026-10-09T09:00:00Z' });
+    expect(statusEvents(after).map(h => h.to)).toEqual(['in_progress']);
+    expect(after.history.filter(h => h.kind === 'progress').map(h => [h.field, h.note])).toEqual([
+      ['percent', '60% done'],
+      ['notes', 'Base mesh done'],
+    ]);
+    const log = dailyLog(s.models, 'waveink');
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatchObject({ date: '2026-10-09', worked: [modelLabel(after)], started: 1, completed: 0 });
+    expect(log[0].notes).toContain(`${modelLabel(after)}: 60% done, Base mesh done`);
+    expect(log[0].notes).not.toContain('20%');
+
+    // Progress alone on a later day still makes a log row.
+    patchModel(s, m.id, { percent: 80 }, '2026-10-10T06:00:00Z');
+    expect(dailyLog(s.models, 'waveink').at(-1)).toMatchObject({ date: '2026-10-10', started: 0, notes: `${modelLabel(after)}: 80% done` });
+  });
 });
 
 describe('excel export', () => {
@@ -274,5 +473,33 @@ describe('calendar', () => {
       fresh(),
     );
     expect(m).toMatchObject({ company: 'waveink', start: '2026-10-14T14:00:00.000Z', joinUrl: 'https://meet.google.com/emh-yjnj-xmi' });
+  });
+});
+
+describe('saved data', () => {
+  it('drops a salary reply that an older sync recorded as a second payment', () => {
+    const s = fresh();
+    const real = s.payments[0];
+    s.payments.push({ ...real, id: 'pay-re', source: 'email', reference: undefined, emailId: 're', note: `Re: ${real.note ?? 'Salary Transfer Reference'}` });
+    expect(repairState(s).payments.map(p => p.id)).toEqual([real.id]);
+  });
+
+  it('fixes an accepted payout in another currency at the rate on the day it was accepted', () => {
+    const s = fresh();
+    s.suggestions.push({ id: 'sg', kind: 'payment', emailId: 'm1', emailUrl: '', title: '', detail: '', createdAt: NOW, payment: { company: 'metaztech', date: '2026-10-05', currency: 'AED' } });
+    acceptSuggestion(s, 'sg', { payment: { amount: 100 } });
+    const p = s.payments.at(-1)!;
+    expect(p.settledAmount).toBe(2400);
+    s.settings.rates.AED = 30;
+    expect(paymentValue(p, 'INR', s.settings.rates)).toBe(2400);
+  });
+
+  it('dates "Last Updated" by real work, not by starring or the import', () => {
+    const s = fresh();
+    const m = s.models.find(x => x.status === 'todo' && x.company === 'waveink')!;
+    patchModel(s, m.id, { starred: true }, '2026-10-09T12:00:00Z');
+    expect(lastWorked(s.models.find(x => x.id === m.id)!)).toBeUndefined();
+    patchModel(s, m.id, { percent: 30 }, '2026-10-09T13:00:00Z');
+    expect(lastWorked(s.models.find(x => x.id === m.id)!)).toBe('2026-10-09T13:00:00Z');
   });
 });

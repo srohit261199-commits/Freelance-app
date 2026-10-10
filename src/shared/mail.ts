@@ -1,4 +1,5 @@
 import type { CompanyConfig, Currency, EmailCompany, EmailItem, Meeting, Payment, Subscription } from './types';
+import { localDate } from './money';
 
 export interface RawMail {
   id: string;
@@ -122,7 +123,7 @@ export function parseWaveinkSalary(mail: RawMail, retainer: number): Partial<Pay
   const period = per ? `${per[2]}-${String(monthIndex(per[1]) + 1).padStart(2, '0')}` : undefined;
   return {
     company: 'waveink',
-    date: mail.date.slice(0, 10),
+    date: localDate(mail.date),
     amount: retainer,
     currency: 'AED',
     period,
@@ -173,7 +174,7 @@ export function parseSubscription(mail: RawMail): Partial<Subscription> | null {
   const body = mail.body ?? mail.snippet;
   const text = `${mail.subject}\n${body}`;
   const from = parseFrom(mail.from).email;
-  const date = mail.date.slice(0, 10);
+  const date = localDate(mail.date);
 
   // Google Play: "Claude Pro Subscription (Claude by Anthropic) ₹1,999.00/month"
   const play = body.match(/^\s*(.+?)\s+(₹|\$|AED\s?|USD\s?|INR\s?)([\d,]+(?:\.\d+)?)\/(month|year|week)/im);

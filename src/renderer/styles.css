@@ -4,18 +4,21 @@
   --panel-2: #f9fafb;
   --line: #e5e7eb;
   --text: #111827;
-  --muted: #6b7280;
+  --muted: #646b77;
   --accent: #2563eb;
   --accent-ink: #ffffff;
+  --accent-solid: #2563eb;
+  --accent-text: #1d4ed8;
   --side: #111827;
   --side-text: #d1d5db;
   --side-hover: #1f2937;
-  --ok: #059669;
+  --ok: #047857;
   --ok-bg: #d1fae5;
   --warn: #b45309;
   --warn-bg: #fef3c7;
-  --bad: #dc2626;
+  --bad: #b91c1c;
   --bad-bg: #fee2e2;
+  --bad-solid: #b91c1c;
   --info-bg: #dbeafe;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 16px rgba(0, 0, 0, 0.04);
   --radius: 10px;
@@ -31,6 +34,7 @@
     --text: #e5e7eb;
     --muted: #9ca3af;
     --accent: #3b82f6;
+    --accent-text: #93c5fd;
     --side: #0b0d11;
     --side-hover: #171a21;
     --ok-bg: #064e3b;
@@ -39,6 +43,7 @@
     --warn: #fbbf24;
     --bad-bg: #450a0a;
     --bad: #f87171;
+    --bad-solid: #dc2626;
     --info-bg: #172554;
     --shadow: none;
     color-scheme: dark;
@@ -52,6 +57,7 @@
   --text: #e5e7eb;
   --muted: #9ca3af;
   --accent: #3b82f6;
+  --accent-text: #93c5fd;
   --side: #0b0d11;
   --side-hover: #171a21;
   --ok-bg: #064e3b;
@@ -60,6 +66,7 @@
   --warn: #fbbf24;
   --bad-bg: #450a0a;
   --bad: #f87171;
+  --bad-solid: #dc2626;
   --info-bg: #172554;
   --shadow: none;
   color-scheme: dark;
@@ -145,8 +152,8 @@ button:disabled {
   cursor: default;
 }
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
   color: var(--accent-ink);
 }
 button.ghost {
@@ -327,6 +334,9 @@ input[type='range'] {
 .wrap {
   flex-wrap: wrap;
 }
+.wrap > select {
+  max-width: 100%;
+}
 .row {
   display: flex;
   align-items: center;
@@ -343,6 +353,16 @@ input[type='range'] {
   display: flex;
   gap: 16px;
   align-items: flex-start;
+}
+.cols > div.grow {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cols > div.grow > button,
+.cols > div.grow > .check {
+  align-self: flex-start;
+  margin-top: 0;
 }
 .side-col {
   width: 360px;
@@ -487,6 +507,10 @@ input[type='range'] {
   width: 100%;
   gap: 2px;
 }
+.link-row > .tag {
+  align-self: flex-start;
+  margin-left: 0;
+}
 .row-top {
   display: flex;
   align-items: center;
@@ -594,7 +618,7 @@ input[type='range'] {
 }
 .st-review {
   background: var(--info-bg);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .st-revision {
   background: var(--bad-bg);
@@ -618,6 +642,10 @@ input[type='range'] {
   border-radius: 50%;
   border: 1px solid var(--line);
 }
+.menu .dot {
+  background: currentColor;
+  border: 0;
+}
 .picker {
   position: relative;
   display: inline-block;
@@ -635,6 +663,10 @@ input[type='range'] {
   min-width: 170px;
   display: flex;
   flex-direction: column;
+}
+.menu.up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 .menu button {
   border: 0;
@@ -714,9 +746,6 @@ input[type='range'] {
   margin: 8px 0;
 }
 .bulk {
-  position: sticky;
-  top: 0;
-  z-index: 5;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -731,6 +760,19 @@ input[type='range'] {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: auto;
+  max-width: 100%;
+}
+.card > .table-wrap {
+  background: none;
+  border: 0;
+  border-radius: 0;
+}
+/* Long model lists scroll in their own box so the sticky column headings stay in view. */
+.table-wrap:has(> table.models) {
+  max-height: max(320px, calc(100dvh - 140px));
+}
+.bulk + .table-wrap:has(> table.models) {
+  max-height: max(280px, calc(100dvh - 220px));
 }
 table {
   border-collapse: collapse;
@@ -786,7 +828,7 @@ tr.dim {
   height: 42px;
   object-fit: contain;
   border-radius: 6px;
-  background: #fff;
+  background: var(--panel-2);
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
@@ -819,7 +861,28 @@ select.cx.unset {
   background: transparent;
 }
 .small-table {
+  flex: none;
   max-height: 300px;
+  overflow: auto;
+}
+.link-btn {
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: normal;
+  justify-content: flex-start;
+  max-width: 100%;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+.link-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .empty {
   border: 1px dashed var(--line);
@@ -866,6 +929,10 @@ select.cx.unset {
   padding: 16px 18px;
   border-bottom: 1px solid var(--line);
 }
+.drawer:focus,
+.modal:focus {
+  outline: none;
+}
 .drawer-body {
   padding: 16px 18px 30px;
   overflow-y: auto;
@@ -900,6 +967,7 @@ select.cx.unset {
   padding: 12px 18px;
   border-top: 1px solid var(--line);
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
   align-items: center;
@@ -945,7 +1013,7 @@ select.cx.unset {
 .gallery button {
   padding: 0;
   overflow: hidden;
-  background: #fff;
+  background: var(--panel-2);
   aspect-ratio: 1;
 }
 .gallery .ph {
@@ -1043,7 +1111,6 @@ select.cx.unset {
 
 /* skeidar */
 .job {
-  margin-bottom: 14px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1053,6 +1120,13 @@ select.cx.unset {
 }
 .job.delivered {
   opacity: 0.75;
+}
+.grid-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.grid-scroll > .fabric-grid {
+  min-width: min-content;
 }
 .fabric-grid {
   display: grid;
@@ -1150,20 +1224,35 @@ select.cx.unset {
 .toast {
   background: var(--text);
   color: var(--bg);
-  padding: 10px 14px;
+  padding: 10px 8px 10px 14px;
   border-radius: 8px;
   max-width: 420px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   animation: slide 0.16s ease-out;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
 }
 .toast.error {
-  background: var(--bad);
+  background: var(--bad-solid);
   color: #fff;
+}
+.toast-x {
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: inherit;
+  opacity: 0.75;
+}
+.toast-x:hover {
+  opacity: 1;
 }
 
 @media (max-width: 1200px) {
   .cols {
     flex-direction: column;
+    align-items: stretch;
   }
   .side-col {
     width: 100%;
@@ -1174,8 +1263,8 @@ select.cx.unset {
 }
 
 button.armed {
-  background: var(--bad);
-  border-color: var(--bad);
+  background: var(--bad-solid);
+  border-color: var(--bad-solid);
   color: #fff;
 }
 
@@ -1230,6 +1319,12 @@ button.armed {
   }
   .search {
     width: 100%;
+  }
+  .table-wrap:has(> table.models) {
+    max-height: max(320px, calc(100dvh - 260px));
+  }
+  .bulk + .table-wrap:has(> table.models) {
+    max-height: max(260px, calc(100dvh - 370px));
   }
   .company-money,
   .suggestions {

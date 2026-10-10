@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppState, FolderEntry, SkeidarJob } from '../../shared/types';
-import { formatMoney, jobOutputs } from '../../shared/money';
+import { formatMoney, jobOutputs, localDate } from '../../shared/money';
 import { uid } from '../../shared/ops';
 import { hub } from '../hub';
 import { ConfirmButton, Empty, Field, Icon, Modal, Progress, fmtDate, relTime, useApp } from '../ui';
@@ -187,8 +187,8 @@ function JobCard({
   }, [job.folder]);
   return (
     <section className={`card job ${highlight ? 'hl' : ''} ${job.status}`}>
-      <header className="row between">
-        <div>
+      <header className="row between gap wrap">
+        <div className="grow" style={{ flexBasis: 240 }}>
           <h3>{job.name}</h3>
           <div className="muted small">
             Received {fmtDate(job.receivedAt)} · {job.fabrics.length} fabrics × {job.images.length} images = {total} outputs · {formatMoney(done * rate, 'AED')} of {formatMoney(total * rate, 'AED')}
@@ -197,7 +197,7 @@ function JobCard({
         </div>
         <div className="row gap">
           {job.folder && (
-            <button type="button" className="mini" onClick={() => hub.openPath(job.folder!)}>
+            <button type="button" className="mini" title="Open folder" aria-label="Open folder" onClick={() => hub.openPath(job.folder!)}>
               <Icon name="folder" size={13} />
             </button>
           )}
@@ -211,28 +211,30 @@ function JobCard({
       </header>
       <Progress value={done} total={total} color="#ea580c" />
       {job.notes && <p className="small muted">{job.notes}</p>}
-      <div className="fabric-grid" style={{ gridTemplateColumns: `minmax(140px, 1fr) repeat(${job.images.length}, 90px)` }}>
-        <div className="fg-head">Fabric</div>
-        {job.images.map((im, i) => (
-          <div key={i} className="fg-head center">
-            {im}
-          </div>
-        ))}
-        {job.fabrics.map((f, fi) => {
-          const all = job.images.every((_, i) => job.done[`${fi}:${i}`]);
-          return (
-            <div key={fi} className="contents">
-              <button type="button" className={`fg-name ${all ? 'done' : ''}`} onClick={() => onFabric(job, fi, !all)} title="Tick or untick this fabric for every image">
-                {f}
-              </button>
-              {job.images.map((_, i) => (
-                <label key={i} className="fg-cell">
-                  <input type="checkbox" checked={!!job.done[`${fi}:${i}`]} onChange={() => onToggle(job, `${fi}:${i}`)} />
-                </label>
-              ))}
+      <div className="grid-scroll">
+        <div className="fabric-grid" style={{ gridTemplateColumns: `minmax(140px, 1fr) repeat(${job.images.length}, 90px)` }}>
+          <div className="fg-head">Fabric</div>
+          {job.images.map((im, i) => (
+            <div key={i} className="fg-head center">
+              {im}
             </div>
-          );
-        })}
+          ))}
+          {job.fabrics.map((f, fi) => {
+            const all = job.images.every((_, i) => job.done[`${fi}:${i}`]);
+            return (
+              <div key={fi} className="contents">
+                <button type="button" className={`fg-name ${all ? 'done' : ''}`} onClick={() => onFabric(job, fi, !all)} title="Tick or untick this fabric for every image">
+                  {f}
+                </button>
+                {job.images.map((_, i) => (
+                  <label key={i} className="fg-cell">
+                    <input type="checkbox" checked={!!job.done[`${fi}:${i}`]} onChange={() => onToggle(job, `${fi}:${i}`)} />
+                  </label>
+                ))}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </section>
   );
@@ -241,20 +243,21 @@ function JobCard({
 function JobEditor({ job, prefill, rate, onClose }: { job?: SkeidarJob; prefill?: Partial<SkeidarJob>; rate: number; onClose(): void }) {
   const base = job ?? prefill;
   const [name, setName] = useState(base?.name ?? '');
-  const [received, setReceived] = useState((job?.receivedAt ?? new Date().toISOString()).slice(0, 10));
+  const [received, setReceived] = useState(localDate(job?.receivedAt ?? new Date()));
   const [images, setImages] = useState((job?.images ?? ['Image 1', 'Image 2']).join('\n'));
   const [fabrics, setFabrics] = useState((job?.fabrics ?? []).join('\n'));
   const [notes, setNotes] = useState(base?.notes ?? '');
   const [folder, setFolder] = useState(base?.folder ?? '');
-  const lines = (s: string) =>
+  const list = (s: string, sep: RegExp) =>
     s
-      .split(/\r?\n|,(?![^(]*\))/)
+      .split(sep)
       .map(x => x.trim())
       .filter(Boolean);
+  const f = list(fabrics, /\r?\n|,(?![^(]*\))/);
+  const im = list(images, /\r?\n/);
+  const missing = !name.trim() ? 'Add a job name' : !f.length ? 'Add the fabrics' : !im.length ? 'Add the source images' : '';
   const save = async () => {
-    const f = lines(fabrics);
-    const im = lines(images);
-    if (!name.trim() || !f.length || !im.length) return;
+    if (missing) return;
     // Keep ticks for fabrics and images that are still in the list.
     const done: Record<string, boolean> = {};
     if (job) {
@@ -282,7 +285,7 @@ function JobEditor({ job, prefill, rate, onClose }: { job?: SkeidarJob; prefill?
     });
     onClose();
   };
-  const count = lines(fabrics).length * lines(images).length;
+  const count = f.length * im.length;
   return (
     <Modal
       title={job ? 'Edit job' : 'New Skeidar job'}
@@ -300,10 +303,11 @@ function JobEditor({ job, prefill, rate, onClose }: { job?: SkeidarJob; prefill?
             />
           )}
           <span className="grow" />
+          {missing && <span className="muted small">{missing}</span>}
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="primary" onClick={save}>
+          <button type="button" className="primary" onClick={save} disabled={!!missing}>
             Save ({count} images = {formatMoney(count * rate, 'AED')})
           </button>
         </>

@@ -1,5 +1,6 @@
 import type { AppState, Complexity, Model, ModelStatus, Payment, Subscription } from './types';
 import { isComplete, setStatus } from './status';
+import { convert } from './money';
 
 export function uid(prefix: string): string {
   const rnd = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -135,12 +136,22 @@ export function importPortalRows(state: AppState, rows: PortalRow[], now: string
   return counts;
 }
 
+/** Undoes data written by older versions: salary "Re:" replies that an earlier sync recorded as a second payment. */
+export function repairState(state: AppState): AppState {
+  state.payments = state.payments.filter(p => !(p.source === 'email' && /^\s*(re|fw|fwd|aw)\s*:/i.test(p.note ?? '')));
+  return state;
+}
+
 export function acceptSuggestion(state: AppState, id: string, override: { payment?: Partial<Payment>; subscription?: Partial<Subscription> }): void {
   const sg = state.suggestions.find(s => s.id === id);
   if (!sg) return;
   if (sg.kind === 'payment') {
     const p = { ...sg.payment, ...override.payment } as Payment;
-    state.payments.push({ ...p, id: uid('pay'), source: 'email', emailId: sg.emailId, amount: Number(p.amount) || 0 });
+    const amount = Number(p.amount) || 0;
+    // Fix the value in the company's currency now, so a later rate change doesn't rewrite this payment.
+    const own = state.companies.find(c => c.id === p.company)?.currency;
+    const settledAmount = own && p.currency !== own ? convert(amount, p.currency, own, state.settings.rates) : undefined;
+    state.payments.push({ ...p, id: uid('pay'), source: 'email', emailId: sg.emailId, amount, ...(settledAmount != null ? { settledAmount } : {}) });
   } else {
     const s: Partial<Subscription> = { ...sg.subscription, ...override.subscription };
     state.subscriptions.push({

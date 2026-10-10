@@ -243,7 +243,6 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
   return out.sort((a, b) => a.priority - b.priority);
 }
 
-/** Recent client mail (last 3 days) that asks for something. */
 /** A client mail that reads like a request and is still unread, or arrived in the last 3 days. */
 export function needsAction(e: EmailItem, now: Date): boolean {
   return e.company !== 'other' && e.attention.length > 0 && (e.unread || new Date(e.date).getTime() > now.getTime() - 3 * DAY);

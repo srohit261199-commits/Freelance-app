@@ -195,7 +195,14 @@ function SubEditor({ sub, onClose }: { sub: Partial<Subscription>; onClose(): vo
           </select>
         </Field>
         <Field label="Status">
-          <select value={s.status} onChange={e => set({ status: e.target.value as Subscription['status'] })}>
+          <select
+            value={s.status}
+            onChange={e => {
+              const status = e.target.value as Subscription['status'];
+              // Access usually runs until the date it would have renewed.
+              set({ status, endsOn: status === 'cancelling' && !s.endsOn ? rollRenewal(s as Subscription, new Date()) : s.endsOn });
+            }}
+          >
             {Object.entries(STATUS_LABEL).map(([k, v]) => (
               <option key={k} value={k}>
                 {v}

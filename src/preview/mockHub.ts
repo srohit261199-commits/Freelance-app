@@ -6,7 +6,7 @@
 import type { Hub, NewModel } from '../shared/api';
 import type { AppState, Collection, Model, SyncResult } from '../shared/types';
 import { initialState } from '../main/seed/initial';
-import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, uid } from '../shared/ops';
+import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, repairState, uid } from '../shared/ops';
 import { applySync, calendarMeetings, driveGlbs, ingestMail } from '../shared/ingest';
 import { localDate } from '../shared/money';
 import { RECEIPT_IDS, SAMPLE_FOLDER, SAMPLE_PORTAL, SNAPSHOT_DRIVE, SNAPSHOT_EVENTS, SNAPSHOT_MAIL } from './snapshot';
@@ -39,7 +39,7 @@ function load(): AppState {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as AppState;
-      if (Array.isArray(s.models) && s.settings) return s;
+      if (Array.isArray(s.models) && s.settings) return repairState(s);
     }
   } catch {}
   return fresh();

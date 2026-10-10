@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { AppState, CompanyId, Currency, Payment } from '../../shared/types';
-import { allEarnings, convert, formatMoney, monthKey, monthLabel, ordinal, tierFee, type CompanyEarnings } from '../../shared/money';
+import { allEarnings, convert, formatMoney, localDate, monthLabel, ordinal, tierFee, type CompanyEarnings } from '../../shared/money';
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
 import { hub } from '../hub';
 import { ConfirmButton, CompanyDot, Field, Icon, Modal, fmtDate, useApp } from '../ui';
@@ -12,20 +12,15 @@ function payTerms(state: AppState, id: CompanyId): string {
   return `${formatMoney(c.pay.rate, c.currency)} per ${c.pay.unit}; no fixed pay day, so record payments as they arrive`;
 }
 
-/** Spends received money on months oldest first to show which months are paid. */
+/** Each month's state from what the recorded payments cover (money.ts allocates them by month). */
 function monthStatus(e: CompanyEarnings, nowMonth: string, today: string) {
-  let left = e.received;
   return e.months.map(l => {
-    const accruing = l.month === nowMonth && e.company === 'waveink';
+    const paid = e.paidByMonth[l.month] ?? 0;
     let state: 'paid' | 'part' | 'due' | 'overdue' | 'accruing';
-    if (accruing) state = 'accruing';
-    else if (left >= l.net - 0.5) {
-      state = 'paid';
-      left -= l.net;
-    } else if (left > 0) {
-      state = 'part';
-      left = 0;
-    } else state = l.due && l.due < today ? 'overdue' : 'due';
+    if (paid >= l.net - 0.5) state = 'paid';
+    else if (l.month === nowMonth && e.company === 'waveink') state = 'accruing';
+    else if (paid > 0) state = 'part';
+    else state = l.due && l.due < today ? 'overdue' : 'due';
     return { ...l, state };
   });
 }
@@ -39,8 +34,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   const toBase = (n: number, c: Currency) => convert(n, c, base, rates);
   const sum = (k: keyof Pick<CompanyEarnings, 'earned' | 'received' | 'outstanding' | 'pipeline' | 'thisMonth'>) =>
     earnings.reduce((s, e) => s + toBase(e[k], e.currency), 0);
-  const today = now.toISOString().slice(0, 10);
-  const nowMonth = monthKey(today);
+  const today = localDate(now);
+  const nowMonth = today.slice(0, 7);
   const mzCfg = state.companies.find(c => c.id === 'metaztech')!;
   const mzDone = state.models.filter(m => m.company === 'metaztech' && isComplete(m.status));
 
@@ -54,7 +49,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
           </p>
         </div>
         <div className="actions">
-          <button type="button" className="primary" onClick={() => setEditing({ date: today, company: 'waveink', currency: 'AED' })}>
+          <button type="button" className="primary" onClick={() => setEditing({ date: localDate(new Date()), company: 'waveink', currency: 'AED' })}>
             <Icon name="plus" /> Record payment
           </button>
           <button
@@ -78,7 +73,9 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
         <div className="kpi">
           <div className="kpi-top">Received</div>
           <div className="kpi-num">{formatMoney(sum('received'), base)}</div>
-          <div className="muted small">{state.payments.length} payments recorded</div>
+          <div className="muted small">
+            {state.payments.length} payment{state.payments.length === 1 ? '' : 's'} recorded
+          </div>
         </div>
         <div className="kpi">
           <div className="kpi-top">Still owed</div>
@@ -86,9 +83,9 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
           <div className="muted small">earned but not received yet</div>
         </div>
         <div className="kpi">
-          <div className="kpi-top">Expected this month</div>
+          <div className="kpi-top">Earning this month</div>
           <div className="kpi-num">{formatMoney(sum('thisMonth'), base)}</div>
-          <div className="muted small">+ {formatMoney(sum('pipeline'), base)} in open work</div>
+          <div className="muted small">paid next month · + {formatMoney(sum('pipeline'), base)} in open work</div>
         </div>
       </section>
 
@@ -116,16 +113,25 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                   <strong className={e.outstanding > 0 ? 'warn-text' : ''}>{formatMoney(e.outstanding, e.currency)}</strong>
                 </div>
                 <div>
-                  <small className="muted">{e.company === 'waveink' ? 'Accruing now' : 'This month'}</small>
+                  <small className="muted">{e.company === 'waveink' ? 'Accruing now' : 'Done this month'}</small>
                   <strong>{formatMoney(e.thisMonth, e.currency)}</strong>
                 </div>
               </div>
               {e.overdue && (
                 <div className="banner warn small">
-                  {monthLabel(e.overdue.month)} was due {fmtDate(e.overdue.due)} and is not recorded. Record it below once it arrives.
+                  {monthLabel(e.overdue.month)} was due {fmtDate(e.overdue.due)}
+                  {e.overdue.paid > 0
+                    ? ` and is only partly recorded: ${formatMoney(e.overdue.paid, e.currency)} of ${formatMoney(e.overdue.net, e.currency)}. Record the rest below once it arrives.`
+                    : ' and is not recorded. Record it below once it arrives.'}
                 </div>
               )}
               {e.unpriced > 0 && <div className="banner small">{e.unpriced} approved model{e.unpriced > 1 ? 's have' : ' has'} no complexity set; counted at the lowest tier.</div>}
+              {e.approxMonth > 0 && (
+                <p className="muted small">
+                  {e.approxMonth} model{e.approxMonth > 1 ? 's' : ''} imported already approved {e.approxMonth > 1 ? 'are' : 'is'} counted in the month{' '}
+                  {e.approxMonth > 1 ? 'they were' : 'it was'} imported.
+                </p>
+              )}
               {months.length === 0 ? (
                 <p className="muted small">Nothing earned yet.</p>
               ) : (
@@ -194,44 +200,51 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
 
       <section className="card">
         <h2>Payments received</h2>
-        {state.payments.length === 0 && <p className="muted small">No payments yet.</p>}
-        <table className="mini-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Company</th>
-              <th>For</th>
-              <th className="num">Amount</th>
-              <th>Reference</th>
-              <th>Note</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {[...state.payments]
-              .sort((a, b) => b.date.localeCompare(a.date))
-              .map(p => {
-                const c = state.companies.find(x => x.id === p.company);
-                return (
-                  <tr key={p.id}>
-                    <td>{fmtDate(p.date)}</td>
-                    <td>
-                      <CompanyDot color={c?.color ?? '#999'} /> {c?.name}
-                    </td>
-                    <td>{p.period ? monthLabel(p.period) : ''}</td>
-                    <td className="num">{formatMoney(p.amount, p.currency, p.amount % 1 ? 2 : 0)}</td>
-                    <td className="small">{p.reference}</td>
-                    <td className="small muted clamp">{p.note}</td>
-                    <td className="row-actions">
-                      <button type="button" className="mini" onClick={() => setEditing(p)}>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-          </tbody>
-        </table>
+        {state.payments.length === 0 ? (
+          <p className="muted small">No payments yet.</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="mini-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Company</th>
+                  <th>For</th>
+                  <th className="num">Amount</th>
+                  <th>Reference</th>
+                  <th>Note</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {[...state.payments]
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map(p => {
+                    const c = state.companies.find(x => x.id === p.company);
+                    return (
+                      <tr key={p.id}>
+                        <td>{fmtDate(p.date)}</td>
+                        <td>
+                          <CompanyDot color={c?.color ?? '#999'} /> {c?.name}
+                        </td>
+                        <td>{p.period ? monthLabel(p.period) : ''}</td>
+                        <td className="num">{formatMoney(p.amount, p.currency, p.amount % 1 ? 2 : 0)}</td>
+                        <td className="small">{p.reference}</td>
+                        <td className="small muted">
+                          <div className="clamp">{p.note}</div>
+                        </td>
+                        <td className="row-actions">
+                          <button type="button" className="mini" onClick={() => setEditing(p)}>
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
       {editing && <PaymentEditor state={state} payment={editing} onClose={() => setEditing(null)} />}
     </div>
@@ -239,11 +252,19 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
 }
 
 function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: Partial<Payment>; onClose(): void }) {
+  const { toast } = useApp();
   const [p, setP] = useState<Partial<Payment>>(payment);
   const set = (patch: Partial<Payment>) => setP({ ...p, ...patch });
   const save = async () => {
-    if (!p.company || !p.date || !Number(p.amount)) return;
-    await hub.upsert('payments', { ...p, amount: Number(p.amount), source: p.source ?? 'manual' });
+    const amount = Number(p.amount);
+    if (!(amount > 0)) return toast('Enter the amount received (more than 0).', 'error');
+    if (!p.company || !p.date) return toast('Enter the date the payment arrived.', 'error');
+    const currency = p.currency ?? 'INR';
+    const own = state.companies.find(c => c.id === p.company)!.currency;
+    // Fix the value in the company's currency now, so a later rate change doesn't rewrite this payment.
+    const changed = !payment.id || amount !== payment.amount || currency !== payment.currency || p.company !== payment.company;
+    const settledAmount = currency === own ? undefined : changed ? convert(amount, currency, own, state.settings.rates) : p.settledAmount;
+    await hub.upsert('payments', { ...p, amount, currency, settledAmount, source: p.source ?? 'manual' });
     onClose();
   };
   const defaults: Record<CompanyId, Currency> = { waveink: 'AED', metaztech: 'INR', skeidar: 'AED' };
@@ -287,7 +308,7 @@ function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: 
           <input type="date" value={p.date ?? ''} onChange={e => set({ date: e.target.value })} />
         </Field>
         <Field label="Amount received">
-          <input type="number" step="0.01" value={p.amount ?? ''} onChange={e => set({ amount: e.target.value as unknown as number })} />
+          <input type="number" min="0" step="0.01" value={p.amount ?? ''} onChange={e => set({ amount: e.target.value as unknown as number })} />
         </Field>
         <Field label="Currency">
           <select value={p.currency} onChange={e => set({ currency: e.target.value as Currency })}>

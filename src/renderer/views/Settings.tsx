@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { AppState, CompanyConfig, Complexity, Currency } from '../../shared/types';
 import { COMPLEXITY_LABELS } from '../../shared/status';
 import { ordinal } from '../../shared/money';
@@ -11,6 +11,8 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
   const g = s.google;
   const [clientId, setClientId] = useState(g.clientId);
   const [secret, setSecret] = useState(g.clientSecret);
+  useEffect(() => setClientId(g.clientId), [g.clientId]);
+  useEffect(() => setSecret(g.clientSecret), [g.clientSecret]);
   const [busy, setBusy] = useState(false);
   const [guide, setGuide] = useState(!g.connected);
   const [info, setInfo] = useState<{ version: string; dataDir: string } | null>(null);
@@ -18,8 +20,15 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
     hub.appInfo().then(setInfo);
   }, []);
 
+  // Kept as typed so leaving Settings doesn't lose them; while connected they only apply on Reconnect.
+  const saveClient = () => {
+    const google = { clientId: clientId.trim(), clientSecret: secret.trim() };
+    if (!g.connected && (google.clientId !== g.clientId || google.clientSecret !== g.clientSecret)) void hub.patchSettings({ google });
+  };
   const connect = async () => {
     if (!clientId.trim() || !secret.trim()) return toast('Paste the client ID and secret, or load the JSON file.', 'error');
+    if (!/\.apps\.googleusercontent\.com$/.test(clientId.trim()))
+      return toast('That client ID should end in .apps.googleusercontent.com. Copy it from Google Cloud → Clients, or load the downloaded JSON.', 'error');
     setBusy(true);
     toast('Your browser will open for Google sign-in…');
     const r = await hub.googleConnect(clientId, secret);
@@ -58,24 +67,24 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
         {guide && (
           <ol className="guide">
             <li>
-              Open <a onClick={() => hub.openUrl('https://console.cloud.google.com/projectcreate')}>console.cloud.google.com/projectcreate</a>, name the project <b>Freelance Hub</b>, click Create, and make sure it is selected at the top.
+              Open <Ext href="https://console.cloud.google.com/projectcreate">console.cloud.google.com/projectcreate</Ext>, name the project <b>Freelance Hub</b>, click Create, and make sure it is selected at the top.
             </li>
             <li>
               Turn on three APIs (open each, click <b>Enable</b>):{' '}
-              <a onClick={() => hub.openUrl('https://console.cloud.google.com/apis/library/gmail.googleapis.com')}>Gmail API</a>,{' '}
-              <a onClick={() => hub.openUrl('https://console.cloud.google.com/apis/library/calendar-json.googleapis.com')}>Google Calendar API</a>,{' '}
-              <a onClick={() => hub.openUrl('https://console.cloud.google.com/apis/library/drive.googleapis.com')}>Google Drive API</a>.
+              <Ext href="https://console.cloud.google.com/apis/library/gmail.googleapis.com">Gmail API</Ext>,{' '}
+              <Ext href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com">Google Calendar API</Ext>,{' '}
+              <Ext href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</Ext>.
             </li>
             <li>
-              Open <a onClick={() => hub.openUrl('https://console.cloud.google.com/auth/overview')}>Google Auth Platform</a> → <b>Get started</b>. App name: Freelance Hub; support email: your Gmail;
+              Open <Ext href="https://console.cloud.google.com/auth/overview">Google Auth Platform</Ext> → <b>Get started</b>. App name: Freelance Hub; support email: your Gmail;
               Audience: <b>External</b>; contact email: your Gmail. Finish.
             </li>
             <li>
-              In <a onClick={() => hub.openUrl('https://console.cloud.google.com/auth/audience')}>Audience</a>, add <b>s.rohit.261199@gmail.com</b> as a test user, then click <b>Publish app</b> → In production. (Left in
+              In <Ext href="https://console.cloud.google.com/auth/audience">Audience</Ext>, add <b>s.rohit.261199@gmail.com</b> as a test user, then click <b>Publish app</b> → In production. (Left in
               "Testing", Google signs you out every 7 days.)
             </li>
             <li>
-              In <a onClick={() => hub.openUrl('https://console.cloud.google.com/auth/clients')}>Clients</a> → <b>Create client</b> → Application type <b>Desktop app</b> → Create → <b>Download JSON</b>.
+              In <Ext href="https://console.cloud.google.com/auth/clients">Clients</Ext> → <b>Create client</b> → Application type <b>Desktop app</b> → Create → <b>Download JSON</b>.
             </li>
             <li>
               Click <b>Load client JSON</b> below, pick that file, then <b>Connect</b>. Your browser opens; Google will say the app isn't verified (it's your own app): click <b>Advanced → Go to Freelance
@@ -85,10 +94,10 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
         )}
         <div className="grid2">
           <Field label="OAuth client ID">
-            <input value={clientId} onChange={e => setClientId(e.target.value)} placeholder="…apps.googleusercontent.com" />
+            <input value={clientId} onChange={e => setClientId(e.target.value)} onBlur={saveClient} placeholder="…apps.googleusercontent.com" />
           </Field>
           <Field label="OAuth client secret">
-            <input type="password" value={secret} onChange={e => setSecret(e.target.value)} placeholder="GOCSPX-…" />
+            <input type="password" value={secret} onChange={e => setSecret(e.target.value)} onBlur={saveClient} placeholder="GOCSPX-…" />
           </Field>
         </div>
         <div className="row gap wrap">
@@ -220,6 +229,20 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
         </p>
       </section>
     </div>
+  );
+}
+
+function Ext({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      onClick={e => {
+        e.preventDefault();
+        void hub.openUrl(href);
+      }}
+    >
+      {children}
+    </a>
   );
 }
 

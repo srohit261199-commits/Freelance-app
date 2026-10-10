@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { AppState, Model } from '../shared/types';
-import { catalogStatusText, COMPLEXITY_LABELS, isComplete, statusLabel, trackerStatusText } from '../shared/status';
+import { catalogStatusText, COMPLEXITY_LABELS, isComplete, lastWorked, statusLabel, trackerStatusText } from '../shared/status';
 import { allEarnings, convert, jobOutputs, monthLabel, rollRenewal, tierFee } from '../shared/money';
 import { dailyLog, localDate } from '../shared/planner';
 
@@ -84,7 +84,7 @@ function waveink(wb: ExcelJS.Workbook, state: AppState): void {
       areas: m.areas ? Number(m.areas) : '',
       variants: m.variants,
       glb: m.glbFile ?? '',
-      updated: m.updatedAt !== m.createdAt ? day(m.updatedAt) : '',
+      updated: day(lastWorked(m)),
       notes: m.notes ?? '',
       url1: m.sourceUrls?.[0] ?? '',
     });
@@ -120,7 +120,7 @@ function waveink(wb: ExcelJS.Workbook, state: AppState): void {
       glb: m.glbFile ?? '',
       drive: m.driveFileUrl ? 'Yes' : '',
       notes: m.notes ?? '',
-      updated: m.updatedAt !== m.createdAt ? day(m.updatedAt) : '',
+      updated: day(lastWorked(m)),
     });
     row.getCell('pct').numFmt = '0%';
     paint(tr, row.number, 'status', m.status);

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { AppState, Model, ModelStatus } from '../../shared/types';
-import { nextActions, attentionMail } from '../../shared/planner';
-import { allEarnings, convert, daysUntil, formatMoney, jobOutputs, monthKey, rollRenewal } from '../../shared/money';
+import { mailLine, modelLabel, needsAction, nextActions } from '../../shared/planner';
+import { allEarnings, convert, daysUntil, formatMoney, jobOutputs, localDate, rollRenewal } from '../../shared/money';
 import { isComplete, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
 import { CompanyDot, Icon, Progress, fmtDate, relTime, useApp } from '../ui';
@@ -25,19 +25,19 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
   const company = (id?: string) => state.companies.find(c => c.id === id);
   const base = state.settings.baseCurrency;
   const rates = state.settings.rates;
-  const month = monthKey(now.toISOString());
+  const month = localDate(now).slice(0, 7);
 
   const wi = state.models.filter(m => m.company === 'waveink' && m.status !== 'skipped');
   const wiDone = wi.filter(m => isComplete(m.status)).length;
   const mz = state.models.filter(m => m.company === 'metaztech');
-  const mzApprovedMonth = mz.filter(m => isComplete(m.status) && m.completedAt?.startsWith(month)).length;
+  // Models imported already approved, with no approval date, weren't approved this month.
+  const mzApprovedMonth = mz.filter(m => isComplete(m.status) && m.completedAt && !m.completedAtApprox && localDate(m.completedAt).startsWith(month)).length;
   const skOpen = state.skeidarJobs.filter(j => j.status === 'open');
   const skLeft = skOpen.reduce((s, j) => {
     const o = jobOutputs(j);
     return s + o.total - o.done;
   }, 0);
   const expectedMonth = earnings.reduce((s, e) => s + convert(e.thisMonth, e.currency, base, rates), 0);
-  const receivedMonth = state.payments.filter(p => p.date.startsWith(month)).reduce((s, p) => s + convert(p.amount, p.currency, base, rates), 0);
   const outstanding = earnings.reduce((s, e) => s + convert(e.outstanding, e.currency, base, rates), 0);
 
   const upcoming = state.meetings.filter(m => new Date(m.end ?? m.start).getTime() > now.getTime() && daysUntil(m.start, now) <= 7).slice(0, 6);
@@ -45,12 +45,11 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
     .map(s => ({ s, date: s.status === 'cancelling' ? s.endsOn : rollRenewal(s, now) }))
     .filter(x => x.date && x.s.status !== 'cancelled' && daysUntil(x.date, now) >= 0 && daysUntil(x.date, now) <= 30)
     .sort((a, b) => a.date!.localeCompare(b.date!));
-  const mail = attentionMail(state.emails, now);
   const recent = state.emails.filter(e => e.company !== 'other').slice(0, 6);
 
   const move = async (m: Model, to: ModelStatus) => {
     await hub.setStatus([m.id], to);
-    toast(`${m.name.split(' - ')[0]} → ${statusLabel(to, m.company)}`);
+    toast(`${modelLabel(m)} → ${statusLabel(to, m.company)}`);
   };
 
   return (
@@ -126,11 +125,11 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
         </button>
         <button type="button" className="kpi" onClick={() => go({ view: 'earnings' })}>
           <div className="kpi-top">
-            <Icon name="money" /> This month
+            <Icon name="money" /> Earning this month
           </div>
           <div className="kpi-num">{formatMoney(expectedMonth, base)}</div>
           <div className="muted small">
-            received {formatMoney(receivedMonth, base)} · owed {formatMoney(outstanding, base)}
+            paid next month · still owed {formatMoney(outstanding, base)}
           </div>
         </button>
       </section>
@@ -206,8 +205,8 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
                       <strong>{e.fromName}</strong>
                       <span className="muted small push">{relTime(e.date, now)}</span>
                     </span>
-                    <span className="small clamp">{e.subject}</span>
-                    {mail.includes(e) && <span className="tag warn">needs reply</span>}
+                    <span className="small clamp">{mailLine(e)}</span>
+                    {needsAction(e, now) && <span className="tag warn">needs reply</span>}
                   </button>
                 </li>
               ))}
@@ -223,7 +222,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
                   <div>
                     <strong>{s.name}</strong>
                     <div className="muted small">
-                      {s.status === 'cancelling' ? 'ends' : 'renews'} {fmtDate(date)} ({daysUntil(date!, now) === 0 ? 'today' : `${daysUntil(date!, now)} d`})
+                      {s.status === 'cancelling' ? 'ends' : s.status === 'trial' ? 'trial ends' : 'renews'} {fmtDate(date)} ({daysUntil(date!, now) === 0 ? 'today' : `${daysUntil(date!, now)} d`})
                     </div>
                   </div>
                   {s.amount != null && <span className="small">{formatMoney(s.amount, s.currency, s.amount % 1 ? 2 : 0)}</span>}

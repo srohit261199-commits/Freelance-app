@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { AppState, Complexity, Model, ModelStatus } from '../../shared/types';
-import { COMPANY_STATUSES, COMPLEXITY_LABELS, isComplete, statusLabel } from '../../shared/status';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { AppState, Complexity, Model, ModelStatus, StatusEvent } from '../../shared/types';
+import { COMPANY_STATUSES, COMPLEXITY_LABELS, isComplete, isOpen, lastWorked, statusEvents, statusLabel } from '../../shared/status';
 import { formatMoney, tierFee } from '../../shared/money';
-import { waveinkQueue } from '../../shared/planner';
+import { modelLabel, waveinkQueue } from '../../shared/planner';
 import { hub } from '../hub';
 import { ConfirmButton, Drawer, Empty, Field, Icon, Modal, Progress, StatusPicker, Thumb, fmtDate, relTime, useApp } from '../ui';
 import { PortalImport } from './PortalImport';
@@ -35,28 +35,31 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
 
   const groups = [...new Set(all.map(m => m.group).filter(Boolean))] as string[];
   const subs = [...new Set(all.filter(m => group === 'all' || m.group === group).flatMap(m => m.subcategories ?? []))].sort();
-  const counts = useMemo(() => {
-    const c: Record<string, number> = { all: all.length, open: 0 };
-    for (const m of all) {
-      c[m.status] = (c[m.status] ?? 0) + 1;
-      if (m.status === 'todo' || m.status === 'in_progress' || m.status === 'revision') c.open++;
-    }
-    return c;
-  }, [all]);
-
-  const shown = useMemo(() => {
+  // Everything but the status filter, so each chip's count is what clicking it shows.
+  const matching = useMemo(() => {
     const q = query.toLowerCase().trim();
-    let list = all.filter(
+    return all.filter(
       m =>
-        (status === 'all' || (status === 'open' ? ['todo', 'in_progress', 'revision'].includes(m.status) : m.status === status)) &&
         (group === 'all' || m.group === group) &&
         (sub === 'all' || m.subcategories?.includes(sub)) &&
         (!starred || m.starred) &&
         (!q || `${m.name} ${m.code ?? ''} ${m.brand ?? ''} ${m.notes ?? ''} ${(m.subcategories ?? []).join(' ')}`.toLowerCase().includes(q)),
     );
+  }, [all, query, group, sub, starred]);
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: matching.length, open: 0 };
+    for (const m of matching) {
+      c[m.status] = (c[m.status] ?? 0) + 1;
+      if (isOpen(m.status)) c.open++;
+    }
+    return c;
+  }, [matching]);
+
+  const shown = useMemo(() => {
+    let list = matching.filter(m => status === 'all' || (status === 'open' ? isOpen(m.status) : m.status === status));
     const order = COMPANY_STATUSES[company];
     if (sort === 'name') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
-    else if (sort === 'updated') list = [...list].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    else if (sort === 'updated') list = [...list].sort((a, b) => (lastWorked(b) ?? '').localeCompare(lastWorked(a) ?? ''));
     else if (sort === 'status') list = [...list].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
     else {
       // Work order: revisions and in-progress first, then the to-do queue, then everything else.
@@ -66,16 +69,19 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
       list = [...list].sort((a, b) => Number(!!b.starred) - Number(!!a.starred) || rank(a) - rank(b) || Math.min(...(a.rows ?? [1e6])) - Math.min(...(b.rows ?? [1e6])));
     }
     return list;
-  }, [all, query, status, group, sub, starred, sort, company]);
+  }, [all, matching, status, sort, company]);
 
   const done = all.filter(m => isComplete(m.status)).length;
   const total = all.filter(m => m.status !== 'skipped').length;
   const driveWaiting = all.filter(m => m.driveFileUrl && (m.status === 'todo' || m.status === 'in_progress'));
   const current = openModel ? all.find(m => m.id === openModel) : undefined;
+  const picked = shown.filter(m => selected.has(m.id)).map(m => m.id);
+  const unpriced = all.filter(m => isComplete(m.status) && !m.complexity).length;
 
   const set = async (ids: string[], to: ModelStatus, note?: string) => {
     await hub.setStatus(ids, to, note);
-    toast(ids.length === 1 ? `${all.find(m => m.id === ids[0])?.name.split(' - ')[0]} → ${statusLabel(to, company)}` : `${ids.length} models → ${statusLabel(to, company)}`);
+    const one = ids.length === 1 && all.find(m => m.id === ids[0]);
+    toast(`${one ? modelLabel(one) : `${ids.length} models`} → ${statusLabel(to, company)}`);
   };
   const toggle = (id: string) =>
     setSelected(s => {
@@ -101,6 +107,11 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
             {cfg.role} · {done}/{total} done
             {company === 'metaztech' && cfg.pay.kind === 'tiered' && ` · ${formatMoney(all.filter(m => isComplete(m.status)).reduce((s, m) => s + tierFee(cfg, m.complexity), 0), 'INR')} approved work`}
           </p>
+          {company === 'metaztech' && unpriced > 0 && (
+            <p className="muted small">
+              {unpriced} approved model{unpriced > 1 ? 's have' : ' has'} no complexity and {unpriced > 1 ? 'are' : 'is'} counted at the {formatMoney(tierFee(cfg, undefined), 'INR')} tier.
+            </p>
+          )}
           <Progress value={done} total={total} color={cfg.color} />
         </div>
         <div className="actions wrap">
@@ -168,7 +179,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
             </button>
           ))}
         </div>
-        <div className="row gap">
+        <div className="row gap wrap">
           {groups.length > 1 && (
             <select value={group} onChange={e => (setGroup(e.target.value), setSub('all'))}>
               <option value="all">All groups</option>
@@ -197,9 +208,9 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
         </div>
       </div>
 
-      {selected.size > 0 && (
+      {picked.length > 0 && (
         <div className="bulk">
-          <strong>{selected.size} selected</strong>
+          <strong>{picked.length} selected</strong>
           <span className="muted">Set status:</span>
           {COMPANY_STATUSES[company].map(s => (
             <button
@@ -207,7 +218,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
               type="button"
               className={`mini pill st-${s}`}
               onClick={async () => {
-                await set([...selected], s);
+                await set(picked, s);
                 setSelected(new Set());
               }}
             >
@@ -267,7 +278,9 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
                     )}
                     <td>
                       <div className="name">
-                        {m.starred && <Icon name="star" size={12} />} {m.name}
+                        <button type="button" className="link-btn" onClick={() => setOpenModel(m.id)}>
+                          {m.starred && <Icon name="star" size={12} />} {m.name}
+                        </button>
                       </div>
                       <div className="muted small">
                         {[m.code, m.brand, m.colour].filter(Boolean).join(' · ')}
@@ -318,7 +331,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
                         )}
                       </td>
                     )}
-                    <td className="small muted">{m.history.length ? relTime(m.updatedAt, now) : ''}</td>
+                    <td className="small muted">{lastWorked(m) ? relTime(lastWorked(m)!, now) : ''}</td>
                     <td className="row-actions" onClick={e => e.stopPropagation()}>
                       {next && (
                         <button type="button" className="mini" onClick={() => set([m.id], next.to)}>
@@ -351,11 +364,29 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
     setGlb(m.glbFile ?? '');
   }, [m.id]);
   const patch = (p: Partial<Model>) => hub.patchModel(m.id, p);
+  // Typed fields save shortly after typing stops, on blur, and when the drawer closes (Escape or an outside click never blurs them).
+  const pending = useRef<{ id: string; patch: Partial<Model> } | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const flush = useCallback(() => {
+    clearTimeout(timer.current);
+    const p = pending.current;
+    pending.current = null;
+    if (p && Object.keys(p.patch).length) hub.patchModel(p.id, p.patch);
+  }, []);
+  const edit = (key: 'notes' | 'glbFile' | 'group', value: string) => {
+    const next = { ...pending.current?.patch };
+    if (value === (m[key] ?? '')) delete next[key];
+    else next[key] = value;
+    pending.current = { id: m.id, patch: next };
+    clearTimeout(timer.current);
+    timer.current = setTimeout(flush, 600);
+  };
+  useEffect(() => flush, [m.id, flush]);
 
   return (
     <Drawer onClose={onClose} title={m.name} subtitle={[m.code, m.group, ...(m.subcategories ?? [])].filter(Boolean).join(' · ')}>
       <div className="row gap wrap">
-        <StatusPicker status={m.status} company={m.company} onPick={s => hub.setStatus([m.id], s).then(() => toast(`→ ${statusLabel(s, m.company)}`))} />
+        <StatusPicker status={m.status} company={m.company} onPick={s => hub.setStatus([m.id], s).then(() => toast(`${modelLabel(m)} → ${statusLabel(s, m.company)}`))} />
         <button type="button" className={`chip ${m.starred ? 'on' : ''}`} onClick={() => patch({ starred: !m.starred })}>
           <Icon name="star" size={13} /> {m.starred ? 'Starred' : 'Star'}
         </button>
@@ -377,7 +408,7 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
             <input type="range" min={0} max={100} step={5} value={m.percent ?? 0} onChange={e => patch({ percent: Number(e.target.value) })} />
           </Field>
           <Field label="GLB file name">
-            <input value={glb} placeholder={`${m.code ?? 'name'}.glb`} onChange={e => setGlb(e.target.value)} onBlur={() => glb !== (m.glbFile ?? '') && patch({ glbFile: glb })} />
+            <input value={glb} placeholder={`${m.code ?? 'name'}.glb`} onChange={e => (setGlb(e.target.value), edit('glbFile', e.target.value))} onBlur={flush} />
           </Field>
         </div>
       )}
@@ -400,13 +431,13 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
             <input type="date" value={m.dueDate ?? ''} onChange={e => patch({ dueDate: e.target.value || undefined })} />
           </Field>
           <Field label="Project">
-            <input defaultValue={m.group ?? ''} onBlur={e => e.target.value !== (m.group ?? '') && patch({ group: e.target.value })} />
+            <input key={m.id} defaultValue={m.group ?? ''} onChange={e => edit('group', e.target.value)} onBlur={flush} />
           </Field>
         </div>
       )}
 
       <Field label={m.company === 'waveink' ? 'Rohit update / notes (goes into the tracker export)' : 'Notes (feedback, what to fix)'}>
-        <textarea rows={4} value={notes} onChange={e => setNotes(e.target.value)} onBlur={() => notes !== (m.notes ?? '') && patch({ notes })} />
+        <textarea rows={4} value={notes} onChange={e => (setNotes(e.target.value), edit('notes', e.target.value))} onBlur={flush} />
       </Field>
 
       {m.sourceUrls && m.sourceUrls.length > 0 && (
@@ -483,18 +514,26 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
       )}
 
       <h4>History</h4>
-      {m.history.length === 0 ? (
-        <p className="muted small">No changes yet{m.source === 'catalog' && isComplete(m.status) ? ' (marked done in the Waveink catalog)' : ''}.</p>
-      ) : (
+      {m.history.length > 0 && (
         <ul className="history">
           {[...m.history].reverse().map((h, i) => (
             <li key={i}>
-              <span className="muted small">{fmtDate(h.at, true)}</span> {h.from ? `${statusLabel(h.from, m.company)} → ` : ''}
-              <strong>{statusLabel(h.to, m.company)}</strong>
-              {h.note && <span className="muted"> · {h.note}</span>}
+              <span className="muted small">{fmtDate(h.at, true)}</span>{' '}
+              {h.kind === 'progress' ? (
+                <span className="muted">{progressText(h)}</span>
+              ) : (
+                <>
+                  {h.kind === 'import' ? 'Imported as ' : h.from ? `${statusLabel(h.from, m.company)} → ` : ''}
+                  <strong>{statusLabel(h.to, m.company)}</strong>
+                  {h.note && <span className="muted"> · {h.kind === 'import' ? h.note.replace(/^Imported /, '') : h.note}</span>}
+                </>
+              )}
             </li>
           ))}
         </ul>
+      )}
+      {statusEvents(m).length === 0 && (
+        <p className="muted small">No status changes yet{m.source === 'catalog' && isComplete(m.status) ? ' (marked done in the Waveink catalog)' : ''}.</p>
       )}
       {m.source !== 'catalog' && (
         <ConfirmButton
@@ -509,6 +548,13 @@ function ModelDrawer({ model: m, state, onClose }: { model: Model; state: AppSta
       )}
     </Drawer>
   );
+}
+
+function progressText(h: StatusEvent): string {
+  const note = h.note ?? '';
+  if (h.field === 'glb') return `GLB: ${note.replace(/^GLB /, '')}`;
+  if (h.field === 'notes') return `Note: ${note}`;
+  return note.replace(/ done$/, '');
 }
 
 function AddModel({ company, groups, onClose }: { company: 'waveink' | 'metaztech'; groups: string[]; onClose(): void }) {

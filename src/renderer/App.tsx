@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ActionTarget } from '../shared/planner';
 import { nextActions } from '../shared/planner';
 import { isComplete } from '../shared/status';
@@ -25,12 +25,18 @@ export function App() {
   const [route, setRoute] = useState<Route>({ view: 'today' });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const side = useRef<HTMLElement>(null);
+  const main = useRef<HTMLElement>(null);
 
-  const toast = useCallback((text: string, kind: 'ok' | 'error' = 'ok') => {
-    const id = Date.now() + Math.random();
-    setToasts(t => [...t, { id, text, kind }]);
-    setTimeout(() => setToasts(t => t.filter(x => x.id !== id)), kind === 'error' ? 7000 : 3500);
-  }, []);
+  const dismiss = useCallback((id: number) => setToasts(t => t.filter(x => x.id !== id)), []);
+  const toast = useCallback(
+    (text: string, kind: 'ok' | 'error' = 'ok') => {
+      const id = Date.now() + Math.random();
+      setToasts(t => [...t.slice(-2), { id, text, kind }]);
+      setTimeout(() => dismiss(id), kind === 'error' ? 7000 : 3500);
+    },
+    [dismiss],
+  );
 
   const go = useCallback((r: Route | ActionTarget) => {
     if ('url' in r) {
@@ -40,6 +46,17 @@ export function App() {
     if (r.view === 'company' && r.company === 'skeidar') setRoute({ view: 'skeidar' });
     else setRoute(r as Route);
   }, []);
+
+  // A new screen starts at its top, and on the phone bar the current screen scrolls into view.
+  useEffect(() => {
+    main.current?.scrollTo(0, 0);
+    const bar = side.current;
+    const on = bar?.querySelector<HTMLElement>('.nav .on');
+    if (!bar || !on || bar.scrollWidth <= bar.clientWidth) return;
+    const a = bar.getBoundingClientRect();
+    const b = on.getBoundingClientRect();
+    bar.scrollBy({ left: b.left - a.left - (a.width - b.width) / 2, behavior: 'smooth' });
+  }, [route]);
 
   useEffect(() => {
     const theme = state?.settings.theme ?? 'system';
@@ -101,7 +118,7 @@ export function App() {
   return (
     <AppCtx.Provider value={{ go, toast }}>
       <div className="shell">
-        <nav className="side">
+        <nav className="side" ref={side}>
           <div className="brand">
             <span className="logo">FH</span>
             <div>
@@ -129,7 +146,7 @@ export function App() {
             </small>
           </div>
         </nav>
-        <main className="content">
+        <main className="content" ref={main}>
           {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
           {route.view === 'company' && <Models key={route.company} state={state} company={route.company} openId={route.modelId} now={now} />}
           {route.view === 'skeidar' && <Skeidar state={state} now={now} openId={route.jobId} />}
@@ -140,10 +157,13 @@ export function App() {
           {route.view === 'settings' && <Settings state={state} now={now} />}
         </main>
       </div>
-      <div className="toasts">
+      <div className="toasts" role="status" aria-atomic="false">
         {toasts.map(t => (
-          <div key={t.id} className={`toast ${t.kind}`}>
-            {t.text}
+          <div key={t.id} className={`toast ${t.kind}`} onClick={() => dismiss(t.id)} title="Click to dismiss">
+            <span className="grow">{t.text}</span>
+            <button type="button" className="toast-x" aria-label="Dismiss">
+              <Icon name="close" size={14} />
+            </button>
           </div>
         ))}
       </div>

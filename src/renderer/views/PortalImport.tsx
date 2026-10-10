@@ -3,16 +3,21 @@ import type { AppState, PortalField, PortalMapping, PortalTable } from '../../sh
 import type { PortalRow } from '../../shared/ops';
 import { COMPLEXITY_LABELS, mapComplexity, mapPortalStatus, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
-import { Field, Modal, StatusPill, useApp } from '../ui';
+import { Field, Modal, StatusPill, fmtDate, useApp } from '../ui';
 
-const FIELDS: { key: PortalField; label: string; guess: RegExp }[] = [
-  { key: 'id', label: 'Job / ID', guess: /^(#|id|job|task|asset|sku|code|ticket)|\b(id|code|no\.?)\b/i },
-  { key: 'name', label: 'Model name', guess: /name|title|asset|model|product|item/i },
-  { key: 'status', label: 'Status', guess: /status|stage|state|progress|approval/i },
-  { key: 'complexity', label: 'Complexity', guess: /complex|level|difficulty|category|type|tier/i },
-  { key: 'revisions', label: 'Rejections / revisions', guess: /reject|revision|iteration|attempt|version|round/i },
-  { key: 'due', label: 'Due date', guess: /due|deadline|target|eta/i },
-  { key: 'project', label: 'Project / client', guess: /project|client|brand|batch/i },
+const ID = /(^#$)|\b(id|code|no|number|ref)\b/i;
+const WHEN = /date|\b(on|at|time)\b/i;
+
+/** Header guesses per field, best first; a column matching `skip` is never guessed for that field. */
+const FIELDS: { key: PortalField; label: string; guess: RegExp[]; skip?: RegExp }[] = [
+  { key: 'id', label: 'Job / ID', guess: [ID, /^(job|ticket|sku)\b|#/i], skip: /serial|^(s|sr|sl)\.?\s*no\b|name|title/i },
+  { key: 'name', label: 'Model name', guess: [/name|title/i, /model|product|item|asset/i], skip: new RegExp(`${ID.source}|project|client|customer|brand`, 'i') },
+  { key: 'status', label: 'Status', guess: [/status|stage|state/i, /progress|approval/i], skip: WHEN },
+  { key: 'complexity', label: 'Complexity', guess: [/complex|level|difficulty|category|type|tier/i] },
+  { key: 'revisions', label: 'Rejections / revisions', guess: [/reject|revision|iteration|attempt|version|round/i], skip: WHEN },
+  { key: 'due', label: 'Due date', guess: [/due|deadline|target|\beta\b/i] },
+  { key: 'approved', label: 'Approved on', guess: [/approv.*(date|\b(on|at)\b)|date.*approv/i, /^approved$/i] },
+  { key: 'project', label: 'Project / client', guess: [/project|client|brand|batch/i] },
 ];
 
 function signature(t: PortalTable): string {
@@ -20,16 +25,17 @@ function signature(t: PortalTable): string {
 }
 
 function guessFields(t: PortalTable, saved?: PortalMapping): Partial<Record<PortalField, number>> {
-  if (saved) return saved.fields;
-  const out: Partial<Record<PortalField, number>> = {};
-  const used = new Set<number>();
-  for (const f of FIELDS) {
-    const i = t.headers.findIndex((h, idx) => !used.has(idx) && f.guess.test(h));
-    if (i >= 0) {
+  const out: Partial<Record<PortalField, number>> = { ...saved?.fields };
+  const used = new Set(Object.values(out));
+  // A saved mapping keeps the user's choices (-1 = "—"); only fields added since it was saved are guessed.
+  for (const f of FIELDS.filter(f => !saved || (f.key === 'approved' && !(f.key in saved.fields))))
+    for (const re of f.guess) {
+      const i = t.headers.findIndex((h, idx) => !used.has(idx) && re.test(h) && !f.skip?.test(h));
+      if (i < 0) continue;
       out[f.key] = i;
       used.add(i);
+      break;
     }
-  }
   return out;
 }
 
@@ -57,13 +63,25 @@ function parsePaste(text: string): PortalTable | null {
   return { source: 'Pasted table', headers, rows, links: rows.map(() => '') };
 }
 
+const MONTH = '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/** Reads a portal date as written, with no time zone shift. 05/10/2026 is 5 Oct unless the numbers say otherwise. */
 function toDate(s: string): string | undefined {
-  if (!s) return undefined;
-  const d = new Date(s);
-  if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-  const m = s.match(/(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})/);
-  if (m) return `${m[3].length === 2 ? '20' + m[3] : m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
-  return undefined;
+  const t = s.toLowerCase();
+  let y: number, m: number, d: number, p: RegExpMatchArray | null;
+  if ((p = t.match(/(?<!\d)(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?!\d)/))) [y, m, d] = [+p[1], +p[2], +p[3]];
+  else if ((p = t.match(/(?<!\d)(\d{1,2})[-/.](\d{1,2})[-/.](\d{4}|\d{2})(?!\d)/))) {
+    [d, m, y] = [+p[1], +p[2], +p[3]];
+    if (d <= 12 && m > 12) [d, m] = [m, d];
+  } else if ((p = t.match(new RegExp(`(?<!\\d)(\\d{1,2})(?:st|nd|rd|th)?[\\s-]+${MONTH},?[\\s-]+(\\d{4}|\\d{2})(?!\\d)`))))
+    [d, m, y] = [+p[1], MONTHS.indexOf(p[2]) + 1, +p[3]];
+  else if ((p = t.match(new RegExp(`\\b${MONTH}[\\s-]+(\\d{1,2})(?:st|nd|rd|th)?,?[\\s-]+(\\d{4}|\\d{2})(?!\\d)`))))
+    [m, d, y] = [MONTHS.indexOf(p[1]) + 1, +p[2], +p[3]];
+  else return undefined;
+  if (y < 100) y += 2000;
+  if (m < 1 || m > 12 || d < 1 || d > new Date(y, m, 0).getDate()) return undefined;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 'pull' | 'paste'; onClose(): void }) {
@@ -75,6 +93,7 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
   const [pick, setPick] = useState(0);
   const [paste, setPaste] = useState('');
   const [fields, setFields] = useState<Partial<Record<PortalField, number>>>({});
+  const has = (f: PortalField) => (fields[f] ?? -1) >= 0;
 
   const pull = async () => {
     setLoading(true);
@@ -112,7 +131,7 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
 
   const rows: PortalRow[] = useMemo(() => {
     if (!table) return [];
-    const get = (r: string[], f: PortalField) => (fields[f] !== undefined ? (r[fields[f]!] ?? '').trim() : '');
+    const get = (r: string[], f: PortalField) => (has(f) ? (r[fields[f]!] ?? '').trim() : '');
     return table.rows.map((r, i) => {
       const statusText = get(r, 'status');
       const rev = get(r, 'revisions');
@@ -124,6 +143,7 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
         complexity: mapComplexity(get(r, 'complexity')),
         revisions: rev && /\d/.test(rev) ? Number(rev.match(/\d+/)![0]) : undefined,
         due: toDate(get(r, 'due')),
+        approvedOn: toDate(get(r, 'approved')),
         project: get(r, 'project') || undefined,
         link: table.links[i] || undefined,
         raw: Object.fromEntries(table.headers.map((h, k) => [h || `Column ${k + 1}`, r[k] ?? ''])),
@@ -156,7 +176,7 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="button" className="primary" onClick={doImport} disabled={!rows.length || fields.name === undefined && fields.id === undefined}>
+          <button type="button" className="primary" onClick={doImport} disabled={!rows.length || !has('name') && !has('id')}>
             Import {rows.length} row{rows.length === 1 ? '' : 's'}
           </button>
         </>
@@ -197,8 +217,8 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
             {FIELDS.map(f => (
               <Field key={f.key} label={f.label}>
                 <select
-                  value={fields[f.key] ?? ''}
-                  onChange={e => setFields({ ...fields, [f.key]: e.target.value === '' ? undefined : Number(e.target.value) })}
+                  value={has(f.key) ? fields[f.key] : ''}
+                  onChange={e => setFields({ ...fields, [f.key]: e.target.value === '' ? -1 : Number(e.target.value) })}
                 >
                   <option value="">—</option>
                   {table.headers.map((h, i) => (
@@ -221,6 +241,8 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
                   <th>Becomes</th>
                   <th>Complexity</th>
                   <th>Rejections</th>
+                  {has('due') && <th>Due</th>}
+                  {has('approved') && <th>Approved on</th>}
                 </tr>
               </thead>
               <tbody>
@@ -234,6 +256,8 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
                     </td>
                     <td>{r.complexity ? COMPLEXITY_LABELS[r.complexity] : <span className="muted">not set</span>}</td>
                     <td>{r.revisions ?? ''}</td>
+                    {has('due') && <td>{fmtDate(r.due)}</td>}
+                    {has('approved') && <td>{fmtDate(r.approvedOn)}</td>}
                   </tr>
                 ))}
               </tbody>
@@ -242,8 +266,11 @@ export function PortalImport({ state, mode, onClose }: { state: AppState; mode: 
           {rows.length > 10 && <p className="muted small">…and {rows.length - 10} more.</p>}
           <p className="muted small">
             Status words are matched automatically (approved → {statusLabel('done', 'metaztech')}, rejected / redo → {statusLabel('revision', 'metaztech')}, submitted / QC →{' '}
-            {statusLabel('review', 'metaztech')}, hold → On hold). Existing models are matched by ID, then by name, so pulling again only updates them.
+            {statusLabel('review', 'metaztech')}, hold → On hold). Existing models are matched by job ID (by name only when there is no ID), so pulling again only updates them.
           </p>
+          {!has('approved') && rows.some(r => r.status === 'done') && (
+            <p className="muted small">No "Approved on" column picked: approved models new to the app count toward this month's earnings.</p>
+          )}
         </>
       )}
     </Modal>
