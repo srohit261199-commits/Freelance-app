@@ -109,6 +109,8 @@ export interface SkeidarJob {
   imageFiles?: string[];
   /** Finished image found in the output folder for a `${fabricIndex}:${imageIndex}` key. */
   outputs?: Record<string, string>;
+  /** What the folder said about photos and fabrics at the last sync; while it says the same, edits made in the app stay. */
+  folderSig?: string;
 }
 
 export interface Payment {

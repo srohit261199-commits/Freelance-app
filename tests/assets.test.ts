@@ -208,8 +208,11 @@ describe('jobs from folders', () => {
     expect(s.skeidarJobs[0].company).toBeUndefined();
     const again = applyJobFolders(s, 'skeidar', [{ info: info(['Justin stol - Kiara 851 Beige - front.jpg']), created: '2026-10-08' }], NOW);
     expect(again).toEqual({ created: 0, updated: 0, ticked: 0, folders: 1 });
-    const more = applyJobFolders(s, 'skeidar', [{ info: info(['Justin stol - Kiara 851 Beige - front.jpg', 'Justin stol - Kiara 851 Beige - back.jpg']), created: '2026-10-08' }], NOW);
-    expect(more).toEqual({ created: 0, updated: 1, ticked: 1, folders: 1 });
+    const two = ['Justin stol - Kiara 851 Beige - front.jpg', 'Justin stol - Kiara 854 Light Grey - back.jpg', 'Justin stol - Kiara 851 Beige - back.jpg'];
+    const more = applyJobFolders(s, 'skeidar', [{ info: info(two), created: '2026-10-08' }], NOW);
+    expect(more).toEqual({ created: 0, updated: 1, ticked: 2, folders: 1 });
+    // The same files again, ticks carried over in a different order: nothing to report.
+    expect(applyJobFolders(s, 'skeidar', [{ info: info(two), created: '2026-10-08' }], NOW)).toEqual({ created: 0, updated: 0, ticked: 0, folders: 1 });
     expect(s.skeidarJobs).toHaveLength(1);
     // Another client's folder makes a job of its own, tagged with the client.
     applyJobFolders(s, 'nordic', [{ info: info(), created: '2026-10-09' }], NOW);
@@ -217,6 +220,24 @@ describe('jobs from folders', () => {
     // Empty folders don't become jobs.
     const empty: JobFolderInfo = { folder: `${DIR}2`, name: 'New', files: [], masters: [], outputs: [] };
     expect(applyJobFolders(s, 'skeidar', [{ info: empty, created: '2026-10-10' }], NOW).created).toBe(0);
+  });
+
+  it('keeps fabrics and photo names edited in the app until the folder itself changes', () => {
+    const s = initialState(NOW);
+    applyJobFolders(s, 'skeidar', [{ info: info(), created: '2026-10-08' }], NOW);
+    const job = s.skeidarJobs[0];
+    job.fabrics = job.fabrics.slice(0, 5);
+    job.images = ['Front', 'Back', 'Three-quarter'];
+    expect(applyJobFolders(s, 'skeidar', [{ info: info(['Justin stol - Kiara 851 Beige - front.jpg']), created: '2026-10-08' }], NOW)).toMatchObject({ updated: 1, ticked: 1 });
+    expect(job.fabrics).toHaveLength(5);
+    expect(job.images).toEqual(['Front', 'Back', 'Three-quarter']);
+    expect(job.done).toEqual({ '0:0': true });
+    // A new photo in the folder: the folder wins again.
+    const i = info();
+    i.masters.push(file('Justin stol - side.jpg'));
+    applyJobFolders(s, 'skeidar', [{ info: i, created: '2026-10-08' }], NOW);
+    expect(job.fabrics).toHaveLength(39);
+    expect(job.images).toHaveLength(4);
   });
 });
 

@@ -18,6 +18,38 @@ const hostOf = (url: string) => {
 };
 const within = (host: string, domains: string[]) => domains.some(d => host === d || host.endsWith(`.${d}`));
 
+const locked = new Set<string>();
+
+/** Pages in an account window get no camera, microphone, location, notifications or other device access. */
+function lockDown(partition: string): void {
+  if (locked.has(partition)) return;
+  locked.add(partition);
+  const ses = session.fromPartition(partition);
+  ses.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  ses.setPermissionCheckHandler(() => false);
+}
+
+/**
+ * Keeps an account window (and any sign-in pop-up it opens) on the vendor's site and the single sign-on pages it hands
+ * off to. Anything else opens in the normal browser.
+ */
+function guard(contents: Electron.WebContents, allowed: string[]): void {
+  const ok = (url: string) => url.startsWith('https:') && within(hostOf(url), allowed);
+  contents.setWindowOpenHandler(({ url }) => {
+    if (ok(url)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true } };
+    if (/^https?:/.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  const stay = (e: Electron.Event, url: string) => {
+    if (ok(url)) return;
+    e.preventDefault();
+    if (/^https?:/.test(url)) void shell.openExternal(url);
+  };
+  contents.on('will-navigate', stay);
+  contents.on('will-redirect', stay);
+  contents.on('did-create-window', child => guard(child.webContents, allowed));
+}
+
 /** The account's window, created on first use. `show` false keeps it hidden while reading. */
 function windowFor(account: SoftwareAccount, show: boolean): BrowserWindow {
   const open = windows.get(account.id);
@@ -29,25 +61,19 @@ function windowFor(account: SoftwareAccount, show: boolean): BrowserWindow {
     return open;
   }
   const domains = accountDomains(account);
+  const partition = `persist:account-${account.id}`;
+  lockDown(partition);
   const win = new BrowserWindow({
     width: 1200,
     height: 860,
     show,
     title: `${account.label} account (Freelance Hub)`,
     autoHideMenuBar: true,
-    webPreferences: { partition: `persist:account-${account.id}`, contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: { partition, contextIsolation: true, sandbox: true, nodeIntegration: false },
   });
   // Some sign-in pages refuse browsers that call themselves Electron.
   win.webContents.setUserAgent(win.webContents.getUserAgent().replace(/\s(Electron|freelance-hub|Freelance Hub)\/\S+/gi, ''));
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    const host = hostOf(url);
-    if (url.startsWith('https:') && (within(host, domains) || within(host, SSO))) return { action: 'allow' };
-    if (/^https?:/.test(url)) void shell.openExternal(url);
-    return { action: 'deny' };
-  });
-  win.webContents.on('will-navigate', (e, url) => {
-    if (!/^https:/.test(url)) e.preventDefault();
-  });
+  guard(win.webContents, [...domains, ...SSO]);
   win.on('page-title-updated', e => e.preventDefault());
   win.on('closed', () => windows.delete(account.id));
   windows.set(account.id, win);

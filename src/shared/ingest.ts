@@ -5,7 +5,7 @@
 import type { AppState, EmailItem, Meeting, Model, Payment, Subscription, Suggestion, SyncResult } from './types';
 import { classify, findJoinUrl, looksLikePayout, meetingFromInviteSubject, parseIcs, parseSubscription, parseWaveinkSalary, toEmailItem, type RawMail } from './mail';
 import { normaliseCode } from './status';
-import { foldVendorMail, matchVendorSub, parseVendorMail, vendorOfMail } from './vendors';
+import { foldVendorMail, matchVendorSub, parseVendorMail, vendorOfMail, type VendorFinding } from './vendors';
 import { localDate } from './money';
 
 const DAY = 86400000;
@@ -142,7 +142,7 @@ export function ingestMail(state: AppState, raws: RawMail[], receiptIds: Set<str
 interface VendorMail {
   raw: RawMail;
   url: string;
-  found: Partial<Subscription>;
+  found: VendorFinding;
 }
 
 /**

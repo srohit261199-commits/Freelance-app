@@ -437,7 +437,7 @@ export function promptList(job: SkeidarJob, opts: { image?: number; onlyMissing?
 
 /* ---------- jobs from folders ---------- */
 
-export type FolderJob = Pick<SkeidarJob, 'name' | 'images' | 'fabrics' | 'done' | 'product' | 'sheet' | 'itemIds' | 'options' | 'imageFiles' | 'outputs'>;
+export type FolderJob = Pick<SkeidarJob, 'name' | 'images' | 'fabrics' | 'done' | 'product' | 'sheet' | 'itemIds' | 'options' | 'imageFiles' | 'outputs' | 'folderSig'>;
 
 /** Ticks of an existing job carried over to a new fabric and photo list (matched by fabric name, then photo file, label or position). */
 function carryTicks(existing: SkeidarJob | undefined, fabrics: string[], images: string[], imageFiles?: string[]): Record<string, boolean> {
@@ -463,22 +463,25 @@ function carryTicks(existing: SkeidarJob | undefined, fabrics: string[], images:
 
 function buildFromFolder(info: JobFolderInfo, existing?: SkeidarJob): { job: FolderJob; ticked: number } {
   const sheet = info.sheet?.fabrics.length ? info.sheet : undefined;
-  const product = sheet?.product || existing?.product;
-  const fabrics = sheet ? sheet.fabrics.map(f => f.name) : (existing?.fabrics ?? []);
-  const itemIds = sheet ? Object.fromEntries(sheet.fabrics.filter(f => f.itemIds.length).map(f => [f.name, f.itemIds])) : existing?.itemIds;
-  const options = sheet ? [...new Map(sheet.fabrics.flatMap(f => f.options).map(o => [o.toLowerCase(), o])).values()] : existing?.options;
+  // While the sheet and photos are what they were at the last sync, fabrics and photos edited in the app are kept.
+  const sig = JSON.stringify([sheet?.fabrics.map(f => [f.name, f.itemIds]) ?? null, info.masters.map(f => f.path).sort()]);
+  const kept = !!existing?.folderSig && existing.folderSig === sig ? existing : undefined;
+  const product = kept ? kept.product : sheet?.product || existing?.product;
+  const fabrics = kept ? kept.fabrics : sheet ? sheet.fabrics.map(f => f.name) : (existing?.fabrics ?? []);
+  const itemIds = kept ? kept.itemIds : sheet ? Object.fromEntries(sheet.fabrics.filter(f => f.itemIds.length).map(f => [f.name, f.itemIds])) : existing?.itemIds;
+  const options = kept ? kept.options : sheet ? [...new Map(sheet.fabrics.flatMap(f => f.options).map(o => [o.toLowerCase(), o])).values()] : existing?.options;
   // Loose photos named after a fabric are finished images saved next to the masters, unless every photo is.
   const named = (f: AssetFile) => !!matchFabric(tokens(stem(f.name)), { fabrics, itemIds });
   const stray = info.masters.filter(named);
   let masters = stray.length < info.masters.length ? info.masters.filter(f => !named(f)) : info.masters;
   if (masters.length > 8) masters = [];
   const sorted = sortMasters(masters);
-  const images = sorted.length ? sorted.map((f, i) => masterLabel(f.name, product, i)) : (existing?.images ?? []);
+  const images = kept ? [...kept.images] : sorted.length ? sorted.map((f, i) => masterLabel(f.name, product, i)) : (existing?.images ?? []);
   images.forEach((l, i) => {
     const dup = images.slice(0, i).filter(x => x === l).length;
     if (dup) images[i] = `${l} ${dup + 1}`;
   });
-  const imageFiles = sorted.length ? sorted.map(f => f.path) : existing?.imageFiles;
+  const imageFiles = kept ? kept.imageFiles : sorted.length ? sorted.map(f => f.path) : existing?.imageFiles;
   const done = carryTicks(existing, fabrics, images, imageFiles);
   const outputs: Record<string, string> = {};
   const shape = { name: existing?.name ?? info.name, product, fabrics, images, imageFiles, itemIds };
@@ -491,7 +494,7 @@ function buildFromFolder(info: JobFolderInfo, existing?: SkeidarJob): { job: Fol
     if (!done[k]) ticked++;
     done[k] = true;
   }
-  return { job: { ...shape, sheet: sheet?.path ?? existing?.sheet, options, done, outputs }, ticked };
+  return { job: { ...shape, sheet: sheet?.path ?? existing?.sheet, options, done, outputs, folderSig: sig }, ticked };
 }
 
 /**
@@ -502,7 +505,7 @@ export function jobFromFolder(info: JobFolderInfo, existing?: SkeidarJob): Folde
   return buildFromFolder(info, existing).job;
 }
 
-const FIELDS = ['images', 'fabrics', 'done', 'product', 'sheet', 'itemIds', 'options', 'imageFiles', 'outputs'] as const;
+const FIELDS = ['images', 'fabrics', 'done', 'product', 'sheet', 'itemIds', 'options', 'imageFiles', 'outputs', 'folderSig'] as const;
 
 /** Creates or updates one job per job folder of a client, in place on a draft state. `created` is each folder's local creation date. */
 export function applyJobFolders(draft: AppState, company: CompanyId, folders: { info: JobFolderInfo; created: string }[], now: string): FolderSyncResult {
@@ -512,9 +515,16 @@ export function applyJobFolders(draft: AppState, company: CompanyId, folders: { 
     if (!existing && !info.masters.length && !info.sheet?.fabrics.length) continue;
     const { job, ticked } = buildFromFolder(info, existing);
     if (existing) {
-      const before = JSON.stringify(FIELDS.map(k => existing[k]));
+      // The folder signature alone changing isn't an update worth reporting.
+      // Keys sorted, so ticks carried over in another order don't count as a change.
+      const seen = () =>
+        JSON.stringify(
+          FIELDS.filter(k => k !== 'folderSig').map(k => existing[k]),
+          (_k, v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y))) : v),
+        );
+      const before = seen();
       for (const k of FIELDS) (existing as unknown as Record<string, unknown>)[k] = job[k];
-      if (JSON.stringify(FIELDS.map(k => existing[k])) !== before) result.updated++;
+      if (seen() !== before) result.updated++;
     } else {
       draft.skeidarJobs.push({
         id: uid('sk'),

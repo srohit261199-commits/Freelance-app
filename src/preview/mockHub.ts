@@ -107,6 +107,8 @@ function openLink(url: string) {
 }
 
 const ctx: mockAssets.MockCtx = { state: () => state, commit, notice };
+// Like the app at start-up: job folders are read once, so the dashboard shows Skeidar's sample job straight away.
+setTimeout(() => void mockAssets.syncJobFolders(ctx, 'skeidar').catch(() => {}), 0);
 
 const hub: Hub = {
   async getState() {
