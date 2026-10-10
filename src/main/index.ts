@@ -330,6 +330,8 @@ app.whenReady().then(() => {
   if (getState().settings.google.connected) setTimeout(() => void syncAndNotify(), 4000);
   setInterval(() => tick(getState(), focus), 60000);
   setTimeout(() => tick(getState(), focus), 8000);
+  // Job folders: re-sync a few seconds after files change in a watched client folder.
+  setTimeout(() => assets.startWatchers(getState, update, onChange), 3000);
 });
 
 app.on('window-all-closed', () => {

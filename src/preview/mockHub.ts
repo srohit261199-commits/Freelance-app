@@ -33,7 +33,16 @@ function notice(text: string, link?: string) {
 }
 
 function fresh(): AppState {
-  return initialState(new Date().toISOString());
+  return withSampleFolders(initialState(new Date().toISOString()));
+}
+
+/** The preview's sample folders for Waveink and MetaZtech (the app leaves these for Rohit to link). */
+function withSampleFolders(s: AppState): AppState {
+  for (const id of ['waveink', 'metaztech'] as const) {
+    const c = s.companies.find(x => x.id === id);
+    if (c && !c.folder) c.folder = mockAssets.SAMPLE_ROOTS[id];
+  }
+  return s;
 }
 
 function load(): AppState {
@@ -41,7 +50,7 @@ function load(): AppState {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as AppState;
-      if (Array.isArray(s.models) && s.settings) return repairState(upgradeState(s, fresh()));
+      if (Array.isArray(s.models) && s.settings) return withSampleFolders(repairState(upgradeState(s, fresh())));
     }
   } catch {}
   return fresh();
