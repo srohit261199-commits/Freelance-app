@@ -3,7 +3,8 @@ import type { AppState, CompanyId, Currency, Payment } from '../../shared/types'
 import { addMonths, allEarnings, convert, formatMoney, localDate, monthLabel, monthsBetween, ordinal, tierFee, type CompanyEarnings } from '../../shared/money';
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
 import { hub } from '../hub';
-import { CLIENT_ICON, ConfirmButton, Field, Icon, Modal, fmtDate, useApp, type IconName } from '../ui';
+import { ConfirmButton, Field, Icon, Modal, fmtDate, useApp, type IconName } from '../ui';
+import { clientIcon } from './JobDetails';
 import './Payments.css';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -305,7 +306,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                 <li key={e.company} className={`pay-client c-${e.company}`}>
                   <div className="pay-client-row">
                     <span className="pay-client-tile c-fill" aria-hidden="true">
-                      <Icon name={CLIENT_ICON[e.company]} size={20} weight="fill" />
+                      <Icon name={clientIcon(c)} size={20} weight="fill" />
                     </span>
                     <div className="pay-client-text">
                       <b>{c.name}</b>

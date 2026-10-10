@@ -4,12 +4,17 @@ import { Icon, type IconName } from '../ui';
 export interface MenuItem {
   label: string;
   icon?: IconName;
+  /** Client the item is for: its icon takes the client's colour, so two clients with the same icon still look apart. */
+  client?: string;
   onSelect(): void;
 }
 
-/** Button with a small menu. The menu is fixed to the window so scrolling columns and panels never clip it. */
+/**
+ * Button with a small menu. The menu is fixed to the window so scrolling columns and panels never clip it,
+ * and scrolls itself when it has more items (a long client list) than the window has room for.
+ */
 export function DashMenu({ label, items, icon, iconOnly, className = '' }: { label: string; items: MenuItem[]; icon?: IconName; iconOnly?: boolean; className?: string }) {
-  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number; max: number } | null>(null);
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const open = pos !== null;
@@ -19,7 +24,7 @@ export function DashMenu({ label, items, icon, iconOnly, className = '' }: { lab
     const r = btn.current.getBoundingClientRect();
     const below = innerHeight - r.bottom;
     const up = below < items.length * 36 + 26 && r.top > below;
-    setPos({ top: up ? undefined : r.bottom + 6, bottom: up ? innerHeight - r.top + 6 : undefined, right: Math.max(8, innerWidth - r.right) });
+    setPos({ top: up ? undefined : r.bottom + 6, bottom: up ? innerHeight - r.top + 6 : undefined, right: Math.max(8, innerWidth - r.right), max: Math.max(120, (up ? r.top : below) - 14) });
   };
 
   useEffect(() => {
@@ -71,7 +76,13 @@ export function DashMenu({ label, items, icon, iconOnly, className = '' }: { lab
         {!iconOnly && label}
       </button>
       {pos && (
-        <div ref={menu} className="menu dash-menu" role="menu" aria-label={label} style={{ position: 'fixed', left: 'auto', top: pos.top ?? 'auto', bottom: pos.bottom ?? 'auto', right: pos.right }}>
+        <div
+          ref={menu}
+          className="menu dash-menu"
+          role="menu"
+          aria-label={label}
+          style={{ position: 'fixed', left: 'auto', top: pos.top ?? 'auto', bottom: pos.bottom ?? 'auto', right: pos.right, maxHeight: pos.max }}
+        >
           {items.map(it => (
             <button
               key={it.label}
@@ -83,7 +94,7 @@ export function DashMenu({ label, items, icon, iconOnly, className = '' }: { lab
                 it.onSelect();
               }}
             >
-              {it.icon && <Icon name={it.icon} />}
+              {it.icon && (it.client ? <span className={`dash-menu-ic c-${it.client}`}><Icon name={it.icon} /></span> : <Icon name={it.icon} />)}
               {it.label}
             </button>
           ))}

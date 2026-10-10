@@ -159,21 +159,29 @@ export function deadlineDates(cfg: CompanyConfig, from: string, to: string): { i
   return out.sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? '24').localeCompare(b.time ?? '24'));
 }
 
+/** One occurrence of a deadline, with its local time and how many days off it is. */
+function hitOf(cfg: CompanyConfig, o: ReturnType<typeof deadlineDates>[number], now: Date): DeadlineHit {
+  const [h, m] = (o.time ?? '23:59').split(':').map(Number);
+  const d = parse(o.date);
+  const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
+  const n = Math.round((parse(o.date).getTime() - parse(localDate(now)).getTime()) / 86400000);
+  return { ...o, company: cfg.id, at, days: n, passed: n === 0 && at.getTime() < now.getTime() };
+}
+
 /** Upcoming recurring deadlines from today through `days` days ahead. Today's stay listed after their time, marked passed. */
 export function nextDeadlines(cfg: CompanyConfig, now: Date, days = 7): DeadlineHit[] {
   const today = localDate(now);
-  return deadlineDates(cfg, today, addDays(today, days)).map(o => {
-    const [h, m] = (o.time ?? '23:59').split(':').map(Number);
-    const d = parse(o.date);
-    const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
-    const n = Math.round((parse(o.date).getTime() - parse(today).getTime()) / 86400000);
-    return { ...o, company: cfg.id, at, days: n, passed: n === 0 && at.getTime() < now.getTime() };
-  });
+  return deadlineDates(cfg, today, addDays(today, days)).map(o => hitOf(cfg, o, now));
 }
 
 /** Upcoming deadlines for every client still on the books, soonest first. */
 export function allDeadlines(state: AppState, now: Date, days = 7): DeadlineHit[] {
   return state.companies.flatMap(c => nextDeadlines(c, now, days)).sort((a, b) => a.at.getTime() - b.at.getTime());
+}
+
+/** Every client's deadlines between two local dates (inclusive), past ones too, soonest first: for a month on the calendar. */
+export function deadlinesBetween(state: AppState, from: string, to: string, now: Date): DeadlineHit[] {
+  return state.companies.flatMap(c => deadlineDates(c, from, to).map(o => hitOf(c, o, now))).sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
 const words = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4));
@@ -183,6 +191,23 @@ export function meetingFor(meetings: Meeting[], d: DeadlineHit): Meeting | undef
   if (!d.time) return undefined;
   const label = words(d.label);
   return meetings.find(m => m.company === d.company && Math.abs(new Date(m.start).getTime() - d.at.getTime()) <= 45 * 60000 && [...words(m.title)].some(w => label.has(w)));
+}
+
+export type AgendaItem = { at: Date } & ({ kind: 'meeting'; meeting: Meeting } | { kind: 'deadline'; deadline: DeadlineHit });
+
+/**
+ * The next `days` days for the dashboard: meetings that haven't ended and recurring deadlines whose time hasn't gone, soonest first.
+ * A deadline that came in from the calendar as a meeting is listed once, as the meeting.
+ */
+export function agenda(state: AppState, now: Date, days = 7): AgendaItem[] {
+  const last = addDays(localDate(now), days);
+  const meetings = state.meetings
+    .filter(m => new Date(m.end ?? m.start).getTime() > now.getTime() && localDate(m.start) <= last)
+    .map((m): AgendaItem => ({ kind: 'meeting', at: new Date(m.start), meeting: m }));
+  const deadlines = allDeadlines(state, now, days)
+    .filter(d => !d.passed && !meetingFor(state.meetings, d))
+    .map((d): AgendaItem => ({ kind: 'deadline', at: d.at, deadline: d }));
+  return [...meetings, ...deadlines].sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
 /** "Today 18:00", "Tomorrow", "Wed 14 Oct 19:30". */

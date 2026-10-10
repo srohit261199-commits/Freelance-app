@@ -1,12 +1,13 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import type { AppState, CompanyId, Model, SkeidarJob } from '../../shared/types';
-import { daysUntil, formatMoney, jobOutputs, tierFee } from '../../shared/money';
+import { daysUntil, formatMoney, jobOutputs, modelFee } from '../../shared/money';
 import { modelLabel } from '../../shared/planner';
 import { isComplete, statusEvents, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
 import { PRIORITY_LABEL, PRIORITY_ORDER, jobPriority, modelPriority, type Priority } from '../priority';
 import { Icon, useApp } from '../ui';
 import { DashMenu, type MenuItem } from './DashMenu';
+import { isBuiltIn } from './JobDetails';
 
 type Col = 'todo' | 'in_progress' | 'review' | 'revision' | 'done';
 const COLS: { id: Col; name: string; tone: string }[] = [
@@ -16,7 +17,7 @@ const COLS: { id: Col; name: string; tone: string }[] = [
   { id: 'revision', name: 'Rejected', tone: 'bad' },
   { id: 'done', name: 'Done', tone: 'ok' },
 ];
-const CLIENTS: CompanyId[] = ['waveink', 'metaztech', 'skeidar'];
+const BUILT_INS: CompanyId[] = ['waveink', 'metaztech', 'skeidar'];
 const RECENT = 14 * 86400000;
 
 interface Card {
@@ -50,12 +51,19 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
   const [filter, setFilter] = useState<'all' | CompanyId>('all');
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<Col | null>(null);
+  // The built-in clients, then the ones added by hand that aren't archived
+  const clients = useMemo(() => [...BUILT_INS, ...state.companies.filter(c => !isBuiltIn(c) && !c.archived).map(c => c.id)], [state.companies]);
+  const shownFilter = filter === 'all' || clients.includes(filter) ? filter : 'all';
 
   const { cards, more } = useMemo(() => {
-    const cfg = (id: CompanyId) => state.companies.find(c => c.id === id)!;
-    const mz = cfg('metaztech');
-    const sk = cfg('skeidar');
-    const rate = sk.pay.kind === 'per-item' ? sk.pay.rate : 5;
+    const cfg = (id: CompanyId) => state.companies.find(c => c.id === id);
+    const gone = new Set(state.companies.filter(c => c.archived).map(c => c.id));
+    // MetaZtech's fee shows once its tier is set; a client paid per item shows its rate.
+    const feeOf = (m: Model) => {
+      const c = cfg(m.company);
+      const f = c && !(c.pay.kind === 'tiered' && !m.complexity) ? modelFee(c, m.complexity) : undefined;
+      return c && f ? formatMoney(f, c.currency) : '';
+    };
     const out: Card[] = [];
     const more: Partial<Record<CompanyId, number>> = {};
     const due = (d?: string) => {
@@ -67,13 +75,13 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
 
     for (const m of state.models) {
       const col = (isComplete(m.status) ? 'done' : m.status === 'on_hold' || m.status === 'skipped' ? undefined : m.status) as Col | undefined;
-      if (!col) continue;
+      if (!col || gone.has(m.company)) continue;
       const prio = modelPriority(m, state, now);
       if (col === 'todo' && prio === 'low') {
         more[m.company] = (more[m.company] ?? 0) + 1;
         continue;
       }
-      const fee = m.company === 'metaztech' && m.complexity ? formatMoney(tierFee(mz, m.complexity), 'INR') : '';
+      const fee = feeOf(m);
       const label = statusLabel(m.status, m.company);
       let when: { date: string; late?: boolean };
       let meta = '';
@@ -82,7 +90,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
         const at = doneAt(m);
         if (!at || now.getTime() - new Date(at).getTime() > RECENT) continue;
         when = { date: short(at) };
-        meta = m.company === 'metaztech' ? `${label}${fee ? ` ${fee}` : ''}` : m.driveFileUrl ? 'GLB on Drive' : label;
+        meta = m.company === 'metaztech' ? `${label}${fee ? ` ${fee}` : ''}` : m.driveFileUrl ? 'GLB on Drive' : fee ? `${label} · ${fee}` : label;
         order = at;
       } else if (col === 'todo') {
         when = due(m.dueDate) ?? { date: m.company === 'waveink' && m.rows?.length ? `Row ${m.rows[0]}` : 'Queue' };
@@ -103,18 +111,21 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
     }
 
     for (const j of state.skeidarJobs) {
+      const client = j.company ?? 'skeidar';
+      const c = cfg(client);
+      if (!c || gone.has(client)) continue;
       const o = jobOutputs(j);
       const col: Col = j.status === 'delivered' ? 'done' : o.done ? 'in_progress' : 'todo';
       if (col === 'done' && now.getTime() - new Date(j.deliveredAt ?? j.receivedAt).getTime() > RECENT) continue;
       out.push({
         key: j.id,
-        client: 'skeidar',
+        client,
         code: 'Job',
         title: `${j.name}, ${j.fabrics.length} fabric${j.fabrics.length === 1 ? '' : 's'}`,
-        prio: jobPriority(j, now),
+        prio: jobPriority(j, now, state),
         col,
         date: col === 'done' ? short(j.deliveredAt ?? j.receivedAt) : short(j.receivedAt),
-        meta: col === 'done' ? `${formatMoney(o.done * rate, sk.currency)} earned` : `${o.done} / ${o.total} images`,
+        meta: col !== 'done' ? `${o.done} / ${o.total} images` : c.pay.kind === 'per-item' ? `${formatMoney(o.done * c.pay.rate, c.currency)} earned` : `${o.done} images`,
         order: col === 'done' ? (j.deliveredAt ?? j.receivedAt) : j.receivedAt,
         job: j,
       });
@@ -122,7 +133,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
     return { cards: out, more };
   }, [state, now]);
 
-  const shown = cards.filter(c => filter === 'all' || c.client === filter);
+  const shown = cards.filter(c => shownFilter === 'all' || c.client === shownFilter);
   const column = (col: Col) =>
     shown
       .filter(c => c.col === col)
@@ -133,7 +144,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
       );
   const name = (id: CompanyId) => state.companies.find(c => c.id === id)?.name ?? id;
 
-  const open = (c: Card) => (c.model ? go({ view: 'company', company: c.model.company as 'waveink' | 'metaztech', modelId: c.model.id }) : go({ view: 'skeidar', jobId: c.job!.id }));
+  const open = (c: Card) => (c.model ? go({ view: 'company', company: c.model.company, modelId: c.model.id }) : go({ view: 'skeidar', company: c.job!.company, jobId: c.job!.id }));
 
   const move = async (c: Card, to: Col) => {
     if (c.col === to) return;
@@ -148,7 +159,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
       } else if (j.status === 'delivered') {
         await hub.upsert('skeidarJobs', { ...j, status: 'open', deliveredAt: undefined });
         toast(`${j.name} reopened`);
-      } else toast('A Skeidar job moves on as you tick its images on the Skeidar screen.');
+      } else toast(`A ${name(c.client)} job moves on as you tick its images on the ${name(c.client)} screen.`);
     }
   };
 
@@ -172,8 +183,8 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
     <>
       <div className="dash-board-bar">
         <div className="chips on-bg" role="group" aria-label="Show client">
-          {(['all', ...CLIENTS] as const).map(f => (
-            <button key={f} type="button" className={`chip ${f !== 'all' ? `c-${f}` : ''} ${filter === f ? 'on' : ''}`} aria-pressed={filter === f} onClick={() => setFilter(f)}>
+          {['all', ...clients].map(f => (
+            <button key={f} type="button" className={`chip ${f !== 'all' ? `c-${f}` : ''} ${shownFilter === f ? 'on' : ''}`} aria-pressed={shownFilter === f} onClick={() => setFilter(f)}>
               {f !== 'all' && <span className="dot" />}
               {f === 'all' ? 'All' : name(f)}
             </button>
@@ -185,7 +196,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
         <div className="dash-cols">
           {COLS.map(col => {
             const list = column(col.id);
-            const hidden = col.id === 'todo' ? CLIENTS.filter(c => c !== 'skeidar' && (filter === 'all' || filter === c) && more[c]) : [];
+            const hidden = col.id === 'todo' ? clients.filter(c => (shownFilter === 'all' || shownFilter === c) && more[c]) : [];
             return (
               <section
                 key={col.id}
@@ -253,7 +264,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
                     </article>
                   ))}
                   {hidden.map(c => (
-                    <button key={c} type="button" className="link-btn dash-more" onClick={() => go({ view: 'company', company: c as 'waveink' | 'metaztech' })}>
+                    <button key={c} type="button" className="link-btn dash-more" onClick={() => go({ view: 'company', company: c })}>
                       +{more[c]} more in {name(c)}
                     </button>
                   ))}

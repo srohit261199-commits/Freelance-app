@@ -202,7 +202,7 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
             type="button"
             className="lg"
             onClick={async () => {
-              const r = await hub.exportExcel('skeidar');
+              const r = await hub.exportExcel(company === 'skeidar' ? 'skeidar' : `client:${company}`);
               if (r.path) toast(`Saved ${r.path}`);
               else if (r.error) toast(r.error, 'error');
             }}

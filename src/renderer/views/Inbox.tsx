@@ -4,8 +4,9 @@ import { mailLine, needsAction } from '../../shared/planner';
 import { companyEarnings, formatMoney, localDate } from '../../shared/money';
 import { gmailUrl } from '../../shared/mail';
 import { hub } from '../hub';
-import { CLIENT_ICON, Empty, Field, Icon, relTime, useApp, type IconName, type Route } from '../ui';
+import { Empty, Field, Icon, relTime, useApp, type IconName, type Route } from '../ui';
 import { DashMenu } from './DashMenu';
+import { clientIcon } from './JobDetails';
 import './Inbox.css';
 
 type Filter = 'clients' | 'waveink' | 'metaztech' | 'skeidar' | 'teams' | 'receipts' | 'other' | 'attention';
@@ -483,7 +484,7 @@ export function Inbox({ state, now, onSync, syncing, emailId }: { state: AppStat
 
 function MailTile({ e }: { e: EmailItem }) {
   const icon: IconName =
-    e.kind === 'teams' ? 'teams' : e.kind === 'invite' ? 'calendar' : e.kind === 'payment' ? 'money' : e.kind === 'receipt' ? 'receipt' : e.company === 'other' ? 'mail' : CLIENT_ICON[e.company];
+    e.kind === 'teams' ? 'teams' : e.kind === 'invite' ? 'calendar' : e.kind === 'payment' ? 'money' : e.kind === 'receipt' ? 'receipt' : e.company === 'other' ? 'mail' : clientIcon({ id: e.company });
   return (
     <span className={`ic-tile mail-row-ic ${e.company === 'other' ? 'plain' : `c-${e.company} c-soft`}`} aria-hidden="true">
       <Icon name={icon} size={19} weight="fill" />

@@ -9,7 +9,7 @@ import * as google from './google';
 import { runSync } from './sync';
 import { openPortal, pullPortal } from './portal';
 import { folderImageCount, scanFolder } from './files';
-import { exportExcel } from './exporter';
+import { exportExcel, exportName } from './exporter';
 import * as assets from './assets';
 import * as accounts from './accounts';
 import { localDate } from '../shared/money';
@@ -219,9 +219,8 @@ const handlers: HubApi = {
     return folderImageCount(dir);
   },
   async exportExcel(scope) {
-    const names = { waveink: 'Waveink-update', metaztech: 'MetaZtech-models', skeidar: 'Skeidar-jobs', all: 'Freelance-Hub-all' };
     const pick = await dialog.showSaveDialog(win!, {
-      defaultPath: path.join(app.getPath('documents'), `${names[scope]}-${localDate(new Date())}.xlsx`),
+      defaultPath: path.join(app.getPath('documents'), `${exportName(getState(), scope)}-${localDate(new Date())}.xlsx`),
       filters: [{ name: 'Excel', extensions: ['xlsx'] }],
     });
     if (pick.canceled || !pick.filePath) return {};

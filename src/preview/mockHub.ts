@@ -208,11 +208,10 @@ const hub: Hub = {
   },
   async exportExcel(scope) {
     try {
-      const { buildWorkbook } = await import('../main/exporter');
+      const { buildWorkbook, exportName } = await import('../main/exporter');
       const wb = await buildWorkbook(state, scope);
       const buf = await wb.xlsx.writeBuffer();
-      const names = { waveink: 'Waveink-update', metaztech: 'MetaZtech-models', skeidar: 'Skeidar-jobs', all: 'Freelance-Hub-all' };
-      const filename = `${names[scope]}-${localDate(new Date())}.xlsx`;
+      const filename = `${exportName(state, scope)}-${localDate(new Date())}.xlsx`;
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const downloads = await window.claude?.use('downloads').catch(() => null);
       if (downloads) {

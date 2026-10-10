@@ -85,8 +85,8 @@ export function Client({ state, company, openId, now }: { state: AppState; compa
     const one = ids.length === 1 && all.find(m => m.id === ids[0]);
     toast(`${one ? modelLabel(one) : `${ids.length} models`} → ${statusLabel(to, company)}`);
   };
-  const exportAll = async () => {
-    const r = await hub.exportExcel('all');
+  const exportClient = async () => {
+    const r = await hub.exportExcel(`client:${company}`);
     if (r.path) toast(`Saved ${r.path}`);
     else if (r.error) toast(r.error, 'error');
   };
@@ -99,7 +99,7 @@ export function Client({ state, company, openId, now }: { state: AppState; compa
     { label: 'Edit job details', icon: 'pencil', onSelect: () => setEditing(true) },
     ...(cfg.notes.trim() ? [{ label: 'Brief & pay terms', icon: 'info' as const, onSelect: () => setBrief(true) }] : []),
     ...cfg.links.map(l => ({ label: l.label, icon: 'link' as const, onSelect: () => void hub.openUrl(l.url) })),
-    { label: 'Export everything to Excel', icon: 'excel', onSelect: () => void exportAll() },
+    { label: 'Export to Excel', icon: 'excel', onSelect: () => void exportClient() },
   ];
 
   return (

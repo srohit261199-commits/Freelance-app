@@ -1,4 +1,4 @@
-/* Settings & import: import panel (dropzone, catalogs, column mapping) beside the Google, money, folders, app and data cards; client editors below. Scoped under .set-page. */
+/* Settings & import: import panel (dropzone, catalogs, column mapping) beside the Google, money, folders, app and data cards; the client list and client editors below. Scoped under .set-page. */
 
 /* ---------- header ---------- */
 .set-page .set-head {
@@ -604,6 +604,100 @@
   font-size: 14px;
   color: var(--muted);
 }
+.set-page .set-sec-row {
+  flex-direction: row;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.set-page .set-sec-row .grow {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+/* the client list: one row per client, archived ones dimmed */
+.set-page .set-cl {
+  padding: 10px;
+  gap: 0;
+  container-type: inline-size;
+}
+.set-page .set-cl ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.set-page .set-cl-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.2fr) 120px minmax(150px, 1.2fr) 104px minmax(170px, 1.4fr) 184px;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  transition: background 0.15s ease;
+}
+.set-page li.set-cl-row:hover {
+  background: var(--hover);
+}
+.set-page .set-cl-th {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--faint);
+}
+.set-page .set-cl-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.set-page .set-cl-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.set-page .set-cl-name b {
+  font-size: 14px;
+  font-weight: 700;
+}
+.set-page .set-cl-name small,
+.set-page .set-cl-cell small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.set-page .set-cl-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.set-page .set-cl-cell small {
+  font-weight: 500;
+}
+.set-page .set-cl-cell .faint {
+  font-weight: 500;
+}
+.set-page .set-cl-behind {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  color: var(--st-prog);
+}
+.set-page .set-cl-behind .icon {
+  flex: none;
+  margin-top: 3px;
+}
+.set-page .set-cl-btns {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.set-page .set-cl-row.off > :not(.set-cl-btns) {
+  opacity: 0.5;
+}
 .set-page .set-client-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
@@ -655,6 +749,67 @@
 }
 .set-page .set-client .field small {
   font-size: 12px;
+}
+
+/* the client list follows its panel's width: below a table's room each client becomes a small card, cells labelled */
+@container (max-width: 980px) {
+  .set-page .set-cl-th {
+    display: none;
+  }
+  .set-page .set-cl-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      'who btns'
+      'work pay'
+      'start pace';
+    gap: 10px 16px;
+    align-items: start;
+    padding: 14px;
+  }
+  .set-page .set-cl ul {
+    gap: 6px;
+  }
+  .set-page li.set-cl-row + li.set-cl-row {
+    box-shadow: 0 -1px 0 var(--line-2);
+  }
+  .set-page .set-cl-who {
+    grid-area: who;
+  }
+  .set-page .set-cl-btns {
+    grid-area: btns;
+    align-self: center;
+  }
+  .set-page .set-cl-cell::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--faint);
+  }
+  .set-page .set-cl-cell[data-label='Work'] {
+    grid-area: work;
+  }
+  .set-page .set-cl-cell[data-label='Pay'] {
+    grid-area: pay;
+  }
+  .set-page .set-cl-cell[data-label='Started'] {
+    grid-area: start;
+  }
+  .set-page .set-cl-pace {
+    grid-area: pace;
+  }
+}
+@container (max-width: 520px) {
+  .set-page .set-cl-row {
+    grid-template-areas:
+      'who who'
+      'work pay'
+      'start pace'
+      'btns btns';
+    gap: 10px 14px;
+  }
+  .set-page .set-cl-btns {
+    justify-content: flex-start;
+  }
 }
 
 /* the mapping table follows the import panel's own width */

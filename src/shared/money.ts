@@ -45,6 +45,13 @@ export function tierFee(cfg: CompanyConfig, complexity: Complexity | undefined):
   return cfg.pay.tiers[complexity ?? 'simple'] ?? 0;
 }
 
+/** What one finished model is worth: its fee tier, or the client's rate per item. Undefined for a retainer, which isn't paid per model. */
+export function modelFee(cfg: CompanyConfig, complexity?: Complexity): number | undefined {
+  if (cfg.pay.kind === 'tiered') return tierFee(cfg, complexity);
+  if (cfg.pay.kind === 'per-item') return cfg.pay.rate;
+  return undefined;
+}
+
 export function jobOutputs(job: SkeidarJob): { total: number; done: number } {
   const total = job.fabrics.length * job.images.length;
   let done = 0;

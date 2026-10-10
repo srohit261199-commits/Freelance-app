@@ -1,6 +1,9 @@
 import type { AppState, AssetFile, Collection, CompanyId, FolderEntry, FoundPlan, JobFolderInfo, Model, ModelStatus, Payment, PortalSnapshot, Settings, Subscription, SyncResult } from './types';
 import type { ImportCounts, PortalRow } from './ops';
 
+/** What to export: one built-in client's sheet, one added client's sheet, or everything. */
+export type ExportScope = 'waveink' | 'metaztech' | 'skeidar' | 'all' | `client:${string}`;
+
 export type SettingsPatch = Partial<Omit<Settings, 'google' | 'rates'>> & {
   google?: Partial<Settings['google']>;
   rates?: Partial<Settings['rates']>;
@@ -29,7 +32,7 @@ export interface HubApi {
   pickFolder(defaultPath?: string): Promise<string | null>;
   scanFolder(path: string): Promise<FolderEntry[] | { error: string }>;
   countImages(path: string): Promise<number>;
-  exportExcel(scope: 'waveink' | 'metaztech' | 'skeidar' | 'all'): Promise<{ path?: string; error?: string }>;
+  exportExcel(scope: ExportScope): Promise<{ path?: string; error?: string }>;
   openUrl(url: string): Promise<void>;
   openPath(path: string): Promise<void>;
   backup(): Promise<string | null>;

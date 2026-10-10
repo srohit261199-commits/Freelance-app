@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { initialState } from '../src/main/seed/initial';
 import { nextActions } from '../src/shared/planner';
 import { applyStatus, importPortalRows } from '../src/shared/ops';
-import { allDeadlines, deadlineDates, nextDeadlines, paceText, weekProgress, weeksIn } from '../src/shared/pace';
+import { agenda, allDeadlines, deadlineDates, deadlinesBetween, nextDeadlines, paceText, weekProgress, weeksIn } from '../src/shared/pace';
+import { modelFee } from '../src/shared/money';
+import { buildWorkbook, sheetName } from '../src/main/exporter';
 import { jobPriority, modelPriority } from '../src/renderer/priority';
-import type { AppState, CompanyConfig, Model, StatusEvent } from '../src/shared/types';
+import type { AppState, CompanyConfig, Model, SkeidarJob, StatusEvent } from '../src/shared/types';
 
 // Tests run in Asia/Kolkata; 2026-10-05 is a Monday.
 const at = (local: string) => new Date(`${local}+05:30`);
@@ -232,5 +234,129 @@ describe('priority from job details', () => {
     expect(jobPriority(job, at('2026-10-09T09:00:00'))).toBe('high');
     expect(jobPriority(job, at('2026-10-09T09:00:00'), s)).toBe('urgent');
     expect(jobPriority(job, at('2026-10-08T09:00:00'), s)).toBe('high');
+  });
+});
+
+describe('dashboard agenda', () => {
+  const list = (s: AppState, now: Date) => agenda(s, now, 7).map(w => (w.kind === 'meeting' ? `meeting ${w.meeting.title}` : `deadline ${w.deadline.company}:${w.deadline.id}:${w.deadline.date}`));
+
+  it('lists meetings and every client’s deadlines together, soonest first', () => {
+    const s = withAcme();
+    s.meetings.push({ id: 'k', company: 'other', title: 'Dentist', start: at('2026-10-12T11:00:00').toISOString(), end: at('2026-10-12T11:30:00').toISOString(), source: 'calendar' });
+    expect(list(s, at('2026-10-10T11:00:00'))).toEqual(['meeting Dentist', 'deadline waveink:wi-demo:2026-10-14', 'deadline acme:call:2026-10-16', 'deadline waveink:wi-report:2026-10-16']);
+  });
+
+  it('shows a deadline once when the calendar brought it in as a meeting, and drops what is over', () => {
+    const s = withAcme();
+    s.meetings.push(
+      { id: 'demo', company: 'waveink', title: 'Weekly Demo', start: at('2026-10-14T19:30:00').toISOString(), end: at('2026-10-14T20:30:00').toISOString(), source: 'calendar' },
+      { id: 'old', company: 'waveink', title: 'Kick-off', start: at('2026-10-09T10:00:00').toISOString(), end: at('2026-10-09T11:00:00').toISOString(), source: 'calendar' },
+    );
+    expect(list(s, at('2026-10-10T11:00:00'))).toEqual(['meeting Weekly Demo', 'deadline acme:call:2026-10-16', 'deadline waveink:wi-report:2026-10-16']);
+    // Friday after 18:00: the log's time has gone, Acme's 16:00 call too. Next week's demo has no meeting yet, so it shows as a deadline.
+    expect(list(s, at('2026-10-16T18:30:00'))).toEqual(['deadline waveink:wi-demo:2026-10-21', 'deadline acme:call:2026-10-23', 'deadline waveink:wi-report:2026-10-23']);
+  });
+
+  it('leaves out archived clients', () => {
+    expect(list(withAcme({ archived: true }), at('2026-10-10T11:00:00')).some(t => t.includes('acme'))).toBe(false);
+  });
+
+  it('marks a calendar month with every deadline in it, past ones too', () => {
+    const month = deadlinesBetween(withAcme({ startDate: '2026-10-07' }), '2026-10-01', '2026-10-31', at('2026-10-10T11:00:00'));
+    expect(month.filter(d => d.company === 'acme').map(d => d.date)).toEqual(['2026-10-09', '2026-10-16', '2026-10-23', '2026-10-30']);
+    expect(month.filter(d => d.id === 'wi-report').map(d => [d.date, d.days])).toEqual([
+      ['2026-10-02', -8],
+      ['2026-10-09', -1],
+      ['2026-10-16', 6],
+      ['2026-10-23', 13],
+      ['2026-10-30', 20],
+    ]);
+  });
+});
+
+describe('Excel export with clients added by hand', () => {
+  const job = (id: string, company: string | undefined, done: Record<string, boolean>): SkeidarJob => ({
+    id,
+    company,
+    name: `Job ${id}`,
+    receivedAt: '2026-10-01',
+    images: ['Front', 'Back'],
+    fabrics: ['A', 'B'],
+    done,
+    status: 'open',
+    createdAt: '2026-10-01T04:00:00Z',
+  });
+  const rows = (ws: { getSheetValues(): unknown[] }) => (ws.getSheetValues().filter(Boolean) as unknown[][]).map(r => r.slice(1));
+
+  it('cleans up a client’s name into a sheet name Excel accepts', () => {
+    expect(sheetName('Studio: North / East [2026]?', [])).toBe('Studio North East 2026');
+    expect(sheetName("'Quoted'", [])).toBe('Quoted');
+    expect(sheetName('A very long client name that keeps going on and on', [])).toBe('A very long client name that ke');
+    expect(sheetName('Acme models', ['ACME MODELS'])).toBe('Acme models (2)');
+    expect(sheetName('A very long client name that keeps going on and on', ['A very long client name that ke'])).toBe('A very long client name tha (2)');
+    expect(sheetName('???', [])).toBe('Sheet');
+  });
+
+  it('adds one sheet per added client and keeps each client’s jobs on its own sheet', async () => {
+    const s = withAcme({}, [{ ...model('1', 'done'), code: 'AC-1', completedAt: '2026-10-05T10:00:00Z' }, { ...model('2', 'review'), code: 'AC-2' }]);
+    s.companies.push(
+      { ...acme(), id: 'fabrik', name: 'Fabrik', workflow: 'variations', currency: 'AED', pay: { kind: 'per-item', rate: 4, unit: 'image' } },
+      { ...acme(), id: 'retain', name: 'Retain Co', archived: true, pay: { kind: 'retainer', amount: 1000, startDate: '2026-09-01', payday: 1 } },
+    );
+    s.skeidarJobs.push(job('sk', undefined, { '0:0': true }), job('fb', 'fabrik', { '0:0': true, '0:1': true, '1:0': true }));
+
+    const wb = await buildWorkbook(s, 'all');
+    expect(wb.worksheets.map(w => w.name)).toEqual([
+      'Tech catalog (updated)',
+      'GLB Task Tracker',
+      'Daily Update Log',
+      'MetaZtech models',
+      'Skeidar jobs',
+      'Acme models',
+      'Fabrik jobs',
+      'Retain Co models',
+      'Earnings summary',
+      'Payments received',
+      'Subscriptions',
+    ]);
+    expect(rows(wb.getWorksheet('Skeidar jobs')!).map(r => r[0])).toEqual(['Job', 'Job sk']);
+    const fabrik = rows(wb.getWorksheet('Fabrik jobs')!);
+    expect(fabrik[0][6]).toBe('Earned (AED, 4/image)');
+    expect(fabrik.slice(1).map(r => [r[0], r[4], r[6]])).toEqual([['Job fb', 3, 12]]);
+
+    const acmeRows = rows(wb.getWorksheet('Acme models')!);
+    expect(acmeRows[0]).toEqual(['Code', 'Model', 'Group', 'Status', 'Started', 'Finished', 'Due', 'Fee (USD)', 'Notes']);
+    expect(acmeRows.slice(1, 3).map(r => [r[0], r[3], r[5], r[7]])).toEqual([
+      ['AC-1', 'Done', '2026-10-05', 40],
+      ['AC-2', 'In review', '', 40],
+    ]);
+    expect(acmeRows.at(-1)?.[1]).toBe('Overall: 1 of 2 done · $40 earned');
+    // A retainer isn't paid per model: no fee column.
+    expect(rows(wb.getWorksheet('Retain Co models')!)[0]).not.toContain('Fee (USD)');
+
+    // Scoped exports stay as they were.
+    expect((await buildWorkbook(s, 'skeidar')).worksheets.map(w => w.name)).toEqual(['Skeidar jobs']);
+  });
+
+  it('prices a model by the client’s pay rule', () => {
+    const s = fresh();
+    const mz = s.companies.find(c => c.id === 'metaztech')!;
+    expect(modelFee(mz, 'complex')).toBe(1200);
+    expect(modelFee(mz)).toBe(900);
+    expect(modelFee(acme())).toBe(40);
+    expect(modelFee(s.companies.find(c => c.id === 'waveink')!)).toBeUndefined();
+  });
+});
+
+describe('export for one added client', () => {
+  it('writes only that client’s sheet, with a file name from its name', async () => {
+    const { buildWorkbook, exportName } = await import('../src/main/exporter');
+    const s = initialState('2026-10-10T09:00:00.000Z');
+    s.companies.push({ ...s.companies.find(c => c.id === 'skeidar')!, id: 'nordic', name: 'Nordic Fabrics', builtIn: undefined, workflow: 'variations' });
+    s.skeidarJobs.push({ id: 'nj1', name: 'Fjord sofa', company: 'nordic', receivedAt: '2026-10-01', images: ['Front'], fabrics: ['Linen Sand'], done: {}, status: 'open', createdAt: '2026-10-01T00:00:00Z' });
+    const wb = await buildWorkbook(s, 'client:nordic');
+    expect(wb.worksheets.map(w => w.name)).toEqual([expect.stringMatching(/Nordic Fabrics/)]);
+    expect(exportName(s, 'client:nordic')).toBe('Nordic-Fabrics-jobs');
+    expect(exportName(s, 'waveink')).toBe('Waveink-update');
   });
 });

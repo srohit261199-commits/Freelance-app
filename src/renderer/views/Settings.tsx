@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import type { AppState, CompanyConfig, CompanyId, Complexity, Currency, Model, PortalField, PortalMapping, PortalTable } from '../../shared/types';
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
-import { ordinal } from '../../shared/money';
+import { daysUntil, ordinal } from '../../shared/money';
+import { DEFAULT_WORKDAYS, paceText, weekProgress, WEEKDAYS } from '../../shared/pace';
 import { hub } from '../hub';
 import { ClientTile, ConfirmButton, Field, Icon, fmtDate, relTime, useApp, type IconName } from '../ui';
 import { FIELDS, PortalImport, parsePaste } from './PortalImport';
+import { AddClient, JobEditor, clientIcon, daysText, isBuiltIn, jobPayText } from './JobDetails';
 import './Settings.css';
 
 type AppInfo = { version: string; dataDir: string };
@@ -19,7 +21,7 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
     <div className="page set-page">
       <header className="set-head">
         <h1>Settings &amp; import</h1>
-        <p>Bring in client sheets, connect Google, set currencies and folders</p>
+        <p>Bring in client sheets, manage clients, connect Google, set currencies and folders</p>
       </header>
 
       <div className="set-grid">
@@ -33,15 +35,19 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
         </div>
       </div>
 
-      <section className="set-clients" aria-labelledby="set-clients-title">
+      <ClientList state={state} now={now} />
+
+      <section className="set-clients" aria-labelledby="set-match-title">
         <div className="set-sec-head">
-          <h2 id="set-clients-title">Clients</h2>
+          <h2 id="set-match-title">Pay and mail matching</h2>
           <p>Pay rules, and how mail, Teams notices and meetings are matched to each client</p>
         </div>
         <div className="set-client-grid">
-          {state.companies.map(c => (
-            <CompanyEditor key={c.id} company={c} />
-          ))}
+          {state.companies
+            .filter(c => !c.archived)
+            .map(c => (
+              <CompanyEditor key={c.id} company={c} />
+            ))}
         </div>
       </section>
     </div>
@@ -161,7 +167,9 @@ function ImportPanel({ state }: { state: AppState }) {
           </div>
           <div className="set-drop-ctl">
             <div className="set-pick" role="group" aria-label="Which client the file is for">
-              {state.companies.map(c => (
+              {state.companies
+                .filter(c => !c.archived)
+                .map(c => (
                 <button
                   key={c.id}
                   type="button"
@@ -174,7 +182,7 @@ function ImportPanel({ state }: { state: AppState }) {
                 >
                   {c.name}
                 </button>
-              ))}
+                ))}
             </div>
             <button type="button" className="primary lg set-choose" disabled={!mz} title={mz ? undefined : 'Only MetaZtech tables can be imported from a file for now'} onClick={() => fileRef.current?.click()}>
               Choose file
@@ -344,6 +352,117 @@ function MappingTable({ state, mapping }: { state: AppState; mapping: PortalMapp
         ))}
       </ul>
     </div>
+  );
+}
+
+/* ---------- clients ---------- */
+
+const WORKFLOW: Record<'models' | 'variations', string> = { models: 'List of models', variations: 'Image variations' };
+const SHORT_DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Every client, built-in and added by hand. Archived ones stay listed, dimmed, so they can be brought back. */
+function ClientList({ state, now }: { state: AppState; now: Date }) {
+  const { toast } = useApp();
+  const [editing, setEditing] = useState<CompanyId | null>(null);
+  const [adding, setAdding] = useState(false);
+  const list = [...state.companies].sort((a, b) => Number(!!a.archived) - Number(!!b.archived));
+  const live = list.filter(c => !c.archived).length;
+
+  const archive = async (c: CompanyConfig, archived: boolean) => {
+    await hub.upsert('companies', { ...c, archived });
+    toast(archived ? `${c.name} archived. It stays listed here to bring back.` : `${c.name} is back in the sidebar and on the dashboard`);
+  };
+
+  return (
+    <section className="set-clients" aria-labelledby="set-clients-title">
+      <div className="set-sec-head set-sec-row">
+        <div className="grow">
+          <h2 id="set-clients-title">Clients</h2>
+          <p>
+            {live} on the books{list.length > live ? `, ${list.length - live} archived` : ''} · their start dates, weekly targets and deadlines decide what's urgent
+          </p>
+        </div>
+        <button type="button" className="primary" onClick={() => setAdding(true)}>
+          <Icon name="plus" /> Add client
+        </button>
+      </div>
+      <div className="panel set-cl">
+        <div className="set-cl-row set-cl-th" aria-hidden="true">
+          <span>Client</span>
+          <span>Work</span>
+          <span>Pay</span>
+          <span>Started</span>
+          <span>Weekly expectations</span>
+          <span />
+        </div>
+        <ul>
+          {list.map(c => {
+            const ex = c.expectations;
+            const t = ex?.target;
+            // A weekly target the job hasn't reached yet (it starts after this week's working days) shows as the target itself
+            const p = weekProgress(state, c.id, now);
+            const pace = p?.target ? p : null;
+            const dl = ex?.deadlines ?? [];
+            // "5 models a week", with the working days when they aren't Monday to Friday
+            const goal = t && `${t.count} ${t.unit} a ${t.per}${ex?.workdays?.length && daysText(ex.workdays) !== daysText(DEFAULT_WORKDAYS) ? ` · ${daysText(ex.workdays)}` : ''}`;
+            const dlText = dl.length > 0 && `${dl.length} deadline${dl.length === 1 ? '' : 's'} · ${[...new Set(dl.map(d => SHORT_DAY[d.weekday]))].join(', ')}`;
+            const starts = c.startDate ? daysUntil(c.startDate, now) : undefined;
+            const ended = !!c.endDate && daysUntil(c.endDate, now) < 0;
+            return (
+              <li key={c.id} className={`set-cl-row ${c.archived ? 'off' : ''}`}>
+                <div className="set-cl-who">
+                  <ClientTile client={c.id} icon={clientIcon(c)} size="sm" />
+                  <span className="set-cl-name">
+                    <b className="ellipsis">{c.name}</b>
+                    <small className="ellipsis">{c.archived ? 'Archived' : c.role || (isBuiltIn(c) ? 'Built in' : 'Added by hand')}</small>
+                  </span>
+                </div>
+                <span className="set-cl-cell" data-label="Work">
+                  {WORKFLOW[c.workflow ?? (c.id === 'skeidar' ? 'variations' : 'models')]}
+                </span>
+                <span className="set-cl-cell" data-label="Pay">
+                  {jobPayText(c)}
+                </span>
+                <span className="set-cl-cell" data-label="Started">
+                  {!c.startDate ? <span className="faint">Not set</span> : starts !== undefined && starts > 0 ? `Starts ${fmtDate(c.startDate)}` : fmtDate(c.startDate)}
+                  {c.endDate && <small>{`${ended ? 'Ended' : 'Ends'} ${fmtDate(c.endDate)}`}</small>}
+                </span>
+                <span className="set-cl-cell set-cl-pace" data-label="Weekly expectations">
+                  {pace ? (
+                    <span className={pace.behind ? 'set-cl-behind' : ''}>
+                      {pace.behind && <Icon name="flag" size={12} weight="fill" />}
+                      {paceText(pace)}
+                    </span>
+                  ) : (
+                    goal || <span className="faint">No target</span>
+                  )}
+                  {(pace || dlText) && (
+                    <small title={dl.map(d => `${d.label}, every ${WEEKDAYS[d.weekday]}${d.time ? ` at ${d.time}` : ''}`).join('\n') || undefined}>
+                      {[pace && goal, dlText].filter(Boolean).join(' · ')}
+                    </small>
+                  )}
+                </span>
+                <div className="set-cl-btns">
+                  <button type="button" className="mini" onClick={() => setEditing(c.id)} aria-label={`Edit ${c.name}`}>
+                    <Icon name="pencil" size={14} /> Edit
+                  </button>
+                  {!isBuiltIn(c) &&
+                    (c.archived ? (
+                      <button type="button" className="mini" onClick={() => void archive(c, false)} aria-label={`Unarchive ${c.name}`}>
+                        Unarchive
+                      </button>
+                    ) : (
+                      <ConfirmButton className="mini" label="Archive" confirmLabel="Click to archive" onConfirm={() => archive(c, true)} />
+                    ))}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      {editing && <JobEditor state={state} company={editing} onClose={() => setEditing(null)} />}
+      {adding && <AddClient state={state} onClose={() => setAdding(false)} />}
+    </section>
   );
 }
 
@@ -732,7 +851,7 @@ function CompanyEditor({ company: c }: { company: CompanyConfig }) {
   return (
     <section className={`panel set-client c-${c.id}`} aria-labelledby={`set-client-${c.id}`}>
       <div className="set-client-head">
-        <ClientTile client={c.id} />
+        <ClientTile client={c.id} icon={clientIcon(c)} />
         <div className="grow">
           <h3 id={`set-client-${c.id}`}>{c.name}</h3>
           <small>{c.role}</small>

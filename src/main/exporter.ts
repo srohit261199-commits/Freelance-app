@@ -1,10 +1,13 @@
 import ExcelJS from 'exceljs';
-import type { AppState, Model } from '../shared/types';
+import type { AppState, CompanyConfig, Model } from '../shared/types';
 import { catalogStatusText, COMPLEXITY_LABELS, isComplete, lastWorked, statusLabel, trackerStatusText } from '../shared/status';
-import { allEarnings, convert, jobOutputs, monthLabel, rollRenewal, tierFee } from '../shared/money';
+import { allEarnings, convert, formatMoney, jobOutputs, modelFee, monthLabel, rollRenewal, tierFee } from '../shared/money';
 import { dailyLog, localDate } from '../shared/planner';
 
-export type ExportScope = 'waveink' | 'metaztech' | 'skeidar' | 'all';
+import type { ExportScope } from '../shared/api';
+export type { ExportScope };
+
+const BUILT_IN = new Set(['waveink', 'metaztech', 'skeidar']);
 
 const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } } as const;
 const FILLS: Record<string, string> = {
@@ -17,8 +20,21 @@ const FILLS: Record<string, string> = {
   skipped: 'FFF3F4F6',
 };
 
+/**
+ * A name Excel accepts for a sheet: at most 31 characters, none of : \ / ? * [ ], no apostrophe at either end,
+ * and not already in the workbook (Excel ignores case). A client's name can be anything, so its sheet's name is cleaned up.
+ */
+export function sheetName(name: string, taken: string[]): string {
+  const clean = (t: string) => t.replace(/\s+/g, ' ').trim().replace(/^'+|'+$/g, '').trim();
+  const base = clean(clean(name.replace(/[:\\/?*[\]]/g, ' ')).slice(0, 31)) || 'Sheet';
+  const used = new Set(taken.map(t => t.toLowerCase()));
+  let out = base;
+  for (let n = 2; used.has(out.toLowerCase()); n++) out = `${clean(base.slice(0, 31 - ` (${n})`.length))} (${n})`;
+  return out;
+}
+
 function sheet(wb: ExcelJS.Workbook, name: string, columns: { header: string; key: string; width: number }[]): ExcelJS.Worksheet {
-  const ws = wb.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
+  const ws = wb.addWorksheet(sheetName(name, wb.worksheets.map(w => w.name)), { views: [{ state: 'frozen', ySplit: 1 }] });
   ws.columns = columns;
   const head = ws.getRow(1);
   head.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -183,23 +199,60 @@ function metaztech(wb: ExcelJS.Workbook, state: AppState): void {
   }
 }
 
-function skeidar(wb: ExcelJS.Workbook, state: AppState): void {
-  const cfg = state.companies.find(c => c.id === 'skeidar')!;
-  const rate = cfg.pay.kind === 'per-item' ? cfg.pay.rate : 0;
-  const ws = sheet(wb, 'Skeidar jobs', [
+/** A client added by hand that works with models: a list like MetaZtech's, with the statuses in the client's own words. */
+function clientModels(wb: ExcelJS.Workbook, state: AppState, cfg: CompanyConfig): void {
+  // A retainer isn't paid per model, so there is nothing to put in a fee column.
+  const paid = cfg.pay.kind !== 'retainer';
+  const ws = sheet(wb, `${cfg.name} models`, [
+    { header: 'Code', key: 'code', width: 16 },
+    { header: 'Model', key: 'name', width: 40 },
+    { header: 'Group', key: 'group', width: 18 },
+    { header: 'Status', key: 'status', width: 14 },
+    { header: 'Started', key: 'started', width: 12 },
+    { header: 'Finished', key: 'finished', width: 12 },
+    { header: 'Due', key: 'due', width: 12 },
+    ...(paid ? [{ header: `Fee (${cfg.currency})`, key: 'fee', width: 12 }] : []),
+    { header: 'Notes', key: 'notes', width: 40 },
+  ]);
+  const models = state.models.filter(m => m.company === cfg.id);
+  for (const m of models) {
+    const row = ws.addRow({
+      code: m.code ?? '',
+      name: m.name,
+      group: m.group ?? '',
+      status: statusLabel(m.status, cfg.id),
+      started: day(m.startedAt),
+      finished: isComplete(m.status) ? day(m.completedAt) : '',
+      due: m.dueDate ?? '',
+      fee: modelFee(cfg, m.complexity) ?? '',
+      notes: m.notes ?? '',
+    });
+    paint(ws, row.number, 'status', m.status);
+  }
+  const total = models.filter(m => m.status !== 'skipped').length;
+  const done = models.filter(m => isComplete(m.status));
+  const earned = done.reduce((s, m) => s + (modelFee(cfg, m.complexity) ?? 0), 0);
+  ws.addRow({});
+  ws.addRow({ name: `Overall: ${done.length} of ${total} done${paid ? ` · ${formatMoney(earned, cfg.currency)} earned` : ''}` }).font = { bold: true };
+}
+
+/** Variation jobs for Skeidar, or for a client added by hand that works the same way: only that client's own jobs. */
+function jobs(wb: ExcelJS.Workbook, state: AppState, cfg: CompanyConfig): void {
+  const per = cfg.pay.kind === 'per-item' ? cfg.pay : undefined;
+  const ws = sheet(wb, `${cfg.name} jobs`, [
     { header: 'Job', key: 'name', width: 34 },
     { header: 'Received', key: 'received', width: 12 },
     { header: 'Source images', key: 'images', width: 12 },
     { header: 'Fabrics', key: 'fabrics', width: 50 },
     { header: 'Outputs done', key: 'done', width: 12 },
     { header: 'Outputs total', key: 'total', width: 12 },
-    { header: `Earned (AED, ${rate}/image)`, key: 'earned', width: 18 },
+    ...(per ? [{ header: `Earned (${cfg.currency}, ${per.rate}/${per.unit})`, key: 'earned', width: 18 }] : []),
     { header: 'Status', key: 'status', width: 10 },
     { header: 'Folder', key: 'folder', width: 40 },
   ]);
-  for (const j of state.skeidarJobs) {
+  for (const j of state.skeidarJobs.filter(j => (j.company ?? 'skeidar') === cfg.id)) {
     const { done, total } = jobOutputs(j);
-    ws.addRow({ name: j.name, received: j.receivedAt, images: j.images.length, fabrics: j.fabrics.join(', '), done, total, earned: done * rate, status: j.status, folder: j.folder ?? '' });
+    ws.addRow({ name: j.name, received: j.receivedAt, images: j.images.length, fabrics: j.fabrics.join(', '), done, total, earned: per ? done * per.rate : '', status: j.status, folder: j.folder ?? '' });
   }
 }
 
@@ -256,9 +309,31 @@ export async function buildWorkbook(state: AppState, scope: ExportScope): Promis
   wb.created = new Date();
   if (scope === 'waveink' || scope === 'all') waveink(wb, state);
   if (scope === 'metaztech' || scope === 'all') metaztech(wb, state);
-  if (scope === 'skeidar' || scope === 'all') skeidar(wb, state);
-  if (scope === 'all') money(wb, state);
+  if (scope === 'skeidar' || scope === 'all') jobs(wb, state, state.companies.find(c => c.id === 'skeidar')!);
+  if (scope.startsWith('client:')) {
+    const c = state.companies.find(x => x.id === scope.slice(7));
+    if (!c) throw new Error('That client is no longer in the app.');
+    if (c.workflow === 'variations') jobs(wb, state, c);
+    else clientModels(wb, state, c);
+  }
+  if (scope === 'all') {
+    // One sheet for each client added by hand, archived ones too: everything means their past work as well.
+    for (const c of state.companies.filter(c => !c.builtIn && !BUILT_IN.has(c.id))) {
+      if (c.workflow === 'variations') jobs(wb, state, c);
+      else clientModels(wb, state, c);
+    }
+    money(wb, state);
+  }
   return wb;
+}
+
+/** File name (without date and extension) for an export: "Waveink-update", "Studio-North-models". */
+export function exportName(state: AppState, scope: ExportScope): string {
+  const names: Record<string, string> = { waveink: 'Waveink-update', metaztech: 'MetaZtech-models', skeidar: 'Skeidar-jobs', all: 'Freelance-Hub-all' };
+  if (names[scope]) return names[scope];
+  const c = state.companies.find(x => x.id === scope.slice(7));
+  const base = (c?.name ?? 'Client').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '') || 'Client';
+  return `${base}-${c?.workflow === 'variations' ? 'jobs' : 'models'}`;
 }
 
 export async function exportExcel(state: AppState, scope: ExportScope, file: string): Promise<void> {
