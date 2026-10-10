@@ -3,6 +3,7 @@ import type { RawMail } from '../shared/mail';
 import { applySync, calendarMeetings, driveGlbs, ingestMail, needsBody, type DriveGlb } from '../shared/ingest';
 import { calendarEvents, driveTree, gmailIds, gmailMessage, hasTokens, pool } from './google';
 import { getState, update } from './store';
+import { vendorMailQuery } from '../shared/vendors';
 
 const DAY = 86400000;
 
@@ -43,10 +44,15 @@ async function doSync(): Promise<SyncResult> {
     const clientIds = new Set<string>();
     for (const q of companyQueries(start)) for (const id of await gmailIds(q, 60)) clientIds.add(id);
     const receiptIds = new Set(await gmailIds(RECEIPTS, 60));
+    // Orders, invoices and renewal notices from Autodesk, Adobe, Chaos and any software account added by hand.
+    const vendorQuery = vendorMailQuery(start.accounts);
+    if (vendorQuery) for (const id of await gmailIds(vendorQuery, 60)) receiptIds.add(id);
     // New mail gets fetched; recent known mail is refetched so read/unread stays current.
+    // Mail already handled that has aged out of the list (old vendor orders, say) isn't fetched again.
+    const handled = new Set(start.handledEmails);
     const toFetch = [...new Set([...clientIds, ...receiptIds])].filter(id => {
       const k = known.get(id);
-      return !k || now - new Date(k.date).getTime() < 7 * DAY;
+      return k ? now - new Date(k.date).getTime() < 7 * DAY : !handled.has(id);
     });
     const raws: RawMail[] = await pool(toFetch, 6, async id => {
       const meta = await gmailMessage(id, false);

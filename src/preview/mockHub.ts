@@ -289,7 +289,12 @@ const hub: Hub = {
       });
       return got;
     } catch (err) {
-      return { error: err instanceof Error ? err.message : String(err) };
+      const msg = err instanceof Error ? err.message : String(err);
+      commit(s => {
+        const a = s.accounts.find(x => x.id === id);
+        if (a) a.lastError = msg;
+      });
+      return { error: msg };
     }
   },
 };

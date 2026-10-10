@@ -121,6 +121,8 @@ const handlers: HubApi = {
     return id;
   },
   async remove(collection, id) {
+    // A removed software account's sign-in is forgotten too.
+    if (collection === 'accounts') await accounts.forgetAccount({ id }).catch(() => {});
     update(s => {
       (s as any)[collection] = (s[collection] as unknown as { id: string }[]).filter(x => x.id !== id);
     });

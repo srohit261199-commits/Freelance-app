@@ -5,6 +5,7 @@
 import type { AppState, EmailItem, Meeting, Model, Payment, Subscription, Suggestion, SyncResult } from './types';
 import { classify, findJoinUrl, looksLikePayout, meetingFromInviteSubject, parseIcs, parseSubscription, parseWaveinkSalary, toEmailItem, type RawMail } from './mail';
 import { normaliseCode } from './status';
+import { foldVendorMail, matchVendorSub, parseVendorMail, vendorOfMail } from './vendors';
 import { localDate } from './money';
 
 const DAY = 86400000;
@@ -37,6 +38,8 @@ export interface Ingested {
   payments: Payment[];
   suggestions: Suggestion[];
   subUpdates: { id: string; patch: Partial<Subscription> }[];
+  /** New mail about a plan already waiting in Mail scan. */
+  suggestionUpdates: { id: string; patch: Partial<Subscription>; detail: string }[];
   mailMeetings: Meeting[];
   handledNow: string[];
   newEmails: number;
@@ -49,7 +52,8 @@ export function needsBody(state: AppState, raw: Pick<RawMail, 'id' | 'subject'>,
 }
 
 export function ingestMail(state: AppState, raws: RawMail[], receiptIds: Set<string>, clientIds: Set<string>, nowIso: string): Ingested {
-  const out: Ingested = { items: [], payments: [], suggestions: [], subUpdates: [], mailMeetings: [], handledNow: [], newEmails: 0 };
+  const out: Ingested = { items: [], payments: [], suggestions: [], subUpdates: [], suggestionUpdates: [], mailMeetings: [], handledNow: [], newEmails: 0 };
+  const vendorMails: VendorMail[] = [];
   const known = new Set(state.emails.map(e => e.id));
   const handled = new Set([...state.handledEmails, ...state.suggestions.map(s => s.emailId)]);
   const wi = state.companies.find(c => c.id === 'waveink')!;
@@ -104,6 +108,13 @@ export function ingestMail(state: AppState, raws: RawMail[], receiptIds: Set<str
       if (meeting && !Number.isNaN(new Date(meeting.start).getTime())) out.mailMeetings.push(meeting);
     }
     if (receiptIds.has(raw.id) && raw.body) {
+      // Software vendors' mail is read by the vendor rules only, so their promotions never become subscriptions.
+      if (vendorOfMail(raw, state.accounts)) {
+        const found = parseVendorMail(raw, state.accounts);
+        if (found) vendorMails.push({ raw, url: item.url, found });
+        else out.handledNow.push(raw.id);
+        continue;
+      }
       const sub = parseSubscription(raw);
       if (!sub) continue;
       const match = findSubscription(state.subscriptions, sub);
@@ -124,7 +135,62 @@ export function ingestMail(state: AppState, raws: RawMail[], receiptIds: Set<str
       }
     }
   }
+  foldVendorMails(state, vendorMails, out, nowIso);
   return out;
+}
+
+interface VendorMail {
+  raw: RawMail;
+  url: string;
+  found: Partial<Subscription>;
+}
+
+/**
+ * A vendor's mails about one plan (trial, order, invoice, auto-renew off) become one update or one proposal: each mail,
+ * oldest first, is folded into the subscription, waiting proposal or new proposal it belongs to.
+ */
+function foldVendorMails(state: AppState, mails: VendorMail[], out: Ingested, nowIso: string): void {
+  type Target = { key: string; kind: 'sub' | 'sg' | 'new'; base: Partial<Subscription>; cur: Partial<Subscription>; mails: VendorMail[] };
+  const targets = new Map<string, Target>();
+  const waiting = state.suggestions.filter(s => s.kind === 'subscription' && s.subscription);
+  for (const m of [...mails].sort((a, b) => a.raw.date.localeCompare(b.raw.date))) {
+    const pool = [
+      ...state.subscriptions.map(s => ({ key: `sub:${s.id}`, kind: 'sub' as const, base: s })),
+      ...waiting.map(s => ({ key: `sg:${s.id}`, kind: 'sg' as const, base: s.subscription! })),
+      ...[...targets.values()].filter(t => t.kind === 'new'),
+    ].map(c => ({ ...c, cur: targets.get(c.key)?.cur ?? c.base }));
+    const hit = matchVendorSub(
+      pool.map(c => ({ ...c.cur, id: c.key, name: c.cur.name ?? '', vendor: c.cur.vendor ?? '', status: c.cur.status ?? 'active' }) as Subscription),
+      m.found,
+    );
+    const c = hit ? pool.find(x => x.key === hit.id)! : { key: `new:${m.raw.id}`, kind: 'new' as const, base: {}, cur: {} };
+    const t: Target = targets.get(c.key) ?? { key: c.key, kind: c.kind, base: c.base, cur: c.cur, mails: [] };
+    t.cur = foldVendorMail(t.cur, m.found);
+    t.mails.push(m);
+    targets.set(c.key, t);
+  }
+  for (const t of targets.values()) {
+    out.handledNow.push(...t.mails.map(m => m.raw.id));
+    const last = t.mails[t.mails.length - 1];
+    const detail = t.mails.length === 1 ? last.raw.subject : `${t.mails.length} ${t.cur.vendor} mails, latest: ${last.raw.subject}`;
+    if (t.kind === 'sub') {
+      const patch = Object.fromEntries(Object.entries(t.cur).filter(([k, v]) => k !== 'emailId' && JSON.stringify(v) !== JSON.stringify((t.base as Record<string, unknown>)[k])));
+      if (Object.keys(patch).length) out.subUpdates.push({ id: t.key.slice(4), patch });
+    } else if (t.kind === 'sg') {
+      out.suggestionUpdates.push({ id: t.key.slice(3), patch: t.cur, detail });
+    } else if (t.cur.name !== t.cur.vendor || t.cur.amount != null || t.cur.status === 'cancelling') {
+      out.suggestions.push({
+        id: `sg-${last.raw.id}`,
+        kind: 'subscription',
+        emailId: last.raw.id,
+        emailUrl: last.url,
+        title: `New subscription? ${t.cur.name}`,
+        detail,
+        subscription: { currency: 'USD', cycle: 'yearly', ...t.cur },
+        createdAt: nowIso,
+      });
+    }
+  }
 }
 
 export function calendarMeetings(events: CalEventLike[], state: AppState): Meeting[] {
@@ -186,6 +252,13 @@ export function applySync(s: AppState, got: Ingested, calMeetings: Meeting[], dr
   for (const u of got.subUpdates) {
     const i = s.subscriptions.findIndex(x => x.id === u.id);
     if (i >= 0) s.subscriptions[i] = { ...s.subscriptions[i], ...u.patch };
+  }
+  for (const u of got.suggestionUpdates) {
+    const sg = s.suggestions.find(x => x.id === u.id);
+    if (!sg) continue;
+    sg.subscription = { ...sg.subscription, ...u.patch };
+    sg.title = `New subscription? ${sg.subscription.name}`;
+    sg.detail = u.detail;
   }
   s.handledEmails = [...new Set([...s.handledEmails, ...got.handledNow])].slice(-2000);
 

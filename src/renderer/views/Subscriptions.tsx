@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
-import type { AppState, Currency, Subscription } from '../../shared/types';
+import type { AppState, Currency, SoftwareAccount, Subscription } from '../../shared/types';
 import { convert, daysUntil, formatMoney, monthlyCost, rollRenewal } from '../../shared/money';
 import { hub } from '../hub';
 import { ConfirmButton, Empty, Field, Icon, Modal, type IconName, useApp } from '../ui';
+import { AccountsPanel, LICENCE_LABEL } from './Accounts';
 import './Subscriptions.css';
 
 type Status = Subscription['status'];
@@ -58,6 +59,7 @@ function foundIn(s: Subscription, state: AppState): { icon: IconName; text: stri
     return { icon: 'mail', text: `${who} ${mail && !/receipt|invoice|order/i.test(mail.subject) ? 'mail' : 'receipt'}` };
   }
   if (s.source === 'email') return { icon: 'mail', text: 'Gmail receipt' };
+  if (s.source === 'account') return { icon: 'user', text: `${state.accounts.find(a => a.id === s.accountId)?.label ?? 'Software'} account` };
   return { icon: 'hand', text: s.source === 'manual' ? 'Added by hand' : 'Added at setup' };
 }
 
@@ -74,7 +76,8 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
   const work = renewing.filter(s => s.category === 'work').reduce((t, s) => t + inBase(s), 0);
   const ended = state.subscriptions.length - live.length;
   const fromMail = live.filter(s => s.emailId || s.source === 'email').length;
-  const byHand = live.length - fromMail;
+  const fromAccounts = live.filter(s => !s.emailId && s.source === 'account').length;
+  const byHand = live.length - fromMail - fromAccounts;
   const subSuggestions = state.suggestions.filter(s => s.kind === 'subscription').length;
 
   const rows = state.subscriptions
@@ -100,7 +103,10 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
       <header className="page-head">
         <div>
           <h1>Subscriptions</h1>
-          <p>{[fromMail && `${fromMail} found in Gmail receipts`, byHand && `${byHand} added by hand`].filter(Boolean).join(' · ') || 'Nothing tracked yet'}</p>
+          <p>
+            {[fromMail && `${fromMail} found in Gmail receipts`, fromAccounts && `${fromAccounts} read from software accounts`, byHand && `${byHand} added by hand`].filter(Boolean).join(' · ') ||
+              'Nothing tracked yet'}
+          </p>
         </div>
         <div className="actions">
           <button type="button" className="lg" onClick={() => go({ view: 'inbox' })} title="Open Mail scan to review what Gmail found">
@@ -194,7 +200,11 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
                               <button type="button" className="link-btn subs-name" title={s.notes || `Edit ${s.name}`} onClick={() => setEditing(s)}>
                                 {s.name}
                               </button>
-                              <span className="subs-sub">{vendorLine(s)}</span>
+                              <span className="subs-sub">
+                                {vendorLine(s)}
+                                {s.licence && s.licence !== 'subscription' && <span className="subs-lic">{LICENCE_LABEL[s.licence]}</span>}
+                                {s.seats && s.seats > 1 ? <span className="subs-lic">{s.seats} seats</span> : null}
+                              </span>
                               <div className="subs-mob">
                                 <span className={`pill ${STATUS[s.status].cls}`}>{STATUS[s.status].label}</span>
                                 <span>
@@ -314,7 +324,8 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
           )}
         </aside>
       </div>
-      {editing && <SubEditor sub={editing} notifications={state.settings.notifications} onClose={() => setEditing(null)} />}
+      <AccountsPanel state={state} now={now} />
+      {editing && <SubEditor sub={editing} accounts={state.accounts} notifications={state.settings.notifications} onClose={() => setEditing(null)} />}
     </div>
   );
 }
@@ -414,7 +425,7 @@ function Pills<T extends string>({ label, value, options, onPick }: { label: str
   );
 }
 
-function SubEditor({ sub, notifications, onClose }: { sub: Partial<Subscription>; notifications: boolean; onClose(): void }) {
+function SubEditor({ sub, accounts, notifications, onClose }: { sub: Partial<Subscription>; accounts: SoftwareAccount[]; notifications: boolean; onClose(): void }) {
   const { toast } = useApp();
   const [s, setS] = useState<Partial<Subscription>>(sub);
   const set = (patch: Partial<Subscription>) => setS({ ...s, ...patch });
@@ -425,7 +436,8 @@ function SubEditor({ sub, notifications, onClose }: { sub: Partial<Subscription>
     const raw = s.amount as unknown;
     const amount = raw === null || raw === '' || raw === undefined ? null : Number(raw);
     if (amount !== null && !(amount >= 0)) return toast('Enter the amount as a number, or leave it empty.', 'error');
-    await hub.upsert('subscriptions', { ...s, name, vendor: s.vendor?.trim() || name, amount, source: s.source ?? 'manual' });
+    const seats = Number(s.seats) > 1 ? Math.round(Number(s.seats)) : undefined;
+    await hub.upsert('subscriptions', { ...s, name, vendor: s.vendor?.trim() || name, amount, seats, source: s.source ?? 'manual' });
     toast(sub.id ? `${name} saved` : `${name} added`);
     onClose();
   };
@@ -509,7 +521,7 @@ function SubEditor({ sub, notifications, onClose }: { sub: Partial<Subscription>
       />
       <details className="subs-more" open={!!sub.id}>
         <summary>
-          <Icon name="caretRight" size={14} weight="bold" /> Billed by, payment method, type and notes
+          <Icon name="caretRight" size={14} weight="bold" /> Billed by, licence, account, payment method and notes
         </summary>
         <div className="subs-more-body">
           <div className="subs-row">
@@ -520,6 +532,33 @@ function SubEditor({ sub, notifications, onClose }: { sub: Partial<Subscription>
               <input value={s.paymentMethod ?? ''} onChange={e => set({ paymentMethod: e.target.value })} placeholder="e.g. UPI: GPay" />
             </Field>
           </div>
+          <div className="subs-row">
+            <Field label="Licence">
+              <select value={s.licence ?? 'subscription'} onChange={e => set({ licence: e.target.value === 'subscription' ? undefined : (e.target.value as Subscription['licence']) })}>
+                {Object.entries(LICENCE_LABEL).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Seats">
+              <input type="number" min="1" step="1" value={s.seats ?? ''} placeholder="1" onChange={e => set({ seats: e.target.value === '' ? undefined : (e.target.value as unknown as number) })} />
+            </Field>
+          </div>
+          {accounts.length > 0 && (
+            <Field label="Software account">
+              <select value={s.accountId ?? ''} onChange={e => set({ accountId: e.target.value || undefined })}>
+                <option value="">None</option>
+                {accounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                    {a.email ? ` (${a.email})` : ''}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
           <Pills
             label="Type"
             value={s.category}
