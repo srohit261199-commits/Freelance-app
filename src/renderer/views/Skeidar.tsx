@@ -5,7 +5,7 @@ import { uid } from '../../shared/ops';
 import { hub } from '../hub';
 import { ConfirmButton, Empty, Field, Icon, Modal, relTime, useApp } from '../ui';
 import { jobPriority, PRIORITY_LABEL } from '../priority';
-import { clientFolder, promptFor, promptList, suggestedFileName } from '../../shared/assets';
+import { clientFolder, promptFor, promptList, suggestedFileName, withFolder } from '../../shared/assets';
 import { AssetsPanel, LocalThumb } from './AssetsPanel';
 import { JobDetails } from './JobDetails';
 import './Skeidar.css';
@@ -90,7 +90,12 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
     const r = await hub.syncJobFolders(company);
     if ('error' in r) return quiet || toast(r.error, 'error');
     if (quiet && !r.created && !r.updated && !r.ticked) return;
-    const bits = [r.created && `${plural(r.created, 'new job')}`, r.updated && `${plural(r.updated, 'job')} updated`, r.ticked && `${plural(r.ticked, 'image')} ticked off from files`].filter(Boolean);
+    const bits = [
+      r.created && `${plural(r.created, 'new job')}`,
+      r.updated && `${plural(r.updated, 'job')} updated`,
+      r.ticked && `${plural(r.ticked, 'image')} ticked off from files`,
+      !quiet && r.older && `${plural(r.older, 'older folder')} left for Make job`,
+    ].filter(Boolean);
     toast(bits.length ? `${bits.join(' · ')}` : `${plural(r.folders, 'job folder')} checked, nothing new`);
   };
   useEffect(() => {
@@ -100,7 +105,7 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
   const changeRoot = async () => {
     const p = await hub.pickFolder(root || undefined);
     if (!p) return;
-    await hub.upsert('companies', { ...cfg, folder: p });
+    await hub.upsert('companies', { ...withFolder(cfg, p) });
     if (company === 'skeidar') await hub.patchSettings({ skeidarFolder: p });
   };
 
@@ -169,6 +174,27 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
   const pick = (id?: string) => {
     setSelId(id);
     heroRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  // A job for a folder that's already there: built from the folder's sheet and photos, or typed in when it has neither.
+  const makeJob = async (f: FolderEntry) => {
+    const id = uid('sk');
+    await hub.upsert('skeidarJobs', {
+      id,
+      name: f.name,
+      folder: f.path,
+      images: [],
+      fabrics: [],
+      done: {},
+      status: 'open',
+      receivedAt: localDate(new Date()),
+      createdAt: new Date().toISOString(),
+      ...(company === 'skeidar' ? {} : { company }),
+    });
+    await syncFolders(true);
+    setSelId(id);
+    const job = (await hub.getState()).skeidarJobs.find(j => j.id === id);
+    if (job && (!job.fabrics.length || !job.images.length)) setEditing(job);
+    else toast(`${f.name} added from its folder`);
   };
   const newJob = (p?: Partial<SkeidarJob>) => {
     setPrefill(p);
@@ -309,7 +335,10 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
           <div className="grow">
             <h2 id="sk-folder-title">Project folder</h2>
             <p className="small muted break">{root || 'No folder linked yet'}</p>
-            <p className="small muted">Each subfolder is a job: put the client's sheet and the master photos in it, save finished images in an output folder inside it.</p>
+            <p className="small muted">
+              Each new subfolder becomes a job: put the client's sheet and the master photos in it, save finished images in an output folder inside it. Folders that were
+              already there more than two weeks before you linked the folder are older projects: click Make job on any you want to track.
+            </p>
           </div>
           <div className="row gap wrap">
             <button
@@ -355,7 +384,7 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
                   <span className="tag ok">Has a job</span>
                 ) : (
                   f.name !== '(files in this folder)' && (
-                    <button type="button" className="mini" onClick={() => newJob({ name: f.name, folder: f.path, notes: `${f.images} images in folder when created.` })}>
+                    <button type="button" className="mini" onClick={() => makeJob(f)}>
                       Make job
                     </button>
                   )
@@ -578,7 +607,15 @@ function useCopy() {
   const dialog = fallback && (
     <Modal title={`Copy ${fallback.what}`} onClose={() => setFallback(null)}>
       <p className="small muted">Copying was blocked. The text is selected: press Ctrl+C.</p>
-      <textarea className="sk-pr-copy" readOnly rows={12} value={fallback.text} ref={el => el?.select()} />
+      <textarea
+        className="sk-pr-copy"
+        readOnly
+        rows={12}
+        value={fallback.text}
+        ref={el => {
+          el?.select();
+        }}
+      />
     </Modal>
   );
   return { copy, dialog };
@@ -728,7 +765,7 @@ function JobEditor({
   const base = job ?? prefill;
   const [name, setName] = useState(base?.name ?? '');
   const [received, setReceived] = useState(localDate(job?.receivedAt ?? new Date()));
-  const [images, setImages] = useState((job?.images ?? ['Image 1', 'Image 2']).join('\n'));
+  const [images, setImages] = useState((job?.images?.length ? job.images : ['Image 1', 'Image 2']).join('\n'));
   const [fabrics, setFabrics] = useState((job?.fabrics ?? []).join('\n'));
   const [notes, setNotes] = useState(base?.notes ?? '');
   const [folder, setFolder] = useState(base?.folder ?? '');

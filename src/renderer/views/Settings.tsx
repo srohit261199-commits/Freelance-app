@@ -3,6 +3,7 @@ import type { AppState, CompanyConfig, CompanyId, Complexity, Currency, Model, P
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
 import { daysUntil, ordinal } from '../../shared/money';
 import { DEFAULT_WORKDAYS, paceText, weekProgress, WEEKDAYS } from '../../shared/pace';
+import { clientFolder, withFolder } from '../../shared/assets';
 import { hub } from '../hub';
 import { ClientTile, ConfirmButton, Field, Icon, fmtDate, relTime, useApp, type IconName } from '../ui';
 import { FIELDS, PortalImport, parsePaste } from './PortalImport';
@@ -635,6 +636,13 @@ function MoneyCard({ state }: { state: AppState }) {
 
 function FoldersCard({ state }: { state: AppState }) {
   const s = state.settings;
+  // The folder the app actually reads is the Skeidar client's; the old setting is kept in step with it.
+  const skeidarRoot = clientFolder(state, 'skeidar') ?? '';
+  const setSkeidarRoot = async (p: string) => {
+    const cfg = state.companies.find(c => c.id === 'skeidar');
+    if (cfg) await hub.upsert('companies', { ...withFolder(cfg, p.trim() || undefined) });
+    await hub.patchSettings({ skeidarFolder: p.trim() });
+  };
   return (
     <section className="panel set-card" aria-labelledby="set-folders-title">
       <h2 id="set-folders-title">Folders and links</h2>
@@ -643,11 +651,11 @@ function FoldersCard({ state }: { state: AppState }) {
         icon="folder"
         label="Skeidar"
         name="Skeidar project folder"
-        value={s.skeidarFolder}
-        onSave={v => hub.patchSettings({ skeidarFolder: v })}
+        value={skeidarRoot}
+        onSave={v => void setSkeidarRoot(v)}
         onChange={async () => {
-          const p = await hub.pickFolder(s.skeidarFolder);
-          if (p) await hub.patchSettings({ skeidarFolder: p });
+          const p = await hub.pickFolder(skeidarRoot || undefined);
+          if (p) await setSkeidarRoot(p);
         }}
       />
       <FolderRow

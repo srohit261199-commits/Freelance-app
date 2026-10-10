@@ -322,6 +322,11 @@ export interface CompanyConfig {
   expectations?: Expectations;
   /** Watched folder: each subfolder is a job, other files are the client's assets. */
   folder?: string;
+  /**
+   * Local date set at the folder's first sync, two weeks back: subfolders made before it are older projects and only
+   * become jobs when Rohit clicks Make job. Cleared when the folder changes.
+   */
+  folderSince?: string;
   archived?: boolean;
   /** One of the three clients the app ships with; can't be removed. */
   builtIn?: boolean;

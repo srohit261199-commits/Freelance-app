@@ -101,11 +101,23 @@ export function flush(): void {
 function writeNow(): void {
   saveTimer = null;
   const target = filePath();
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  const tmp = target + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(state));
-  fs.renameSync(tmp, target);
-  backupDaily(target);
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const tmp = target + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(state));
+    fs.renameSync(tmp, target);
+  } catch (err) {
+    // Windows: a virus scanner, backup tool or indexer can hold the file for a moment (EPERM/EBUSY). Keep the save
+    // pending so it's retried, and so the flush at quit still writes it.
+    console.error('Saving failed, retrying in a second', err);
+    saveTimer = setTimeout(writeNow, 1000);
+    return;
+  }
+  try {
+    backupDaily(target);
+  } catch (err) {
+    console.error('Daily backup failed', err);
+  }
 }
 
 function backupDaily(source: string): void {

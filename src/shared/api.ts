@@ -59,6 +59,8 @@ export interface FolderSyncResult {
   /** Images newly ticked off because a matching file appeared in an output folder. */
   ticked: number;
   folders: number;
+  /** Project folders older than the client's first sync, left for Make job. */
+  older?: number;
 }
 
 export const HUB_METHODS: (keyof HubApi)[] = [

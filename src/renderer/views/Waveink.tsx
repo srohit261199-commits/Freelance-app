@@ -126,7 +126,10 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
   const filtered = status !== 'all' || sub !== 'all' || starred;
   const chosen = sel ? all.find(m => m.id === sel) : undefined;
   const current = chosen ?? (wide ? shown[0] : undefined);
-  useEffect(() => detailBox.current?.scrollTo(0, 0), [current?.id]);
+  useEffect(() => {
+    // A block body: scrollTo returns a Promise in Electron 44, and an effect must return nothing or a cleanup.
+    detailBox.current?.scrollTo(0, 0);
+  }, [current?.id]);
 
   const set = async (ids: string[], to: ModelStatus, note?: string) => {
     await hub.setStatus(ids, to, note);

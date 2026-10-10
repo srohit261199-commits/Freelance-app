@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { initialState } from '../src/main/seed/initial';
+import { upgradeState } from '../src/shared/ops';
 import {
   applyJobFolders,
+  decodeText,
+  withFolder,
   classifyJobFiles,
   fileKind,
   jobFromFolder,
@@ -203,16 +206,16 @@ describe('jobs from folders', () => {
   it('creates one job per folder and updates it in place', () => {
     const s = initialState(NOW);
     const r1 = applyJobFolders(s, 'skeidar', [{ info: info(['Justin stol - Kiara 851 Beige - front.jpg']), created: '2026-10-08' }], NOW);
-    expect(r1).toEqual({ created: 1, updated: 0, ticked: 1, folders: 1 });
+    expect(r1).toEqual({ created: 1, updated: 0, ticked: 1, folders: 1, older: 0 });
     expect(s.skeidarJobs[0]).toMatchObject({ name: 'Justin stol', status: 'open', receivedAt: '2026-10-08', folder: DIR });
     expect(s.skeidarJobs[0].company).toBeUndefined();
     const again = applyJobFolders(s, 'skeidar', [{ info: info(['Justin stol - Kiara 851 Beige - front.jpg']), created: '2026-10-08' }], NOW);
-    expect(again).toEqual({ created: 0, updated: 0, ticked: 0, folders: 1 });
+    expect(again).toEqual({ created: 0, updated: 0, ticked: 0, folders: 1, older: 0 });
     const two = ['Justin stol - Kiara 851 Beige - front.jpg', 'Justin stol - Kiara 854 Light Grey - back.jpg', 'Justin stol - Kiara 851 Beige - back.jpg'];
     const more = applyJobFolders(s, 'skeidar', [{ info: info(two), created: '2026-10-08' }], NOW);
-    expect(more).toEqual({ created: 0, updated: 1, ticked: 2, folders: 1 });
+    expect(more).toEqual({ created: 0, updated: 1, ticked: 2, folders: 1, older: 0 });
     // The same files again, ticks carried over in a different order: nothing to report.
-    expect(applyJobFolders(s, 'skeidar', [{ info: info(two), created: '2026-10-08' }], NOW)).toEqual({ created: 0, updated: 0, ticked: 0, folders: 1 });
+    expect(applyJobFolders(s, 'skeidar', [{ info: info(two), created: '2026-10-08' }], NOW)).toEqual({ created: 0, updated: 0, ticked: 0, folders: 1, older: 0 });
     expect(s.skeidarJobs).toHaveLength(1);
     // Another client's folder makes a job of its own, tagged with the client.
     applyJobFolders(s, 'nordic', [{ info: info(), created: '2026-10-09' }], NOW);
@@ -264,5 +267,80 @@ describe('prompts', () => {
     expect(list.count).toBe(38);
     expect(list.text.startsWith('1. Save as: Justin stol - Kiara 854 Light Grey - front.jpg\nEdit the attached front view')).toBe(true);
     expect(promptList(job).count).toBe(117);
+  });
+});
+
+describe('upgrading from an older build', () => {
+  const handMade = (extra: Partial<SkeidarJob> = {}): SkeidarJob => ({
+    id: 'old-1',
+    name: 'Justin stol',
+    receivedAt: '2026-10-01',
+    images: ['Image 1', 'Image 2'],
+    fabrics: ['Kiara 851 Beige', 'Kiara 854 Light Grey'],
+    done: { '0:0': true, '1:1': true },
+    status: 'delivered',
+    deliveredAt: '2026-10-05T10:00:00.000Z',
+    createdAt: '2026-10-01T10:00:00.000Z',
+    ...extra,
+  });
+
+  it('links a job typed in by hand to its folder by name instead of making a second one', () => {
+    const s = initialState(NOW);
+    s.skeidarJobs = [handMade()];
+    const r = applyJobFolders(s, 'skeidar', [{ info: info(), created: '2026-10-08' }], NOW);
+    expect(r.created).toBe(0);
+    expect(s.skeidarJobs).toHaveLength(1);
+    expect(s.skeidarJobs[0]).toMatchObject({ folder: DIR, status: 'delivered', fabrics: ['Kiara 851 Beige', 'Kiara 854 Light Grey'], images: ['Image 1', 'Image 2'] });
+    expect(s.skeidarJobs[0].done).toEqual({ '0:0': true, '1:1': true });
+  });
+
+  it('keeps an old linked job’s own lists, then follows the folder once its sheet or photos change', () => {
+    const s = initialState(NOW);
+    s.skeidarJobs = [handMade({ folder: DIR, status: 'open', deliveredAt: undefined })];
+    applyJobFolders(s, 'skeidar', [{ info: info(), created: '2026-10-08' }], NOW);
+    expect(s.skeidarJobs[0].fabrics).toHaveLength(2);
+    expect(s.skeidarJobs[0].folderSig).toBeTruthy();
+    const i = info();
+    i.masters.push(file('Justin stol - side.jpg'));
+    applyJobFolders(s, 'skeidar', [{ info: i, created: '2026-10-08' }], NOW);
+    expect(s.skeidarJobs[0].fabrics).toHaveLength(39);
+  });
+
+  it('leaves folders from well before the first sync for Make job, and takes new ones', () => {
+    const s = initialState(NOW);
+    s.skeidarJobs = [];
+    const old = { ...info(), folder: `${DIR} 2025`, name: 'Old sofa' };
+    expect(applyJobFolders(s, 'skeidar', [{ info: old, created: '2025-11-02' }], NOW)).toMatchObject({ created: 0, older: 1 });
+    expect(s.companies.find(c => c.id === 'skeidar')!.folderSince).toBe('2026-09-26');
+    expect(applyJobFolders(s, 'skeidar', [{ info: info(), created: '2026-10-08' }], NOW)).toMatchObject({ created: 1, older: 0 });
+    // Make job: a bare job for the old folder is filled from its sheet and photos by the next sync.
+    s.skeidarJobs.push({ id: 'mk', name: 'Old sofa', folder: old.folder, images: [], fabrics: [], done: {}, status: 'open', receivedAt: '2026-10-10', createdAt: NOW });
+    applyJobFolders(s, 'skeidar', [{ info: old, created: '2025-11-02' }], NOW);
+    expect(s.skeidarJobs.find(j => j.id === 'mk')).toMatchObject({ fabrics: expect.arrayContaining(['Kiara 851 Beige']), images: ['Front', 'Back', '3/4'] });
+    // A different folder starts its own first sync.
+    const sk = s.companies.find(c => c.id === 'skeidar')!;
+    expect(withFolder(sk, 'E:\\Work\\Skeidar').folderSince).toBeUndefined();
+    expect(withFolder(sk, sk.folder).folderSince).toBe('2026-09-26');
+  });
+
+  it('gives saved files from the first builds the newer mail rules once', () => {
+    const seed = initialState(NOW);
+    const old = initialState(NOW);
+    const wi = old.companies.find(c => c.id === 'waveink')!;
+    delete wi.match.emails;
+    wi.match.keywords = wi.match.keywords.filter(k => !/weekly demo/i.test(k));
+    upgradeState(old, seed);
+    expect(wi.match.emails).toEqual(seed.companies.find(c => c.id === 'waveink')!.match.emails);
+    expect(wi.match.keywords.some(k => /weekly demo/i.test(k))).toBe(seed.companies.find(c => c.id === 'waveink')!.match.keywords.some(k => /weekly demo/i.test(k)));
+    // Rules Rohit edited later stay as they are.
+    wi.match.emails = ['someone@example.com'];
+    upgradeState(old, seed);
+    expect(wi.match.emails).toEqual(['someone@example.com']);
+  });
+
+  it('reads CSV sheets in every encoding Excel saves', () => {
+    expect(decodeText(new Uint8Array([0x47, 0x72, 0xf8, 0x6e, 0x6e]))).toBe('Grønn'); // Excel "CSV" on Windows (ANSI)
+    expect(decodeText(new TextEncoder().encode('\ufeffGrønn'))).toBe('Grønn'); // CSV UTF-8 with BOM
+    expect(decodeText(new Uint8Array([0xff, 0xfe, 0x47, 0, 0xf8, 0]))).toBe('Gø'); // Unicode text
   });
 });

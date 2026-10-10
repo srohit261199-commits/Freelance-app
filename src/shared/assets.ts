@@ -2,6 +2,7 @@
 import type { FolderSyncResult } from './api';
 import type { AppState, AssetFile, CompanyConfig, CompanyId, JobFolderInfo, ParsedSheet, SheetVariant, SkeidarJob } from './types';
 import { uid } from './ops';
+import { localDate } from './money';
 
 export type Cell = string | number | null | undefined;
 
@@ -42,6 +43,11 @@ export function workflowOf(cfg: CompanyConfig): 'models' | 'variations' {
 }
 
 /** The client's watched folder (Skeidar falls back to the older setting). */
+/** A client with a (possibly new) watched folder. A different folder starts its own first sync, so its cutoff is cleared. */
+export function withFolder<T extends Pick<CompanyConfig, 'folder' | 'folderSince'>>(cfg: T, folder: string | undefined): T {
+  return { ...cfg, folder, folderSince: samePath(cfg.folder, folder) ? cfg.folderSince : undefined };
+}
+
 export function clientFolder(state: AppState, company: CompanyId): string | undefined {
   const cfg = state.companies.find(c => c.id === company);
   return cfg?.folder || (company === 'skeidar' ? state.settings.skeidarFolder : undefined) || undefined;
@@ -63,6 +69,20 @@ export function classifyJobFiles(files: AssetFile[]): { masters: AssetFile[]; ou
   const rank = (f: AssetFile) => f.rel.split(/[\\/]/).length * 10 + (/\.xlsx$/i.test(f.name) ? 0 : /\.(csv|tsv|xlsm)$/i.test(f.name) ? 1 : 2);
   sheets.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
   return { masters, outputs, sheetFile: sheets[0] };
+}
+
+/**
+ * Text of a CSV as Excel saved it: UTF-8 (with or without a BOM), UTF-16 ("Unicode text"), or, for Excel's plain "CSV"
+ * on Windows, the ANSI code page, where "Grønn" would otherwise come out as "Gr�nn".
+ */
+export function decodeText(buf: Uint8Array): string {
+  if (buf[0] === 0xff && buf[1] === 0xfe) return new TextDecoder('utf-16le').decode(buf);
+  if (buf[0] === 0xfe && buf[1] === 0xff) return new TextDecoder('utf-16be').decode(buf);
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    return new TextDecoder('windows-1252').decode(buf);
+  }
 }
 
 /** Rows of a CSV or TSV export; works out the separator (Norwegian Excel writes semicolons). */
@@ -465,7 +485,9 @@ function buildFromFolder(info: JobFolderInfo, existing?: SkeidarJob): { job: Fol
   const sheet = info.sheet?.fabrics.length ? info.sheet : undefined;
   // While the sheet and photos are what they were at the last sync, fabrics and photos edited in the app are kept.
   const sig = JSON.stringify([sheet?.fabrics.map(f => [f.name, f.itemIds]) ?? null, info.masters.map(f => f.path).sort()]);
-  const kept = !!existing?.folderSig && existing.folderSig === sig ? existing : undefined;
+  // A job from a build before folder signatures keeps what was typed for it until its sheet or photos change.
+  const legacy = !!existing && !existing.folderSig && existing.fabrics.length > 0;
+  const kept = existing && (legacy || existing.folderSig === sig) ? existing : undefined;
   const product = kept ? kept.product : sheet?.product || existing?.product;
   const fabrics = kept ? kept.fabrics : sheet ? sheet.fabrics.map(f => f.name) : (existing?.fabrics ?? []);
   const itemIds = kept ? kept.itemIds : sheet ? Object.fromEntries(sheet.fabrics.filter(f => f.itemIds.length).map(f => [f.name, f.itemIds])) : existing?.itemIds;
@@ -509,10 +531,24 @@ const FIELDS = ['images', 'fabrics', 'done', 'product', 'sheet', 'itemIds', 'opt
 
 /** Creates or updates one job per job folder of a client, in place on a draft state. `created` is each folder's local creation date. */
 export function applyJobFolders(draft: AppState, company: CompanyId, folders: { info: JobFolderInfo; created: string }[], now: string): FolderSyncResult {
-  const result: FolderSyncResult = { created: 0, updated: 0, ticked: 0, folders: folders.length };
+  const result: FolderSyncResult = { created: 0, updated: 0, ticked: 0, folders: folders.length, older: 0 };
+  const cfg = draft.companies.find(c => c.id === company);
+  // First sync of this folder: anything made more than two weeks ago is an older project, not new work.
+  if (cfg && !cfg.folderSince) cfg.folderSince = localDate(new Date(new Date(now).getTime() - 14 * 86400000));
+  const mine = (j: SkeidarJob) => (j.company ?? 'skeidar') === company;
+  const key = (s: string) => tokens(s).join(' ');
   for (const { info, created } of folders) {
-    const existing = draft.skeidarJobs.find(j => (j.company ?? 'skeidar') === company && samePath(j.folder, info.folder));
+    let existing = draft.skeidarJobs.find(j => mine(j) && samePath(j.folder, info.folder));
+    // A job typed in by hand (older versions left the folder optional) is linked to its folder, not duplicated.
+    if (!existing) {
+      existing = draft.skeidarJobs.find(j => mine(j) && !j.folder && key(j.name) === key(info.name));
+      if (existing) existing.folder = info.folder;
+    }
     if (!existing && !info.masters.length && !info.sheet?.fabrics.length) continue;
+    if (!existing && cfg?.folderSince && created < cfg.folderSince) {
+      result.older!++;
+      continue;
+    }
     const { job, ticked } = buildFromFolder(info, existing);
     if (existing) {
       // The folder signature alone changing isn't an update worth reporting.

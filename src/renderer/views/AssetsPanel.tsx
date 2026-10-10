@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { AppState, AssetFile, CompanyId } from '../../shared/types';
-import { clientFolder } from '../../shared/assets';
+import { clientFolder, withFolder } from '../../shared/assets';
 import { hub, useNow } from '../hub';
 import { Icon, relTime, useApp, type IconName } from '../ui';
 import './AssetsPanel.css';
@@ -66,7 +66,7 @@ export function AssetsPanel({ state, company, folder, title = 'Files' }: { state
     if (!cfg) return;
     const p = await hub.pickFolder(cfg.folder || undefined);
     if (!p) return;
-    await hub.upsert('companies', { ...cfg, folder: p });
+    await hub.upsert('companies', { ...withFolder(cfg, p) });
     if (company === 'skeidar') await hub.patchSettings({ skeidarFolder: p });
     toast(`${cfg.name} now reads files from ${p}`);
   };

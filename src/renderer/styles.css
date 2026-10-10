@@ -1857,3 +1857,34 @@ th.num,
     max-width: none;
   }
 }
+
+/* a screen that failed to render (ScreenBoundary) */
+.screen-error {
+  max-width: 640px;
+  gap: 12px;
+}
+.screen-error-ic {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: var(--st-bad-bg);
+  color: var(--st-bad);
+}
+.screen-error h2 {
+  font-size: 20px;
+}
+.screen-error p {
+  color: var(--text-2);
+}
+.screen-error pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--hover);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}

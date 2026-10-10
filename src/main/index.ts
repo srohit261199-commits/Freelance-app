@@ -24,6 +24,14 @@ if (!app.requestSingleInstanceLock()) app.quit();
 app.on('second-instance', () => focus());
 app.setAppUserModelId('com.rohitsharma.freelancehub');
 
+/**
+ * Start with Windows. The portable exe runs from a temporary copy that is deleted on exit, so the login item must point
+ * at the real file, which the portable launcher passes in PORTABLE_EXECUTABLE_FILE.
+ */
+function setLaunchAtLogin(on: boolean): void {
+  app.setLoginItemSettings({ openAtLogin: on, path: process.env.PORTABLE_EXECUTABLE_FILE || process.execPath });
+}
+
 function focus(): void {
   if (!win) return;
   if (win.isMinimized()) win.restore();
@@ -136,7 +144,7 @@ const handlers: HubApi = {
         rates: { ...s.settings.rates, ...patch.rates },
       };
     });
-    if (patch.launchAtStartup !== undefined) app.setLoginItemSettings({ openAtLogin: patch.launchAtStartup });
+    if (patch.launchAtStartup !== undefined) setLaunchAtLogin(patch.launchAtStartup);
     if (patch.syncMinutes !== undefined) scheduleSync();
   },
   async acceptSuggestion(id, override) {
@@ -319,6 +327,8 @@ for (const [name, fn] of Object.entries(handlers)) {
 
 app.whenReady().then(() => {
   const state = loadState();
+  // Re-point a login item an older portable build registered at its temporary copy.
+  if (process.platform === 'win32' && state.settings.launchAtStartup) setLaunchAtLogin(true);
   google.configure(state.settings.google);
   if (state.settings.google.connected && !google.hasTokens()) {
     update(s => {

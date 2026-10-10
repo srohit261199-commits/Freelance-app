@@ -18,6 +18,7 @@ import { Earnings } from './views/Earnings';
 import { Subscriptions } from './views/Subscriptions';
 import { Portfolio } from './views/Portfolio';
 import { Settings } from './views/Settings';
+import { ScreenBoundary } from './ScreenBoundary';
 
 interface Toast {
   id: number;
@@ -227,18 +228,20 @@ export function App() {
             </div>
           </nav>
           <main className="content" ref={main}>
-            {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
-            {route.view === 'company' && route.company === 'waveink' && <Waveink state={state} openId={route.modelId} now={now} />}
-            {route.view === 'company' && route.company === 'metaztech' && <MetaZtech state={state} openId={route.modelId} now={now} />}
-            {route.view === 'company' && route.company !== 'waveink' && route.company !== 'metaztech' && (
-              <Client key={route.company} state={state} company={route.company} openId={route.modelId} now={now} />
-            )}
-            {route.view === 'skeidar' && <Skeidar key={route.company ?? 'skeidar'} state={state} now={now} openId={route.jobId} company={route.company ?? 'skeidar'} />}
-            {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} emailId={route.emailId} />}
-            {route.view === 'earnings' && <Earnings state={state} now={now} />}
-            {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
-            {route.view === 'portfolio' && <Portfolio state={state} now={now} />}
-            {route.view === 'settings' && <Settings state={state} now={now} />}
+            <ScreenBoundary screen={JSON.stringify(route)}>
+              {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
+              {route.view === 'company' && route.company === 'waveink' && <Waveink state={state} openId={route.modelId} now={now} />}
+              {route.view === 'company' && route.company === 'metaztech' && <MetaZtech state={state} openId={route.modelId} now={now} />}
+              {route.view === 'company' && route.company !== 'waveink' && route.company !== 'metaztech' && (
+                <Client key={route.company} state={state} company={route.company} openId={route.modelId} now={now} />
+              )}
+              {route.view === 'skeidar' && <Skeidar key={route.company ?? 'skeidar'} state={state} now={now} openId={route.jobId} company={route.company ?? 'skeidar'} />}
+              {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} emailId={route.emailId} />}
+              {route.view === 'earnings' && <Earnings state={state} now={now} />}
+              {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
+              {route.view === 'portfolio' && <Portfolio state={state} now={now} />}
+              {route.view === 'settings' && <Settings state={state} now={now} />}
+            </ScreenBoundary>
           </main>
         </div>
       </div>

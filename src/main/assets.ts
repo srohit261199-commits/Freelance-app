@@ -6,7 +6,7 @@ import { nativeImage } from 'electron';
 import ExcelJS from 'exceljs';
 import type { AppState, AssetFile, CompanyId, JobFolderInfo, ParsedSheet } from '../shared/types';
 import type { FolderSyncResult } from '../shared/api';
-import { applyJobFolders, classifyJobFiles, clientFolder, fileKind, parseCsv, parseProductSheet, SKIP_ENTRY, workflowOf, type Cell } from '../shared/assets';
+import { applyJobFolders, classifyJobFiles, clientFolder, decodeText, fileKind, parseCsv, parseProductSheet, SKIP_ENTRY, workflowOf, type Cell } from '../shared/assets';
 import { localDate } from '../shared/money';
 
 type Update = (change: (draft: AppState) => void) => AppState;
@@ -39,7 +39,7 @@ export async function listAssets(folder: string, depth = 3): Promise<AssetFile[]
  * data validations over whole columns, which the normal reader expands cell by cell and never finishes.
  */
 async function sheetRows(file: string): Promise<Cell[][]> {
-  if (/\.(csv|tsv|txt)$/i.test(file)) return parseCsv(await fsp.readFile(file, 'utf8'));
+  if (/\.(csv|tsv|txt)$/i.test(file)) return parseCsv(decodeText(await fsp.readFile(file)));
   const reader = new ExcelJS.stream.xlsx.WorkbookReader(file, { worksheets: 'emit', sharedStrings: 'cache', hyperlinks: 'ignore', styles: 'ignore', entries: 'ignore' });
   const rows: Cell[][] = [];
   for await (const ws of reader) {

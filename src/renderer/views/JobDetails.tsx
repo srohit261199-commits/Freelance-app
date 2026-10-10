@@ -5,6 +5,7 @@ import { daysUntil, formatMoney, localDate, ordinal } from '../../shared/money';
 import { DEFAULT_WORKDAYS, nextDeadlines, paceText, weekProgress, weeksIn, WEEKDAYS, type Deadline, type Target } from '../../shared/pace';
 import { hub } from '../hub';
 import { CLIENT_ICON, ConfirmButton, Drawer, Field, Icon, Modal, fmtDate, useApp, type IconName } from '../ui';
+import { samePath } from '../../shared/assets';
 import { AssetsPanel } from './AssetsPanel';
 import './JobDetails.css';
 
@@ -366,6 +367,8 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
       expectations,
       folder: d.folder.trim() || undefined,
     };
+    // A different folder starts its own first sync (see withFolder).
+    cfg.folderSince = existing && samePath(existing.folder, cfg.folder) ? existing.folderSince : undefined;
     await hub.upsert('companies', { ...cfg });
     if (id === 'skeidar' && cfg.folder && cfg.folder !== state.settings.skeidarFolder) await hub.patchSettings({ skeidarFolder: cfg.folder });
     toast(existing ? `${name} saved` : `${name} added`);

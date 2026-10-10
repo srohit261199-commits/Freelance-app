@@ -142,6 +142,12 @@ export function upgradeState(state: AppState, seed: AppState): AppState {
   for (const c of state.companies) {
     const def = seed.companies.find(x => x.id === c.id);
     if (!def) continue;
+    // Files from the first builds predate per-sender mail rules (Waveink's demo invites come from personal Gmail);
+    // fill them in once, so later edits in Settings stay.
+    if (!c.match.emails && def.match.emails) {
+      c.match.emails = [...def.match.emails];
+      c.match.keywords = [...new Set([...c.match.keywords, ...def.match.keywords])];
+    }
     c.builtIn ??= def.builtIn;
     c.workflow ??= def.workflow;
     c.startDate ??= def.startDate;
