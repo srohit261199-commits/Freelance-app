@@ -1,6 +1,6 @@
-import type { AppState, CompanyId, EmailItem, Model } from './types';
-import { companyEarnings, daysUntil, formatMoney, jobOutputs, monthKey, monthLabel, ordinal, rollRenewal, tierFee } from './money';
-import { isComplete, statusLabel } from './status';
+import type { AppState, CompanyId, EmailItem, Model, StatusEvent } from './types';
+import { companyEarnings, daysUntil, formatMoney, jobOutputs, localDate, monthLabel, ordinal, rollRenewal, tierFee } from './money';
+import { isComplete, statusEvents, statusLabel } from './status';
 
 export type ActionTarget =
   | { view: 'company'; company: CompanyId; modelId?: string }
@@ -75,8 +75,10 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
         id: `overdue-${c.id}-${e.overdue.month}`,
         priority: 1,
         company: 'money',
-        title: `${c.name} payment for ${monthLabel(e.overdue.month)} not recorded`,
-        detail: `Due ${e.overdue.due}. Outstanding ${formatMoney(e.outstanding, e.currency)}. Record it in Earnings once it lands.`,
+        title: e.overdue.paid > 0
+          ? `${c.name} payment for ${monthLabel(e.overdue.month)} is only partly recorded`
+          : `${c.name} payment for ${monthLabel(e.overdue.month)} not recorded`,
+        detail: `Due ${e.overdue.due}. ${formatMoney(e.overdue.paid, e.currency)} of ${formatMoney(e.overdue.net, e.currency)} recorded. Record it in Earnings once it lands.`,
         target: { view: 'earnings' },
       });
     }
@@ -84,9 +86,9 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
   const mz = cfg('metaztech');
   if (mz.pay.kind === 'tiered' && now.getDate() >= mz.pay.payoutFrom && now.getDate() <= mz.pay.payoutTo + 2) {
     const e = companyEarnings(state, 'metaztech', now);
-    const thisMonth = monthKey(now.toISOString());
-    const beforeNow = e.months.filter(l => l.month < thisMonth).reduce((s, l) => s + l.net, 0);
-    const due = beforeNow - e.received;
+    const thisMonth = localDate(now).slice(0, 7);
+    // What last month's (and older) approvals are worth minus what has been recorded against them
+    const due = e.months.filter(l => l.month < thisMonth).reduce((s, l) => s + l.net - (e.paidByMonth[l.month] ?? 0), 0);
     if (due > 0.5) {
       out.push({
         id: `mz-payout-${now.getFullYear()}-${now.getMonth()}`,
@@ -113,7 +115,7 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
     });
   }
   const submittedToday = mzModels.filter(m =>
-    m.history.some(h => h.to === 'review' && sameDay(new Date(h.at), now)),
+    statusEvents(m).some(h => h.to === 'review' && sameDay(new Date(h.at), now)),
   ).length;
   const mzOpen = mzModels.filter(m => m.status === 'todo' || m.status === 'in_progress').length;
   if (mzModels.length && submittedToday < 2 && mzOpen) {
@@ -187,8 +189,8 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
       id: `mail-${e.id}`,
       priority: e.unread ? 1 : 2,
       company: e.company === 'other' ? undefined : e.company,
-      title: `${e.fromName}: ${e.subject}`,
-      detail: e.snippet.slice(0, 140),
+      title: `${e.fromName}: ${mailLine(e)}`,
+      detail: e.kind === 'teams' ? 'Teams message' : e.snippet.slice(0, 140),
       target: { url: e.url },
     });
   }
@@ -242,10 +244,20 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
 }
 
 /** Recent client mail (last 3 days) that asks for something. */
+/** A client mail that reads like a request and is still unread, or arrived in the last 3 days. */
+export function needsAction(e: EmailItem, now: Date): boolean {
+  return e.company !== 'other' && e.attention.length > 0 && (e.unread || new Date(e.date).getTime() > now.getTime() - 3 * DAY);
+}
+
+/** The line worth showing for a mail: a Teams notification's subject only repeats the sender's name. */
+export function mailLine(e: EmailItem): string {
+  return e.kind === 'teams' && e.snippet && !/^\[image\]/i.test(e.snippet) ? e.snippet : e.subject;
+}
+
+/** Newest mails that need action, for the Today page. */
 export function attentionMail(emails: EmailItem[], now: Date): EmailItem[] {
-  const since = now.getTime() - 3 * DAY;
   return emails
-    .filter(e => e.company !== 'other' && e.attention.length && new Date(e.date).getTime() > since)
+    .filter(e => needsAction(e, now))
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 6);
 }
@@ -259,33 +271,58 @@ export interface DailyLogRow {
   notes: string;
 }
 
-/** Rebuilds Waveink's "Daily Update Log" from status history. */
+/** "ANZIO - Recycled Leather ... - Black" with code ITWC 1138 becomes "ANZIO (ITWC 1138)". */
+export function modelLabel(m: Model): string {
+  const short = m.name.split(' - ')[0].trim();
+  return m.code ? `${short} (${m.code})` : short;
+}
+
+/**
+ * Rebuilds Waveink's "Daily Update Log": for each day, each model's net status change
+ * (Done then undone the same day counts as nothing) plus its progress notes.
+ */
 export function dailyLog(models: Model[], company: CompanyId, from?: string): DailyLogRow[] {
   const days = new Map<string, DailyLogRow>();
+  const row = (d: string) => {
+    let r = days.get(d);
+    if (!r) days.set(d, (r = { date: d, worked: [], started: 0, completed: 0, inReview: 0, notes: '' }));
+    return r;
+  };
+  const add = (r: DailyLogRow, note: string) => (r.notes = r.notes ? `${r.notes}; ${note}` : note);
   for (const m of models) {
     if (m.company !== company) continue;
+    const byDay = new Map<string, StatusEvent[]>();
     for (const h of m.history) {
+      if (h.kind === 'import') continue;
       const d = localDate(h.at);
       if (from && d < from) continue;
-      const row = days.get(d) ?? { date: d, worked: [], started: 0, completed: 0, inReview: 0, notes: '' };
-      const label = m.code ? `${shortName(m.name)} (${m.code})` : shortName(m.name);
-      if (!row.worked.includes(label)) row.worked.push(label);
-      if (h.to === 'in_progress' && h.from === 'todo') row.started++;
-      if (isComplete(h.to)) row.completed++;
-      if (h.to === 'review') row.inReview++;
-      const note = h.note ? `${shortName(m.name)}: ${h.note}` : `${shortName(m.name)} → ${statusLabel(h.to, company)}`;
-      row.notes = row.notes ? `${row.notes}; ${note}` : note;
-      days.set(d, row);
+      byDay.set(d, [...(byDay.get(d) ?? []), h]);
+    }
+    const label = modelLabel(m);
+    for (const [d, evs] of byDay) {
+      const changes = evs.filter(h => !h.kind || h.kind === 'status');
+      const progress = evs.filter(h => h.kind === 'progress');
+      const start = changes[0]?.from ?? null;
+      const end = changes.at(-1)?.to;
+      const moved = changes.length > 0 && start !== end;
+      if (!moved && !progress.length) continue;
+      const r = row(d);
+      if (!r.worked.includes(label)) r.worked.push(label);
+      if (moved && end) {
+        if ((start === 'todo' || start === null) && end !== 'todo' && end !== 'skipped') r.started++;
+        if (isComplete(end) && !(start && isComplete(start))) r.completed++;
+        if (end === 'review' && start !== 'review') r.inReview++;
+        const why = changes.map(h => h.note).filter(Boolean).at(-1);
+        add(r, `${label}: ${start ? `${statusLabel(start, company)} → ` : ''}${statusLabel(end, company)}${why ? ` (${why})` : ''}`);
+      }
+      // Latest value of each progress field that day
+      const latest = new Map<string, StatusEvent>();
+      for (const h of progress) latest.set(h.field ?? 'notes', h);
+      const bits = ['percent', 'glb', 'notes'].map(f => latest.get(f)?.note).filter(Boolean);
+      if (bits.length) add(r, `${label}: ${bits.join(', ')}`);
     }
   }
   return [...days.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function shortName(name: string): string {
-  return name.split(' - ')[0].trim();
-}
-
-export function localDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+export { localDate };

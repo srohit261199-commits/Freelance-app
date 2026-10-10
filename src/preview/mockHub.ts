@@ -8,6 +8,7 @@ import type { AppState, Collection, Model, SyncResult } from '../shared/types';
 import { initialState } from '../main/seed/initial';
 import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, uid } from '../shared/ops';
 import { applySync, calendarMeetings, driveGlbs, ingestMail } from '../shared/ingest';
+import { localDate } from '../shared/money';
 import { RECEIPT_IDS, SAMPLE_FOLDER, SAMPLE_PORTAL, SNAPSHOT_DRIVE, SNAPSHOT_EVENTS, SNAPSHOT_MAIL } from './snapshot';
 
 declare global {
@@ -198,7 +199,7 @@ const hub: Hub = {
       const wb = await buildWorkbook(state, scope);
       const buf = await wb.xlsx.writeBuffer();
       const names = { waveink: 'Waveink-update', metaztech: 'MetaZtech-models', skeidar: 'Skeidar-jobs', all: 'Freelance-Hub-all' };
-      const filename = `${names[scope]}-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const filename = `${names[scope]}-${localDate(new Date())}.xlsx`;
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const downloads = await window.claude?.use('downloads').catch(() => null);
       if (downloads) {

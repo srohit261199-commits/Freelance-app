@@ -1,5 +1,5 @@
 import type { AppState, Complexity, Model, ModelStatus, Payment, Subscription } from './types';
-import { setStatus } from './status';
+import { isComplete, setStatus } from './status';
 
 export function uid(prefix: string): string {
   const rnd = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -17,8 +17,20 @@ export function patchModel(state: AppState, id: string, patch: Partial<Model>, n
     const { status, ...rest } = patch;
     let next: Model = { ...m, ...rest, updatedAt: now };
     if (status && status !== m.status) next = setStatus(next, status, now);
+    // Logging progress on a model that hasn't been started starts it.
+    else if (!status && m.status === 'todo' && (rest.percent ?? 0) > 0) next = setStatus(next, 'in_progress', now);
+    if (rest.percent !== undefined && rest.percent !== m.percent) next = logProgress(next, 'percent', `${rest.percent}% done`, now);
+    if (rest.glbFile !== undefined && rest.glbFile.trim() && rest.glbFile !== m.glbFile) next = logProgress(next, 'glb', `GLB ${rest.glbFile.trim()}`, now);
+    if (rest.notes !== undefined && rest.notes.trim() && rest.notes !== m.notes) next = logProgress(next, 'notes', rest.notes.trim().replace(/\s+/g, ' ').slice(0, 200), now);
     return next;
   });
+}
+
+/** Records a progress edit, replacing that day's earlier entry for the same field. */
+function logProgress(m: Model, field: 'percent' | 'glb' | 'notes', note: string, now: string): Model {
+  const day = new Date(now).toDateString();
+  const history = m.history.filter(h => !(h.kind === 'progress' && h.field === field && new Date(h.at).toDateString() === day));
+  return { ...m, history: [...history, { at: now, from: m.status, to: m.status, kind: 'progress', field, note }] };
 }
 
 export interface PortalRow {
@@ -29,10 +41,14 @@ export interface PortalRow {
   complexity?: Complexity;
   revisions?: number;
   due?: string;
+  /** Approval date from the portal (YYYY-MM-DD), so earnings land in the right month. */
+  approvedOn?: string;
   project?: string;
   link?: string;
   raw: Record<string, string>;
 }
+
+const atNoon = (date: string) => new Date(`${date}T12:00:00`).toISOString();
 
 export interface ImportCounts {
   added: number;
@@ -48,36 +64,42 @@ export function importPortalRows(state: AppState, rows: PortalRow[], now: string
   const mine = state.models.filter(m => m.company === 'metaztech');
   for (const r of rows) {
     if (!r.name && !r.code) continue;
+    // Match by job ID; fall back to the name only when one side has no ID, so two jobs that share a name stay separate.
     const existing =
-      (r.code && mine.find(m => m.code && key(m.code) === key(r.code!))) || mine.find(m => key(m.name) === key(r.name || r.code!));
+      (r.code && mine.find(m => m.code && key(m.code) === key(r.code!))) ||
+      mine.find(m => (!r.code || !m.code) && key(m.name) === key(r.name || r.code!));
     if (!existing) {
+      const done = isComplete(r.status);
       const model: Model = {
         id: uid('mz'),
         company: 'metaztech',
         name: r.name || r.code!,
         code: r.code,
         group: r.project,
-        status: 'todo',
+        status: r.status,
         complexity: r.complexity,
-        revisions: r.revisions ?? 0,
+        revisions: r.revisions ?? (r.status === 'revision' ? 1 : 0),
         dueDate: r.due,
         portalRow: r.raw,
         portalUrl: r.link || undefined,
         source: 'portal',
         createdAt: now,
         updatedAt: now,
-        history: [],
+        // The status it already had is not work done today, so it is logged as an import, not a change.
+        history: [{ at: now, from: null, to: r.status, kind: 'import', note: `Imported from portal: ${r.statusText || r.status}` }],
+        ...(done ? (r.approvedOn ? { completedAt: atNoon(r.approvedOn) } : { completedAt: now, completedAtApprox: true }) : {}),
       };
-      const withStatus = r.status === 'todo' ? model : setStatus(model, r.status, now, `From portal: ${r.statusText ?? r.status}`);
-      // A model first seen as rejected counts its earlier rejections from the sheet, not the +1 setStatus adds.
-      if (r.revisions != null) withStatus.revisions = r.revisions;
-      state.models.push(withStatus);
-      mine.push(withStatus);
+      state.models.push(model);
+      mine.push(model);
       counts.added++;
       continue;
     }
     let next: Model = { ...existing, portalRow: r.raw };
     let changed = false;
+    if (r.code && (!existing.code || key(r.code) !== key(existing.code))) {
+      next.code = r.code;
+      changed = true;
+    }
     if (r.complexity && r.complexity !== existing.complexity) {
       next.complexity = r.complexity;
       changed = true;
@@ -92,15 +114,21 @@ export function importPortalRows(state: AppState, rows: PortalRow[], now: string
     }
     if (r.link && r.link !== existing.portalUrl) next.portalUrl = r.link;
     if (r.status !== existing.status) {
-      next = setStatus(next, r.status, now, `From portal: ${r.statusText ?? r.status}`);
+      next = setStatus(next, r.status, now, `From portal: ${r.statusText || r.status}`);
       changed = true;
     }
     if (r.revisions != null && r.revisions !== next.revisions) {
       next.revisions = r.revisions;
       changed = true;
     }
+    if (r.approvedOn && isComplete(next.status) && next.completedAt !== atNoon(r.approvedOn)) {
+      next.completedAt = atNoon(r.approvedOn);
+      delete next.completedAtApprox;
+      changed = true;
+    }
     if (changed) next.updatedAt = now;
     state.models = state.models.map(m => (m.id === existing.id ? next : m));
+    mine[mine.indexOf(existing)] = next;
     if (changed) counts.updated++;
     else counts.unchanged++;
   }

@@ -168,7 +168,12 @@ export function applySync(s: AppState, got: Ingested, calMeetings: Meeting[], dr
   result.newEmails += got.newEmails;
 
   for (const p of got.payments) {
-    if (s.payments.some(x => x.emailId === p.emailId || (p.reference && x.reference === p.reference))) continue;
+    if (
+      s.payments.some(
+        x => x.emailId === p.emailId || (p.reference && x.reference === p.reference) || (p.period && x.company === p.company && x.period === p.period),
+      )
+    )
+      continue;
     s.payments.push(p);
     result.newPayments++;
   }

@@ -20,6 +20,13 @@ export interface StatusEvent {
   from: ModelStatus | null;
   to: ModelStatus;
   note?: string;
+  /**
+   * 'status' (or missing): a status change Rohit made or a later portal pull found.
+   * 'progress': % complete, GLB name or notes changed; from and to are the unchanged status.
+   * 'import': the status a model already had when it was first imported; not counted as work.
+   */
+  kind?: 'status' | 'progress' | 'import';
+  field?: 'percent' | 'glb' | 'notes';
 }
 
 export interface Model {
@@ -36,6 +43,8 @@ export interface Model {
   /** How many times MetaZtech sent it back. */
   revisions?: number;
   percent?: number;
+  /** % complete before it was marked done, restored if Done is undone. */
+  percentBeforeDone?: number;
   glbFile?: string;
   driveFileUrl?: string;
   driveModifiedAt?: string;
@@ -64,6 +73,8 @@ export interface Model {
   updatedAt: string;
   startedAt?: string;
   completedAt?: string;
+  /** Imported already approved with no approval date; counted in the month it was imported. */
+  completedAtApprox?: boolean;
   history: StatusEvent[];
 }
 
@@ -95,6 +106,8 @@ export interface Payment {
   note?: string;
   source: 'email' | 'manual' | 'seed';
   emailId?: string;
+  /** Amount in the company's own currency, fixed at the rate on the day it was recorded. */
+  settledAmount?: number;
 }
 
 export type SubStatus = 'active' | 'trial' | 'cancelling' | 'cancelled';
@@ -201,7 +214,7 @@ export interface PortalMapping {
   fields: Partial<Record<PortalField, number>>;
 }
 
-export type PortalField = 'id' | 'name' | 'status' | 'complexity' | 'revisions' | 'due' | 'project';
+export type PortalField = 'id' | 'name' | 'status' | 'complexity' | 'revisions' | 'due' | 'approved' | 'project';
 
 export interface Settings {
   google: {

@@ -10,6 +10,7 @@ import { runSync } from './sync';
 import { openPortal, pullPortal } from './portal';
 import { folderImageCount, scanFolder } from './files';
 import { exportExcel } from './exporter';
+import { localDate } from '../shared/money';
 import { newMail, tick } from './notify';
 
 let win: BrowserWindow | null = null;
@@ -216,7 +217,7 @@ const handlers: HubApi = {
   async exportExcel(scope) {
     const names = { waveink: 'Waveink-update', metaztech: 'MetaZtech-models', skeidar: 'Skeidar-jobs', all: 'Freelance-Hub-all' };
     const pick = await dialog.showSaveDialog(win!, {
-      defaultPath: path.join(app.getPath('documents'), `${names[scope]}-${new Date().toISOString().slice(0, 10)}.xlsx`),
+      defaultPath: path.join(app.getPath('documents'), `${names[scope]}-${localDate(new Date())}.xlsx`),
       filters: [{ name: 'Excel', extensions: ['xlsx'] }],
     });
     if (pick.canceled || !pick.filePath) return {};
@@ -236,7 +237,7 @@ const handlers: HubApi = {
   },
   async backup() {
     const pick = await dialog.showSaveDialog(win!, {
-      defaultPath: path.join(app.getPath('documents'), `freelance-hub-backup-${new Date().toISOString().slice(0, 10)}.json`),
+      defaultPath: path.join(app.getPath('documents'), `freelance-hub-backup-${localDate(new Date())}.json`),
       filters: [{ name: 'JSON', extensions: ['json'] }],
     });
     if (pick.canceled || !pick.filePath) return null;

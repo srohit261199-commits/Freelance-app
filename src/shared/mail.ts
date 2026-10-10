@@ -63,6 +63,9 @@ export function gmailUrl(id: string): string {
   return `https://mail.google.com/mail/u/0/#all/${id}`;
 }
 
+/** "Re:", "Fwd:" — a reply about a payment is not a second payment. */
+const REPLY = /^\s*(re|fw|fwd|aw)\s*:/i;
+
 export function toEmailItem(mail: RawMail, companies: CompanyConfig[]): EmailItem {
   const { name, email } = parseFrom(mail.from);
   const teams = email === TEAMS_SENDER;
@@ -70,7 +73,7 @@ export function toEmailItem(mail: RawMail, companies: CompanyConfig[]): EmailIte
     ? 'teams'
     : mail.calendar || /^(updated )?invitation|invitation from/i.test(mail.subject)
       ? 'invite'
-      : /salary|payout|payment|remittance|transfer reference/i.test(mail.subject)
+      : !REPLY.test(mail.subject) && /salary|payout|payment|remittance|transfer reference/i.test(mail.subject)
         ? 'payment'
         : /receipt|invoice|subscription|renew/i.test(mail.subject)
           ? 'receipt'
@@ -113,7 +116,7 @@ function monthIndex(word: string): number {
 
 /** Waveink salary mail: "Salary Transfer Reference – Rohit - September 2026". */
 export function parseWaveinkSalary(mail: RawMail, retainer: number): Partial<Payment> | null {
-  if (!/salary/i.test(mail.subject)) return null;
+  if (REPLY.test(mail.subject) || !/salary/i.test(mail.subject)) return null;
   const ref = `${mail.subject} ${mail.body ?? mail.snippet}`.match(/transfer reference:?\s*([A-Z0-9]{6,})/i)?.[1];
   const per = mail.subject.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s+(\d{4})/i);
   const period = per ? `${per[2]}-${String(monthIndex(per[1]) + 1).padStart(2, '0')}` : undefined;
@@ -131,7 +134,7 @@ export function parseWaveinkSalary(mail: RawMail, retainer: number): Partial<Pay
 }
 
 export function looksLikePayout(mail: RawMail): boolean {
-  return /payout|payment|remittance|credited|transferred|invoice|salary|paid/i.test(mail.subject);
+  return !REPLY.test(mail.subject) && /payout|payment|remittance|credited|transferred|invoice|salary|paid/i.test(mail.subject);
 }
 
 const CUR: Record<string, Currency> = { '₹': 'INR', rs: 'INR', 'rs.': 'INR', inr: 'INR', aed: 'AED', $: 'USD', usd: 'USD' };

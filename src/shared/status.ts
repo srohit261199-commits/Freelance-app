@@ -1,4 +1,4 @@
-import type { CompanyId, Complexity, Model, ModelStatus } from './types';
+import type { CompanyId, Complexity, Model, ModelStatus, StatusEvent } from './types';
 
 /** Statuses each company uses, in workflow order. */
 export const COMPANY_STATUSES: Record<CompanyId, ModelStatus[]> = {
@@ -47,10 +47,26 @@ export function setStatus(model: Model, to: ModelStatus, now: string, note?: str
   };
   if (to === 'in_progress' && !next.startedAt) next.startedAt = now;
   if (isComplete(to) && !next.completedAt) next.completedAt = now;
-  if (!isComplete(to) && to !== 'skipped') delete next.completedAt;
+  if (!isComplete(to) && to !== 'skipped') {
+    delete next.completedAt;
+    delete next.completedAtApprox;
+  }
   if (to === 'revision' && model.company === 'metaztech') next.revisions = (model.revisions ?? 0) + 1;
-  if (isComplete(to) && model.company === 'waveink') next.percent = 100;
+  if (model.company === 'waveink') {
+    if (isComplete(to) && !isComplete(model.status)) {
+      next.percentBeforeDone = model.percent ?? 0;
+      next.percent = 100;
+    } else if (!isComplete(to) && isComplete(model.status)) {
+      next.percent = to === 'todo' ? 0 : model.percentBeforeDone ?? 0;
+      delete next.percentBeforeDone;
+    } else if (to === 'todo') next.percent = 0;
+  }
   return next;
+}
+
+/** Status changes only (not progress notes or the status a model was imported with). */
+export function statusEvents(model: Model): StatusEvent[] {
+  return model.history.filter(h => !h.kind || h.kind === 'status');
 }
 
 export const COMPLEXITY_LABELS: Record<Complexity, string> = {
@@ -65,20 +81,26 @@ export const COMPLEXITY_LABELS: Record<Complexity, string> = {
 export function mapPortalStatus(text: string): ModelStatus {
   const t = text.toLowerCase().trim();
   if (!t) return 'todo';
-  if (/hold|paused|parked/.test(t)) return 'on_hold';
-  if (/reject|redo|rework|revis|correction|changes? requested|returned|re-?open|fail/.test(t)) return 'revision';
-  if (/(pending|awaiting|under|in|for)\s*(approval|review|qc|qa)|submitted|review|\bqc\b|\bqa\b|uploaded|verification|checking/.test(t)) return 'review';
-  if (/approv|accept|complete|\bdone\b|final|deliver|closed|publish|\blive\b|passed/.test(t)) return 'done';
-  if (/progress|\bwip\b|working|started|ongoing|active|modell?ing|texturing/.test(t)) return 'in_progress';
+  // Order matters: negations and "pending" wording are caught before the words they contain.
+  if (/\bhold\b|paused|parked/.test(t)) return 'on_hold';
+  if (/reject|not approved|disapprov|unapproved|redo|re-?work|revis|correction|changes? requested|returned|re-?open|\bfail/.test(t)) return 'revision';
+  if (/not started|yet to start|not yet started|to ?do\b|unassigned|\bassigned\b|^new\b|\bopen\b|queued|allocated|^pending$|not submitted|backlog/.test(t)) return 'todo';
+  if (/(pending|awaiting|waiting for|under|in|for)\s*(approval|review|qc|qa|check)|(approval|review|qc)\s*pending|submitted|\breview|\bqc\b|\bqa\b|uploaded|verification|checking/.test(t)) return 'review';
+  if (/incomplete|not complete|in ?progress|\bwip\b|working|started|ongoing|active|modell?ing|texturing/.test(t)) return 'in_progress';
+  if (/approv|accepted|complete|\bdone\b|final|deliver|closed|publish|\blive\b|passed/.test(t)) return 'done';
   return 'todo';
 }
 
 export function mapComplexity(text: string): Complexity | undefined {
   const t = text.toLowerCase().replace(/\s+/g, ' ').trim();
   if (!t) return undefined;
-  if (/super ?complex ?-? ?(2|ii)\b|2\s*\+/.test(t)) return 'super2';
-  if (/super ?complex ?-? ?(1|i)\b/.test(t)) return 'super1';
-  if (/super/.test(t)) return 'super';
+  // "Super Complex-1", "SC-1", "SC 2+", "Super Complex-3" (3 and up are paid at the 2+ rate)
+  const level = t.match(/(?:super ?complex|\bsc)\s*-?\s*(\d+|i{1,3})\s*(\+)?/);
+  if (level) {
+    const n = /^i+$/.test(level[1]) ? level[1].length : Number(level[1]);
+    return n >= 2 ? 'super2' : n === 1 ? 'super1' : 'super';
+  }
+  if (/super|\bsc\b/.test(t)) return 'super';
   if (/complex|hard/.test(t)) return 'complex';
   if (/simple|medium|retexture|secondary|basic|easy|low/.test(t)) return 'simple';
   return undefined;
@@ -107,9 +129,9 @@ export function catalogStatusText(model: Model): string {
 export function trackerStatusText(status: ModelStatus): string {
   switch (status) {
     case 'in_progress':
+    case 'revision':
       return 'In Progress 🔄';
     case 'review':
-    case 'revision':
       return 'Under Review 👀';
     case 'done':
       return 'Approved ✅';

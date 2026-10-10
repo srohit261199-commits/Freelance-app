@@ -84,7 +84,7 @@ function waveink(wb: ExcelJS.Workbook, state: AppState): void {
       areas: m.areas ? Number(m.areas) : '',
       variants: m.variants,
       glb: m.glbFile ?? '',
-      updated: m.history.length ? day(m.updatedAt) : '',
+      updated: m.updatedAt !== m.createdAt ? day(m.updatedAt) : '',
       notes: m.notes ?? '',
       url1: m.sourceUrls?.[0] ?? '',
     });
@@ -120,7 +120,7 @@ function waveink(wb: ExcelJS.Workbook, state: AppState): void {
       glb: m.glbFile ?? '',
       drive: m.driveFileUrl ? 'Yes' : '',
       notes: m.notes ?? '',
-      updated: m.history.length ? day(m.updatedAt) : '',
+      updated: m.updatedAt !== m.createdAt ? day(m.updatedAt) : '',
     });
     row.getCell('pct').numFmt = '0%';
     paint(tr, row.number, 'status', m.status);

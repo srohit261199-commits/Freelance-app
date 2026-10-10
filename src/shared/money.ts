@@ -1,4 +1,4 @@
-import type { AppState, CompanyConfig, CompanyId, Complexity, Currency, Model, SkeidarJob, Subscription } from './types';
+import type { AppState, CompanyConfig, CompanyId, Complexity, Currency, Model, Payment, SkeidarJob, Subscription } from './types';
 import { isComplete } from './status';
 
 /** Rates are stored as the INR value of one unit; INR is always 1. */
@@ -70,19 +70,29 @@ export interface CompanyEarnings {
   earned: number;
   received: number;
   outstanding: number;
-  /** Value still accruing this month (retainer) or done this month (per piece). */
+  /** Value still accruing this month (retainer) or done this month (per piece); paid next month. */
   thisMonth: number;
   /** Value of open work not yet finished. */
   pipeline: number;
   months: MonthLine[];
+  /** How much of each month (by month key) the recorded payments cover. */
+  paidByMonth: Record<string, number>;
   /** Finished MetaZtech models with no complexity set, priced at the lowest tier. */
   unpriced: number;
-  /** Earliest due date in the past with nothing received for it. */
-  overdue?: { month: string; due: string };
+  /** Models imported already approved without an approval date, counted in the month they were imported. */
+  approxMonth: number;
+  /** Earliest month past its due date (plus 3 days' grace) that the recorded payments don't fully cover. */
+  overdue?: { month: string; due: string; paid: number; net: number };
 }
 
-function iso(d: Date): string {
-  return d.toISOString().slice(0, 10);
+/** The calendar date on this computer, not in UTC (India and the UAE are hours ahead of UTC). */
+export function localDate(d: Date | string): string {
+  const x = typeof d === 'string' ? new Date(d.length === 10 ? d + 'T00:00:00' : d) : d;
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+}
+
+function localMonth(d: string): string {
+  return d.length === 10 ? d.slice(0, 7) : localDate(d).slice(0, 7);
 }
 
 function dueOn(month: string, day: number): string {
@@ -90,19 +100,61 @@ function dueOn(month: string, day: number): string {
   return `${next}-${String(day).padStart(2, '0')}`;
 }
 
+function plusDays(date: string, n: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const x = new Date(Date.UTC(y, m - 1, d + n));
+  return x.toISOString().slice(0, 10);
+}
+
+/** A payment's value in the company's currency: fixed when recorded, so later rate changes don't rewrite history. */
+export function paymentValue(p: Payment, currency: Currency, rates: Record<Currency, number>): number {
+  if (p.currency === currency) return p.amount;
+  return p.settledAmount ?? convert(p.amount, p.currency, currency, rates);
+}
+
+/**
+ * Splits received money across months: payments marked for a month go there first,
+ * anything left over (and unmarked payments) pays the oldest months first.
+ */
+export function allocate(lines: MonthLine[], payments: { period?: string; value: number }[]): Record<string, number> {
+  const paid: Record<string, number> = Object.fromEntries(lines.map(l => [l.month, 0]));
+  const net: Record<string, number> = Object.fromEntries(lines.map(l => [l.month, l.net]));
+  let pool = 0;
+  for (const p of payments) {
+    if (p.period && p.period in paid) paid[p.period] += p.value;
+    else pool += p.value;
+  }
+  for (const l of lines) {
+    if (paid[l.month] > net[l.month]) {
+      pool += paid[l.month] - net[l.month];
+      paid[l.month] = net[l.month];
+    }
+  }
+  for (const l of lines) {
+    const take = Math.min(net[l.month] - paid[l.month], pool);
+    if (take > 0) {
+      paid[l.month] += take;
+      pool -= take;
+    }
+  }
+  return paid;
+}
+
 export function companyEarnings(state: AppState, company: CompanyId, now: Date): CompanyEarnings {
   const cfg = state.companies.find(c => c.id === company)!;
-  const today = iso(now);
-  const thisMonth = monthKey(today);
-  const payments = state.payments.filter(p => p.company === company);
-  const received = payments.reduce((s, p) => s + convert(p.amount, p.currency, cfg.currency, state.settings.rates), 0);
+  const today = localDate(now);
+  const thisMonth = today.slice(0, 7);
+  const rates = state.settings.rates;
+  const payments = state.payments.filter(p => p.company === company).map(p => ({ period: p.period, value: paymentValue(p, cfg.currency, rates) }));
+  const received = payments.reduce((s, p) => s + p.value, 0);
   const months: MonthLine[] = [];
   let pipeline = 0;
   let unpriced = 0;
+  let approxMonth = 0;
 
   if (cfg.pay.kind === 'retainer') {
     const pay = cfg.pay;
-    const start = monthKey(pay.startDate);
+    const start = localMonth(pay.startDate);
     for (const m of monthsBetween(start, thisMonth)) {
       months.push({ month: m, gross: pay.amount, net: pay.amount, units: 1, due: dueOn(m, pay.payday) });
     }
@@ -114,7 +166,8 @@ export function companyEarnings(state: AppState, company: CompanyId, now: Date):
       const fee = tierFee(cfg, m.complexity);
       if (isComplete(m.status)) {
         if (!m.complexity) unpriced++;
-        const mk = monthKey(m.completedAt ?? m.updatedAt);
+        if (m.completedAtApprox) approxMonth++;
+        const mk = localMonth(m.completedAt ?? m.updatedAt);
         const line = byMonth.get(mk) ?? { month: mk, gross: 0, net: 0, units: 0, due: dueOn(mk, pay.payoutTo) };
         line.gross += fee;
         line.net += fee * (1 - pay.tdsPercent / 100);
@@ -132,7 +185,7 @@ export function companyEarnings(state: AppState, company: CompanyId, now: Date):
       const { total, done } = jobOutputs(job);
       pipeline += (total - done) * pay.rate;
       if (!done) continue;
-      const mk = monthKey(job.deliveredAt ?? job.receivedAt);
+      const mk = localMonth(job.deliveredAt ?? job.receivedAt);
       const line = byMonth.get(mk) ?? { month: mk, gross: 0, net: 0, units: 0, due: '' };
       line.gross += done * pay.rate;
       line.net += done * pay.rate;
@@ -147,19 +200,12 @@ export function companyEarnings(state: AppState, company: CompanyId, now: Date):
   const earnedLines = isRetainer ? months.filter(l => l.month < thisMonth) : months;
   const earned = earnedLines.reduce((s, l) => s + l.net, 0);
   const current = months.find(l => l.month === thisMonth)?.net ?? 0;
+  const paidByMonth = allocate(months, payments);
 
-  // Walk months oldest first, spending received money on each; the first month it runs out on is overdue if past due.
-  let left = received;
   let overdue: CompanyEarnings['overdue'];
   for (const l of earnedLines) {
-    if (!l.due) break;
-    if (left >= l.net - 0.5) {
-      left -= l.net;
-      continue;
-    }
-    const grace = new Date(l.due + 'T00:00:00Z');
-    grace.setUTCDate(grace.getUTCDate() + 3);
-    if (iso(grace) < today) overdue = { month: l.month, due: l.due };
+    if (!l.due || paidByMonth[l.month] >= l.net - 0.5) continue;
+    if (plusDays(l.due, 3) < today) overdue = { month: l.month, due: l.due, paid: paidByMonth[l.month], net: l.net };
     break;
   }
 
@@ -172,7 +218,9 @@ export function companyEarnings(state: AppState, company: CompanyId, now: Date):
     thisMonth: current,
     pipeline,
     months,
+    paidByMonth,
     unpriced,
+    approxMonth,
     overdue,
   };
 }
