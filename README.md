@@ -16,10 +16,13 @@ Everything is stored locally in `%APPDATA%\Freelance Hub\freelance-hub.json`. Th
 
 ## Install
 
-1. Open the repository's **Actions** tab, then the latest **Build Windows app** run, and download the **FreelanceHub-Windows** artifact. It contains:
-   - `FreelanceHub-Setup-1.0.0.exe`, an installer with a Start-menu entry, and
-   - `FreelanceHub-Portable-1.0.0.exe`, a single file you can run from anywhere.
+1. Open the repository's **Releases** page (<https://github.com/srohit261199-commits/Freelance-app/releases/latest>) and download one of:
+   - `FreelanceHub-Setup-1.1.0.exe`, an installer with a Start-menu entry, or
+   - `FreelanceHub-Portable-1.1.0.exe`, a single file you can run from anywhere.
 2. The app isn't code-signed, so Windows SmartScreen may say *Windows protected your PC*. Click **More info → Run anyway**.
+3. Installing a new version over an old one keeps your data: it lives in `%APPDATA%\Freelance Hub`, not in the program folder.
+
+Every push also builds both files; they're under the repository's **Actions** tab → latest **Build Windows app** run → **FreelanceHub-Windows** artifact.
 
 ## Connect Google (one time, about 10 minutes)
 
