@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>html,body{margin:0;height:100%;overflow:hidden}body{font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#16171d;-webkit-font-smoothing:antialiased}*{box-sizing:border-box}button{font-family:inherit}a{color:#2f4fb8}a:hover{color:#16171d}::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#d9dbe4;border-radius:8px}</style>
+</helmet>
+<div style="position:fixed;inset:0;overflow:hidden;background:radial-gradient(1200px 700px at 15% 10%,#eceafb 0%,transparent 60%),radial-gradient(1000px 700px at 90% 90%,#e6ecf8 0%,transparent 60%),#dfe1ea">
+<div data-screen-label="Freelance Hub window" style="position:absolute;left:{{ win.left }};top:{{ win.top }};transform:scale({{ win.s }});transform-origin:0 0;width:1920px;height:1080px;border-radius:10px;overflow:hidden;background:#f3f4f9;box-shadow:0 30px 80px rgba(30,32,60,.22),0 0 0 1px rgba(20,22,40,.08);display:flex;flex-direction:column">
+
+  <div style="height:44px;flex:none;display:flex;align-items:center;background:#f3f4f9;padding-left:16px">
+    <div style="width:22px;height:22px;border-radius:7px;background:#16171d;color:#fff;display:grid;place-items:center;font-size:10px;font-weight:800">FH</div>
+    <span style="font-size:13px;font-weight:600;margin-left:10px">Freelance Hub</span>
+    <span style="font-size:13px;color:#9a9daa;margin-left:8px">— {{ title }}</span>
+    <div style="margin:0 auto;width:520px;height:32px;border-radius:10px;background:#fff;display:flex;align-items:center;gap:10px;padding:0 12px;color:#9a9daa;font-size:13px;box-shadow:0 0 0 1px #e7e8ef"><i class="ph ph-magnifying-glass" style="font-size:16px"></i><span style="flex:1">Search models, clients, mail…</span><span style="font-size:11px;font-weight:600;padding:2px 6px;border-radius:6px;background:#f3f4f9;color:#6e7180">Ctrl K</span></div>
+    <div style="display:flex;align-items:center;gap:6px;margin-right:12px;font-size:12px;color:#6e7180"><span style="width:7px;height:7px;border-radius:50%;background:#2fb56a"></span>Synced 4 min ago</div>
+    <div style="display:flex;height:44px">
+      <div style="width:46px;display:grid;place-items:center;font-size:15px;color:#3b3e4a" style-hover="background:#e6e7ee"><i class="ph ph-minus"></i></div>
+      <div style="width:46px;display:grid;place-items:center;font-size:13px;color:#3b3e4a" style-hover="background:#e6e7ee"><i class="ph ph-square"></i></div>
+      <div style="width:46px;display:grid;place-items:center;font-size:15px;color:#3b3e4a" style-hover="background:#c42b1c;color:#fff"><i class="ph ph-x"></i></div>
+    </div>
+  </div>
+
+  <div style="flex:1;min-height:0;display:flex">
+    <aside style="width:264px;flex:none;display:flex;flex-direction:column;gap:20px;padding:14px 16px 20px 20px">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:18px;background:#fff">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#a9c1ff,#eaa9f6);display:grid;place-items:center;font-weight:700;font-size:15px">RS</div>
+        <div style="display:flex;flex-direction:column;flex:1;min-width:0"><span style="font-size:15px;font-weight:700">Rohit Sharma</span><span style="font-size:12px;color:#6e7180">Freelance 3D artist</span></div>
+        <i class="ph ph-caret-up-down" style="color:#9a9daa"></i>
+      </div>
+      <sc-for list="{{ nav }}" as="sec" hint-placeholder-count="4">
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <div style="font-size:11px;font-weight:700;letter-spacing:.12em;color:#9a9daa;padding:0 12px 6px">{{ sec.label }}</div>
+          <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="2">
+            <button onClick="{{ it.go }}" style="display:flex;align-items:center;gap:12px;height:44px;padding:0 14px;border:0;border-radius:999px;cursor:pointer;font-size:14px;font-weight:600;text-align:left;background:{{ it.bg }};color:{{ it.fg }};box-shadow:{{ it.shadow }}">
+              <sc-if value="{{ it.hasDot }}" hint-placeholder-val="{{ false }}"><span style="width:20px;height:20px;border-radius:7px;flex:none;background:{{ it.dot }}"></span></sc-if>
+              <sc-if value="{{ it.hasIcon }}" hint-placeholder-val="{{ true }}"><i class="ph {{ it.icon }}" style="font-size:20px;width:20px"></i></sc-if>
+              <span style="flex:1">{{ it.label }}</span>
+              <sc-if value="{{ it.badge }}" hint-placeholder-val="{{ false }}"><span style="min-width:24px;height:22px;padding:0 7px;border-radius:999px;display:grid;place-items:center;font-size:11px;font-weight:700;background:{{ it.badgeBg }};color:{{ it.badgeFg }}">{{ it.badge }}</span></sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </sc-for>
+      <div style="margin-top:auto;border-radius:22px;padding:18px;background:#ece8ff;display:flex;flex-direction:column;gap:10px">
+        <div style="width:40px;height:40px;border-radius:12px;background:#fff;display:grid;place-items:center;color:#5b48c2;font-size:20px"><i class="ph-fill ph-envelope-simple-open"></i></div>
+        <div style="font-size:15px;font-weight:700;line-height:1.3">3 new things found in Gmail</div>
+        <div style="font-size:13px;color:#5a5e6d;line-height:1.45">A receipt, a payment advice and a one-off purchase.</div>
+        <button onClick="{{ goMail }}" style="height:38px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Review now</button>
+      </div>
+    </aside>
+
+    <main style="flex:1;min-width:0;position:relative;padding:14px 28px 24px 8px;display:flex;flex-direction:column;overflow:hidden">
+
+<sc-if value="{{ r.dashboard }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="Dashboard" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:4px;margin-right:auto">
+      <div style="font-size:32px;font-weight:800;letter-spacing:-.02em;line-height:1.1">Hello, Rohit</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:14px;color:#6e7180">Saturday, 10 October 2026<span style="width:4px;height:4px;border-radius:50%;background:#c4c6d0"></span><span><strong style="color:#16171d">{{ remaining }} tasks</strong> on your plate</span><span style="padding:4px 10px;border-radius:999px;background:#ffe9e5;color:#b8321f;font-size:12px;font-weight:700">MetaZtech review after today</span></div>
+    </div>
+    <div style="display:flex;padding:4px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef">
+      <button onClick="{{ setWidgets }}" style="height:36px;padding:0 16px;border:0;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;background:{{ lw.bg }};color:{{ lw.fg }}"><i class="ph ph-squares-four"></i>Widgets</button>
+      <button onClick="{{ setBoard }}" style="height:36px;padding:0 16px;border:0;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;background:{{ lb.bg }};color:{{ lb.fg }}"><i class="ph ph-kanban"></i>Board</button>
+    </div>
+    <button onClick="{{ goSettings }}" style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-file-arrow-up" style="font-size:18px"></i>Import sheet</button>
+    <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px" style-hover="background:#34363f"><i class="ph ph-plus" style="font-size:18px"></i>Add task</button>
+  </div>
+
+  <sc-if value="{{ isWidgets }}" hint-placeholder-val="{{ true }}">
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+    <sc-for list="{{ clientCards }}" as="cc" hint-placeholder-count="4">
+      <div onClick="{{ cc.go }}" style="height:184px;border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;cursor:pointer;background:{{ cc.main }}">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:38px;height:38px;border-radius:50%;background:#fff;display:grid;place-items:center;font-size:18px"><i class="ph-fill {{ cc.icon }}"></i></div><span style="font-size:15px;font-weight:700">{{ cc.name }}</span><span style="margin-left:auto;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.55);display:grid;place-items:center"><i class="ph ph-arrow-up-right"></i></span></div>
+        <div style="font-size:36px;font-weight:800;letter-spacing:-.02em;margin-top:auto;line-height:1.1">{{ cc.big }}</div>
+        <div style="font-size:13px;font-weight:500;color:rgba(22,23,29,.72);margin-top:2px">{{ cc.sub }}</div>
+        <div style="height:6px;border-radius:999px;background:rgba(255,255,255,.6);margin-top:12px;overflow:hidden"><div style="height:6px;border-radius:999px;background:#16171d;width:{{ cc.pct }}"></div></div>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 420px 400px;gap:20px;flex:1;min-height:0">
+    <div style="background:#fff;border-radius:26px;padding:22px 22px 10px;display:flex;flex-direction:column;gap:14px;min-height:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px;font-weight:800;white-space:nowrap;flex:none">Up next</span><span style="height:24px;padding:0 9px;border-radius:999px;background:#16171d;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center">{{ remaining }}</span>
+        <div style="display:flex;gap:6px;margin-left:10px;min-width:0">
+          <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5"><button onClick="{{ f.set }}" style="height:32px;padding:0 12px;white-space:nowrap;flex:none;border:0;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;background:{{ f.bg }};color:{{ f.fg }}"><sc-if value="{{ f.dot }}" hint-placeholder-val="{{ false }}"><span style="width:8px;height:8px;border-radius:50%;background:{{ f.dot }}"></span></sc-if>{{ f.label }}</button></sc-for>
+        </div>
+        <span title="Sorted by due date, then sheet order, then your priority" style="margin-left:auto;flex:none;white-space:nowrap;font-size:12px;font-weight:600;color:#6e7180;display:flex;align-items:center;gap:6px"><i class="ph ph-sparkle" style="font-size:15px"></i>Smart order</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2px;overflow-y:auto;overflow-x:hidden;min-height:0;margin:0 -8px;padding:0 8px">
+        <sc-for list="{{ queue }}" as="it" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:26px 42px minmax(0,1fr) 92px 84px 20px;gap:14px;align-items:center;padding:9px 10px;border-radius:16px;opacity:{{ it.opacity }}" style-hover="background:#f6f7fb">
+            <button onClick="{{ it.toggle }}" style="width:24px;height:24px;border-radius:8px;padding:0;cursor:pointer;display:grid;place-items:center;color:#fff;border:2px solid {{ it.ring }};background:{{ it.fill }}"><i class="ph ph-check" style="font-size:13px;font-weight:700"></i></button>
+            <div style="width:42px;height:42px;border-radius:14px;display:grid;place-items:center;font-size:19px;background:{{ it.tint }};color:{{ it.deep }}"><i class="ph-fill {{ it.icon }}"></i></div>
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:{{ it.deco }}">{{ it.title }}</span><span style="font-size:13px;color:#6e7180;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ it.clientName }} · {{ it.detail }}</span></div>
+            <span style="justify-self:start;height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;display:flex;align-items:center;gap:5px;background:{{ it.dueBg }};color:{{ it.dueFg }}"><i class="ph-fill ph-flag" style="font-size:11px"></i>{{ it.dueText }}</span>
+            <span style="font-size:14px;font-weight:700;text-align:right">{{ it.meta }}</span>
+            <i class="ph ph-caret-right" style="color:#9a9daa"></i>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+      <div style="background:#fff;border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:38px;height:38px;border-radius:12px;background:#f3f4f9;display:grid;place-items:center;font-size:18px"><i class="ph ph-calendar-blank"></i></div><span style="font-size:18px;font-weight:800">October</span><span style="margin-left:auto;display:flex;gap:6px"><span style="width:32px;height:32px;border-radius:50%;background:#f3f4f9;display:grid;place-items:center"><i class="ph ph-caret-left"></i></span><span style="width:32px;height:32px;border-radius:50%;background:#f3f4f9;display:grid;place-items:center"><i class="ph ph-caret-right"></i></span></span></div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);font-size:12px;font-weight:600;color:#9a9daa;text-align:center"><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span><span>Su</span></div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);row-gap:6px">
+          <sc-for list="{{ cal }}" as="d" hint-placeholder-count="35">
+            <div style="height:42px;display:grid;place-items:center;background:{{ d.band }};border-radius:{{ d.bandR }}"><span style="width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-size:14px;font-weight:600;background:{{ d.bg }};color:{{ d.fg }}">{{ d.n }}</span></div>
+          </sc-for>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:#6e7180">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#eaa9f6"></span>MetaZtech payout</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#a9c1ff"></span>Meeting / report</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#f0523f"></span>Trial ends</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:#9fdcb8"></span>Payday</span>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+        <span style="font-size:18px;font-weight:800">This week</span>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:52px;border-radius:14px;background:#f9eafc;color:#8a2aa0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1"><span style="font-size:11px;font-weight:700">MON</span><span style="font-size:17px;font-weight:800">12</span></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">Core prod team sync</span><span style="font-size:12px;color:#6e7180">MetaZtech · Teams · 10:00</span></div><button style="height:32px;padding:0 14px;border:0;border-radius:999px;background:#f3f4f9;font-size:12px;font-weight:700;cursor:pointer">Join</button></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:52px;border-radius:14px;background:#e8eeff;color:#2f4fb8;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1"><span style="font-size:11px;font-weight:700">WED</span><span style="font-size:17px;font-weight:800">14</span></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">Weekly Demo with Sibi</span><span style="font-size:12px;color:#6e7180">Waveink · Google Meet · 7:30 PM</span></div><button style="height:32px;padding:0 14px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:12px;font-weight:700;cursor:pointer">Join</button></div>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:48px;height:52px;border-radius:14px;background:#e8eeff;color:#2f4fb8;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1"><span style="font-size:11px;font-weight:700">FRI</span><span style="font-size:17px;font-weight:800">16</span></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">Daily update log to Sibi</span><span style="font-size:12px;color:#6e7180">Waveink · by end of day</span></div><button style="height:32px;padding:0 14px;border:0;border-radius:999px;background:#f3f4f9;font-size:12px;font-weight:700;cursor:pointer">Export</button></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+      <div onClick="{{ goPayments }}" style="background:#fff;border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;cursor:pointer">
+        <div style="display:flex;align-items:center"><span style="font-size:18px;font-weight:800">Earnings</span><span style="margin-left:auto;height:28px;padding:0 10px;border-radius:999px;background:#e3f5ea;color:#1d7646;font-size:12px;font-weight:700;display:flex;align-items:center;gap:4px"><i class="ph ph-trend-up"></i>Sep best month</span></div>
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:30px;font-weight:800;letter-spacing:-.02em">₹1,26,480</span><span style="font-size:13px;color:#6e7180">received since April</span></div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;align-items:end;height:170px;padding:10px 8px 0;border-radius:18px;background:#f6f7fb">
+          <sc-for list="{{ barsSm }}" as="b" hint-placeholder-count="7">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end">
+              <div style="width:26px;display:flex;flex-direction:column-reverse;border-radius:9px 9px 4px 4px;overflow:hidden">
+                <sc-for list="{{ b.segs }}" as="s" hint-placeholder-count="1"><div style="height:{{ s.h }};background:{{ s.bg }}"></div></sc-for>
+              </div>
+              <span style="font-size:11px;font-weight:600;color:{{ b.labelFg }};padding-bottom:6px">{{ b.m }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:#6e7180">Owed to you</span><span style="font-weight:700">₹90,312</span></div>
+      </div>
+      <div onClick="{{ goSubs }}" style="background:#fff;border-radius:26px;padding:20px 22px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;cursor:pointer">
+        <div style="display:flex;align-items:center"><span style="font-size:18px;font-weight:800">Renewing soon</span><span style="margin-left:auto;font-size:13px;color:#6e7180">₹8,185 / mo</span></div>
+        <sc-for list="{{ renewSoon }}" as="s" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;gap:12px"><div style="width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:14px;font-weight:800;background:{{ s.tileBg }};color:{{ s.tileFg }}">{{ s.letter }}</div><div style="flex:1;display:flex;flex-direction:column;min-width:0"><span style="font-size:14px;font-weight:700">{{ s.name }}</span><span style="font-size:12px;color:{{ s.whenFg }};font-weight:600">{{ s.when }}</span></div><span style="font-size:14px;font-weight:700">{{ s.amount }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isBoard }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px">
+    <sc-for list="{{ filters }}" as="f" hint-placeholder-count="5"><button onClick="{{ f.set }}" style="height:40px;padding:0 18px;border:0;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;background:{{ f.bgBoard }};color:{{ f.fg }};box-shadow:0 0 0 1px #e7e8ef"><sc-if value="{{ f.dot }}" hint-placeholder-val="{{ false }}"><span style="width:9px;height:9px;border-radius:50%;background:{{ f.dot }}"></span></sc-if>{{ f.label }}</button></sc-for>
+    <span style="margin-left:auto;font-size:13px;color:#6e7180">Drag cards between columns · MetaZtech statuses sync from the CMS</span>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px;flex:1;min-height:0">
+    <sc-for list="{{ board }}" as="col" hint-placeholder-count="5">
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;padding:14px;border-radius:26px;background:#eceef5">
+        <div style="display:flex;align-items:center;gap:8px"><span style="height:38px;padding:0 16px;border-radius:999px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;background:{{ col.bg }};color:{{ col.fg }}">{{ col.name }}<span style="height:22px;min-width:22px;padding:0 6px;border-radius:999px;background:rgba(255,255,255,.7);display:grid;place-items:center;font-size:11px">{{ col.count }}</span></span><i class="ph ph-plus" style="margin-left:auto;font-size:18px;color:#6e7180"></i><i class="ph ph-dots-three" style="font-size:20px;color:#6e7180"></i></div>
+        <div style="display:flex;flex-direction:column;gap:12px;overflow:auto;min-height:0">
+          <sc-for list="{{ col.cards }}" as="cd" hint-placeholder-count="3">
+            <div style="background:#fff;border-radius:20px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;box-shadow:0 1px 2px rgba(20,22,40,.05)">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:#6e7180"><span style="width:8px;height:8px;border-radius:50%;background:{{ cd.dot }}"></span>{{ cd.clientName }} · {{ cd.code }}<i class="ph ph-dots-three" style="margin-left:auto;font-size:18px"></i></div>
+              <div style="font-size:16px;font-weight:700;line-height:1.3">{{ cd.title }}</div>
+              <div style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.06em;color:{{ cd.flagFg }}"><i class="ph-fill ph-flag"></i>{{ cd.flag }}</div>
+              <div style="display:flex;align-items:center;gap:14px;font-size:12px;font-weight:600;color:#6e7180;padding-top:8px;border-top:1px solid #f0f1f5"><span style="display:flex;align-items:center;gap:5px;color:{{ cd.dateFg }}"><i class="ph ph-calendar-blank"></i>{{ cd.date }}</span><span style="display:flex;align-items:center;gap:5px"><i class="ph ph-info"></i>{{ cd.meta }}</span></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.metaztech }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="MetaZtech" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div style="width:64px;height:64px;border-radius:22px;background:#eaa9f6;display:grid;place-items:center;font-size:30px"><i class="ph-fill ph-cube-focus"></i></div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-right:auto">
+      <div style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">MetaZtech</div>
+      <div style="display:flex;gap:6px"><span style="height:26px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:600;display:flex;align-items:center">Freelance L3 3D artist</span><span style="height:26px;padding:0 10px;border-radius:999px;background:#f9eafc;color:#8a2aa0;font-size:12px;font-weight:700;display:flex;align-items:center">₹900–₹2,400 per approved model</span><span style="height:26px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:600;display:flex;align-items:center">1% TDS</span><span style="height:26px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:600;display:flex;align-items:center">Paid 3rd–10th monthly</span></div>
+    </div>
+    <button style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-arrow-square-out" style="font-size:18px"></i>Open CMS</button>
+    <button style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-clipboard-text" style="font-size:18px"></i>Paste a table</button>
+    <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-cloud-arrow-down" style="font-size:18px"></i>Pull from portal</button>
+  </div>
+  <div style="display:flex;gap:10px">
+    <sc-for list="{{ mzTabs }}" as="t" hint-placeholder-count="7"><button onClick="{{ t.set }}" style="height:46px;padding:0 10px 0 18px;border:0;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:12px;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}<span style="height:28px;min-width:28px;padding:0 8px;border-radius:999px;display:grid;place-items:center;font-size:12px;font-weight:700;background:{{ t.cBg }};color:{{ t.cFg }}">{{ t.count }}</span></button></sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:20px;flex:1;min-height:0">
+    <div style="background:#fff;border-radius:26px;padding:12px 18px;display:flex;flex-direction:column;min-height:0">
+      <div style="display:grid;grid-template-columns:90px minmax(0,1fr) 150px 130px 100px 90px 110px 110px;gap:14px;padding:12px 10px;font-size:12px;font-weight:600;color:#9a9daa"><span>ID</span><span>Model</span><span>Complexity</span><span>Status</span><span>Rejections</span><span>Fee</span><span>Updated</span><span></span></div>
+      <div style="display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0">
+        <sc-for list="{{ mz }}" as="m" hint-placeholder-count="10">
+          <div style="display:grid;grid-template-columns:90px minmax(0,1fr) 150px 130px 100px 90px 110px 110px;gap:14px;padding:12px 10px;align-items:center;border-radius:16px;font-size:14px;background:{{ m.rowBg }}" style-hover="background:#f6f7fb">
+            <span style="font-size:13px;font-weight:600;color:#6e7180">{{ m.id }}</span>
+            <span style="display:flex;align-items:center;gap:12px;min-width:0"><span style="width:36px;height:36px;flex:none;border-radius:12px;background:#f9eafc;color:#8a2aa0;display:grid;place-items:center;font-size:16px"><i class="ph-fill ph-armchair"></i></span><span style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span></span>
+            <span style="color:#3b3e4a">{{ m.cx }}</span>
+            <span><span style="height:28px;padding:0 12px;border-radius:999px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;background:{{ m.sBg }};color:{{ m.sFg }}">{{ m.status }}</span></span>
+            <span style="font-weight:600;color:{{ m.rejFg }}">{{ m.rej }}</span>
+            <span style="font-weight:700">{{ m.fee }}</span>
+            <span style="font-size:13px;color:#6e7180">{{ m.upd }}</span>
+            <button style="height:32px;border:0;border-radius:999px;background:{{ m.aBg }};color:{{ m.aFg }};font-size:12px;font-weight:700;cursor:pointer">{{ m.action }}</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;align-items:center;gap:20px">
+        <div style="width:116px;height:116px;border-radius:50%;background:conic-gradient(#16171d 0 4%,#f3f4f9 4% 100%);display:grid;place-items:center;flex:none"><div style="width:90px;height:90px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:26px;font-weight:800;line-height:1">0/2</span><span style="font-size:11px;color:#6e7180;font-weight:600">today</span></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:18px;font-weight:800">Daily target</span><span style="font-size:13px;color:#6e7180;line-height:1.5">Submit 1–2 files a day. Fix the two rejections first, they count toward review.</span></div>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0">
+        <div style="display:flex;align-items:center;gap:10px"><i class="ph ph-microsoft-teams-logo" style="font-size:22px;color:#5b48c2"></i><span style="font-size:18px;font-weight:800">From Teams</span><span style="margin-left:auto;font-size:12px;color:#9a9daa">Core prod team</span></div>
+        <div style="align-self:flex-start;max-width:300px;padding:12px 14px;border-radius:4px 18px 18px 18px;background:#f6f7fb;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:700;color:#8a2aa0">Ritu Agrawal</span><span style="font-size:14px;line-height:1.45">Please work on the rejections first, and upload the SPP with every file.</span></div>
+        <div style="align-self:flex-start;max-width:300px;padding:12px 14px;border-radius:4px 18px 18px 18px;background:#f6f7fb;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:700;color:#8a2aa0">Ritu Agrawal</span><span style="font-size:14px;line-height:1.45">Aim for 1–2 files a day. Super complex jobs are on hold for now.</span></div>
+        <div style="align-self:flex-start;max-width:300px;padding:12px 14px;border-radius:4px 18px 18px 18px;background:#ffe9e5;display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:700;color:#b8321f">Sharon Rosalia · PM</span><span style="font-size:14px;line-height:1.45">Management will remove low performers after 10 Oct.</span></div>
+        <div style="align-self:flex-end;padding:10px 14px;border-radius:18px 4px 18px 18px;background:#ece8ff;font-size:14px">Noted, rejections going out today.</div>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:20px 22px;display:grid;grid-template-columns:1fr auto;row-gap:8px;font-size:13px">
+        <span style="font-size:16px;font-weight:800;grid-column:1/3;margin-bottom:4px">Fee tiers</span>
+        <span style="color:#6e7180">Simple / medium / retexture</span><span style="font-weight:700">₹900</span>
+        <span style="color:#6e7180">Complex</span><span style="font-weight:700">₹1,200</span>
+        <span style="color:#6e7180">Super complex · SC-1 · SC-2+</span><span style="font-weight:700">₹1,500 · 1,800 · 2,400</span>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.waveink }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Waveink" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div style="width:64px;height:64px;border-radius:22px;background:#a9c1ff;display:grid;place-items:center;font-size:30px"><i class="ph-fill ph-cube"></i></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">Waveink</div>
+      <div style="display:flex;gap:6px"><span style="height:26px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:600;display:flex;align-items:center">3D product modeler · GLB</span><span style="height:26px;padding:0 10px;border-radius:999px;background:#e8eeff;color:#2f4fb8;font-size:12px;font-weight:700;display:flex;align-items:center">AED 3,000 retainer</span><span style="height:26px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:600;display:flex;align-items:center">Report to Sibi every Friday</span></div>
+    </div>
+    <div style="margin:0 auto;width:420px;display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600"><span>{{ techDone }} of 199 Tech models done</span><span style="color:#6e7180">{{ techPct }}</span></div><div style="height:10px;border-radius:999px;background:#fff;overflow:hidden"><div style="height:10px;border-radius:999px;background:#a9c1ff;width:{{ techPct }}"></div></div></div>
+    <button style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-file-arrow-up" style="font-size:18px"></i>Import catalog</button>
+    <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-microsoft-excel-logo" style="font-size:18px"></i>Export Excel</button>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 620px;gap:20px;flex:1;min-height:0">
+    <div style="background:#fff;border-radius:26px;padding:18px;display:flex;flex-direction:column;gap:12px;min-height:0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="height:38px;padding:0 16px;border-radius:999px;background:#16171d;color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center">Tech · 199</span>
+        <span style="height:38px;padding:0 16px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Apparel · 39</span>
+        <div style="margin-left:auto;width:300px;height:38px;border-radius:999px;background:#f3f4f9;display:flex;align-items:center;gap:8px;padding:0 14px;color:#9a9daa;font-size:13px"><i class="ph ph-magnifying-glass" style="font-size:16px"></i>Name or Jasani code</div>
+        <span style="width:38px;height:38px;border-radius:50%;background:#f3f4f9;display:grid;place-items:center"><i class="ph ph-funnel"></i></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0">
+        <sc-for list="{{ wiRows }}" as="w" hint-placeholder-count="12">
+          <div onClick="{{ w.select }}" style="display:grid;grid-template-columns:44px minmax(0,1fr) 140px 120px 28px;gap:14px;align-items:center;padding:8px 10px;border-radius:16px;cursor:pointer;background:{{ w.bg }};box-shadow:{{ w.ring }}">
+            <div style="width:44px;height:44px;border-radius:14px;background:#e8eeff;color:#2f4fb8;display:grid;place-items:center;font-size:20px"><i class="ph-fill ph-cube"></i></div>
+            <div style="display:flex;flex-direction:column;min-width:0"><span style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ w.name }}</span><span style="font-size:12px;color:#6e7180">{{ w.code }}</span></div>
+            <span style="font-size:13px;color:#3b3e4a">{{ w.sub }}</span>
+            <span><span style="height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;background:{{ w.sBg }};color:{{ w.sFg }}">{{ w.status }}</span></span>
+            <sc-if value="{{ w.drive }}" hint-placeholder-val="{{ false }}"><i class="ph-fill ph-google-drive-logo" style="font-size:18px;color:#2f4fb8"></i></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:26px;padding:24px;display:flex;flex-direction:column;gap:18px;min-height:0;overflow:auto">
+      <div style="display:flex;align-items:center;gap:8px"><span style="height:28px;padding:0 12px;border-radius:999px;background:#e8eeff;color:#2f4fb8;font-size:12px;font-weight:700;display:flex;align-items:center">{{ cur.code }}</span><span style="font-size:13px;color:#6e7180">{{ cur.sub }} · sheet row {{ cur.row }}</span><i class="ph ph-dots-three" style="margin-left:auto;font-size:22px;color:#6e7180"></i></div>
+      <div style="font-size:24px;font-weight:800;line-height:1.25;letter-spacing:-.01em">{{ cur.name }}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        <sc-for list="{{ wiOpts }}" as="o" hint-placeholder-count="6"><button onClick="{{ o.set }}" style="height:34px;padding:0 14px;border:0;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;background:{{ o.bg }};color:{{ o.fg }}">{{ o.label }}</button></sc-for>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onClick="{{ wiMarkDone }}" style="flex:1;height:50px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><i class="ph-fill ph-check-circle" style="font-size:20px"></i>{{ wiDoneLabel }}</button>
+        <button style="height:50px;padding:0 20px;border:0;border-radius:999px;background:#f3f4f9;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-folder-open" style="font-size:18px"></i>GLB folder</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div style="height:170px;border-radius:20px;background:repeating-linear-gradient(135deg,#f3f4f9 0 10px,#eceef5 10px 20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#6e7180;font-size:13px;font-weight:600"><i class="ph ph-image" style="font-size:26px"></i>Source photo</div>
+        <div style="height:170px;border-radius:20px;background:repeating-linear-gradient(135deg,#e8eeff 0 10px,#dfe7ff 10px 20px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#2f4fb8;font-size:13px;font-weight:600"><i class="ph ph-cube" style="font-size:26px"></i>GLB preview</div>
+      </div>
+      <div style="display:grid;grid-template-columns:140px 1fr;row-gap:12px;font-size:14px;padding:16px 18px;border-radius:20px;background:#f6f7fb">
+        <span style="color:#6e7180">Brand</span><span style="font-weight:600">{{ cur.brand }}</span>
+        <span style="color:#6e7180">Colour</span><span style="font-weight:600">{{ cur.colour }}</span>
+        <span style="color:#6e7180">Branding area</span><span style="font-weight:600">Front face · 40 × 20 mm</span>
+        <span style="color:#6e7180">Print methods</span><span style="font-weight:600">UV print, laser engraving</span>
+        <span style="color:#6e7180">On Drive</span><span style="font-weight:600">{{ cur.driveText }}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <span style="font-size:15px;font-weight:800">History</span>
+        <sc-for list="{{ cur.history }}" as="h" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:12px;font-size:13px"><span style="width:10px;height:10px;border-radius:50%;background:#a9c1ff;flex:none"></span><span style="width:56px;color:#6e7180;font-weight:600">{{ h.when }}</span><span>{{ h.text }}</span></div></sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.skeidar }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Skeidar" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:16px">
+    <div style="width:64px;height:64px;border-radius:22px;background:#f8ae6c;display:grid;place-items:center;font-size:30px"><i class="ph-fill ph-paint-brush"></i></div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-right:auto">
+      <div style="font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1">Skeidar</div>
+      <div style="display:flex;gap:6px"><span style="height:26px;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:600;display:flex;align-items:center">Generative AI fabric variations</span><span style="height:26px;padding:0 10px;border-radius:999px;background:#feefe0;color:#a3520f;font-size:12px;font-weight:700;display:flex;align-items:center">AED 5 per image</span></div>
+    </div>
+    <button style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-plus" style="font-size:18px"></i>New job</button>
+  </div>
+  <div style="border-radius:28px;background:#feefe0;padding:24px 28px;display:flex;align-items:center;gap:32px">
+    <div style="width:132px;height:132px;border-radius:50%;background:conic-gradient(#16171d 0 {{ skDeg }},#fff {{ skDeg }} 360deg);display:grid;place-items:center;flex:none"><div style="width:104px;height:104px;border-radius:50%;background:#feefe0;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:30px;font-weight:800;line-height:1">{{ skDone }}/24</span><span style="font-size:12px;font-weight:600;color:#a3520f">images</span></div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-right:auto">
+      <span style="height:26px;width:fit-content;padding:0 10px;border-radius:999px;background:#fff;font-size:12px;font-weight:700;color:#a3520f;display:flex;align-items:center;gap:6px"><i class="ph ph-microsoft-teams-logo"></i>Received 7 Oct on Teams</span>
+      <span style="font-size:28px;font-weight:800;letter-spacing:-.02em">Oslo 3-seat sofa</span>
+      <span style="font-size:14px;color:#5a5e6d">2 master images × 12 fabrics · D:\Files\Projects\Skediar\genrativeAI\oslo-sofa</span>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:16px 22px;border-radius:20px;background:#fff"><span style="font-size:12px;color:#6e7180;font-weight:600">Earned</span><span style="font-size:24px;font-weight:800">AED {{ skEarned }}</span></div>
+    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:16px 22px;border-radius:20px;background:#fff"><span style="font-size:12px;color:#6e7180;font-weight:600">Still to make</span><span style="font-size:24px;font-weight:800">AED {{ skRemain }}</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-paper-plane-tilt" style="font-size:18px"></i>Mark delivered</button>
+      <button style="height:40px;padding:0 20px;border:0;border-radius:999px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-folder-simple-dashed" style="font-size:16px"></i>Scan folder</button>
+    </div>
+  </div>
+  <div style="background:#fff;border-radius:26px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:center"><span style="font-size:18px;font-weight:800">Variations</span><span style="margin-left:12px;font-size:13px;color:#6e7180">Click a tile once that fabric is generated · folder scan found 14 images, newest 2 h ago</span></div>
+    <div style="display:grid;grid-template-columns:200px repeat(12,96px);gap:10px;align-items:end">
+      <span></span>
+      <sc-for list="{{ fabrics }}" as="f" hint-placeholder-count="12"><div style="display:flex;flex-direction:column;align-items:center;gap:6px"><span style="width:26px;height:26px;border-radius:50%;background:{{ f.color }};box-shadow:0 0 0 3px #fff,0 0 0 4px #e7e8ef"></span><span style="font-size:11px;font-weight:600;text-align:center;line-height:1.25">{{ f.name }}</span></div></sc-for>
+    </div>
+    <sc-for list="{{ skRows }}" as="row" hint-placeholder-count="2">
+      <div style="display:grid;grid-template-columns:200px repeat(12,96px);gap:10px;align-items:center">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:72px;height:72px;border-radius:18px;background:repeating-linear-gradient(135deg,#f3f4f9 0 8px,#eceef5 8px 16px);display:grid;place-items:center;color:#6e7180;font-size:22px;flex:none"><i class="ph ph-image"></i></div><div style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">{{ row.label }}</span><span style="font-size:12px;color:#6e7180">{{ row.file }}</span></div></div>
+        <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="12">
+          <button onClick="{{ c.toggle }}" style="width:96px;height:96px;padding:0;cursor:pointer;border-radius:20px;display:grid;place-items:center;background:{{ c.bg }};border:{{ c.border }}">
+            <sc-if value="{{ c.done }}" hint-placeholder-val="{{ false }}"><span style="width:30px;height:30px;border-radius:50%;background:#fff;color:#16171d;display:grid;place-items:center;font-size:15px;box-shadow:0 2px 6px rgba(0,0,0,.15)"><i class="ph ph-check" style="font-weight:700"></i></span></sc-if>
+            <sc-if value="{{ c.notDone }}" hint-placeholder-val="{{ true }}"><i class="ph ph-plus" style="font-size:20px;color:#9a9daa"></i></sc-if>
+          </button>
+        </sc-for>
+      </div>
+    </sc-for>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px">
+    <div style="background:#fff;border-radius:24px;padding:18px 20px;display:flex;align-items:center;gap:14px"><div style="width:48px;height:48px;border-radius:16px;background:#e3f5ea;color:#1d7646;display:grid;place-items:center;font-size:22px"><i class="ph-fill ph-check-circle"></i></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Bergen armchair · 2 × 8</span><span style="font-size:13px;color:#6e7180">Delivered 28 Sep · 16 images</span></div><span style="font-size:15px;font-weight:800">AED 80</span></div>
+    <div style="background:#fff;border-radius:24px;padding:18px 20px;display:flex;align-items:center;gap:14px"><div style="width:48px;height:48px;border-radius:16px;background:#e3f5ea;color:#1d7646;display:grid;place-items:center;font-size:22px"><i class="ph-fill ph-check-circle"></i></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Lund corner sectional · 2 × 14</span><span style="font-size:13px;color:#6e7180">Delivered 21 Sep · 28 images</span></div><span style="font-size:15px;font-weight:800">AED 140</span></div>
+    <div style="background:#fff;border-radius:24px;padding:18px 20px;display:flex;align-items:center;gap:14px"><div style="width:48px;height:48px;border-radius:16px;background:#e3f5ea;color:#1d7646;display:grid;place-items:center;font-size:22px"><i class="ph-fill ph-check-circle"></i></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Fjord dining chair · 2 × 10</span><span style="font-size:13px;color:#6e7180">Delivered 14 Sep · 20 images</span></div><span style="font-size:15px;font-weight:800">AED 100</span></div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.payments }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Payments" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:4px;margin-right:auto"><div style="font-size:30px;font-weight:800;letter-spacing:-.02em">Payments</div><div style="font-size:14px;color:#6e7180">April – October 2026 · shown in ₹ at AED 24 and US$ 88</div></div>
+    <div style="display:flex;padding:4px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef"><span style="height:36px;padding:0 16px;border-radius:999px;background:#16171d;color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center">₹ INR</span><span style="height:36px;padding:0 16px;font-size:13px;font-weight:600;display:flex;align-items:center">AED</span><span style="height:36px;padding:0 16px;font-size:13px;font-weight:600;display:flex;align-items:center">US$</span></div>
+    <button style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-download-simple" style="font-size:18px"></i>Export</button>
+    <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-plus" style="font-size:18px"></i>Record payment</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+    <div style="border-radius:24px;padding:20px 22px;background:#e3f5ea;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:center;font-size:14px;font-weight:600">Received<span style="margin-left:auto;width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#1d7646"><i class="ph-fill ph-arrow-down-left"></i></span></div><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">₹1,26,480</span></div>
+    <div style="border-radius:24px;padding:20px 22px;background:#ece8ff;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:center;font-size:14px;font-weight:600">Earned, not paid yet<span style="margin-left:auto;width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#5b48c2"><i class="ph-fill ph-hourglass-medium"></i></span></div><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">₹90,312</span></div>
+    <div style="border-radius:24px;padding:20px 22px;background:#ffe9e5;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:center;font-size:14px;font-weight:600">Late after today<span style="margin-left:auto;width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#b8321f"><i class="ph-fill ph-warning"></i></span></div><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">₹16,632</span></div>
+    <div style="border-radius:24px;padding:20px 22px;background:#fff4cf;display:flex;flex-direction:column;gap:14px"><div style="display:flex;align-items:center;font-size:14px;font-weight:600">Best month<span style="margin-left:auto;width:34px;height:34px;border-radius:50%;background:#fff;display:grid;place-items:center;color:#8a6a00"><i class="ph-fill ph-trophy"></i></span></div><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">Sep · ₹96,312</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 520px;gap:20px">
+    <div style="background:#fff;border-radius:26px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:18px;font-size:13px;font-weight:600"><span style="font-size:18px;font-weight:800;margin-right:auto">Earned per month</span><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#a9c1ff"></span>Waveink</span><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#eaa9f6"></span>MetaZtech</span><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#f8ae6c"></span>Skeidar</span><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:repeating-linear-gradient(135deg,#9a9daa 0 2px,#fff 2px 4px)"></span>Not paid yet</span></div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:24px;align-items:end;height:250px;padding:0 10px">
+        <sc-for list="{{ barsLg }}" as="b" hint-placeholder-count="7">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end">
+            <span style="font-size:12px;font-weight:700;color:#3b3e4a">{{ b.total }}</span>
+            <div style="width:56px;display:flex;flex-direction:column-reverse;border-radius:14px 14px 6px 6px;overflow:hidden"><sc-for list="{{ b.segs }}" as="s" hint-placeholder-count="1"><div style="height:{{ s.h }};background:{{ s.bg }}"></div></sc-for></div>
+            <span style="font-size:13px;font-weight:600;color:{{ b.labelFg }}">{{ b.m }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:26px;padding:22px 24px;display:flex;flex-direction:column;gap:14px">
+      <span style="font-size:18px;font-weight:800">By client</span>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:18px;background:#f6f7fb"><div style="width:44px;height:44px;border-radius:14px;background:#a9c1ff;display:grid;place-items:center;font-size:20px"><i class="ph-fill ph-cube"></i></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Waveink</span><span style="font-size:12px;color:#6e7180">Retainer AED 3,000 / mo · next 1 Nov</span></div><div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:15px;font-weight:800">₹72,000</span><span style="font-size:12px;color:#1d7646;font-weight:600">paid</span></div></div>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:18px;background:#f6f7fb"><div style="width:44px;height:44px;border-radius:14px;background:#eaa9f6;display:grid;place-items:center;font-size:20px"><i class="ph-fill ph-cube-focus"></i></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">MetaZtech</span><span style="font-size:12px;color:#6e7180">Sep: 14 approved · ₹16,800 − ₹168 TDS</span></div><div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:15px;font-weight:800">₹16,632</span><span style="font-size:12px;color:#b8321f;font-weight:700">late today</span></div></div>
+      <div style="display:flex;align-items:center;gap:14px;padding:12px;border-radius:18px;background:#f6f7fb"><div style="width:44px;height:44px;border-radius:14px;background:#f8ae6c;display:grid;place-items:center;font-size:20px"><i class="ph-fill ph-paint-brush"></i></div><div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Skeidar</span><span style="font-size:12px;color:#6e7180">AED 5 / image · AED 2,270 since April</span></div><div style="display:flex;flex-direction:column;align-items:flex-end"><span style="font-size:15px;font-weight:800">₹54,480</span><span style="font-size:12px;color:#1d7646;font-weight:600">paid</span></div></div>
+    </div>
+  </div>
+  <div style="background:#fff;border-radius:26px;padding:12px 18px;flex:1;min-height:0;display:flex;flex-direction:column">
+    <div style="display:grid;grid-template-columns:140px 180px minmax(0,1fr) 130px 120px 130px 280px;gap:14px;padding:12px 10px;font-size:12px;font-weight:600;color:#9a9daa"><span>Date</span><span>Client</span><span>For</span><span>Amount</span><span>In ₹</span><span>Status</span><span>Source</span></div>
+    <div style="overflow:auto;min-height:0;display:flex;flex-direction:column;gap:2px">
+      <sc-for list="{{ txns }}" as="t" hint-placeholder-count="5">
+        <div style="display:grid;grid-template-columns:140px 180px minmax(0,1fr) 130px 120px 130px 280px;gap:14px;padding:11px 10px;align-items:center;border-radius:14px;font-size:14px" style-hover="background:#f6f7fb">
+          <span style="font-weight:600">{{ t.date }}</span><span style="display:flex;align-items:center;gap:8px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;background:{{ t.dot }}"></span>{{ t.client }}</span><span style="color:#3b3e4a">{{ t.for }}</span><span style="font-weight:700">{{ t.amount }}</span><span>{{ t.inr }}</span>
+          <span><span style="height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;background:{{ t.sBg }};color:{{ t.sFg }}">{{ t.status }}</span></span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e7180"><i class="ph {{ t.icon }}" style="font-size:16px"></i>{{ t.src }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.subscriptions }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Subscriptions" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:4px;margin-right:auto"><div style="font-size:30px;font-weight:800;letter-spacing:-.02em">Subscriptions</div><div style="font-size:14px;color:#6e7180">6 found in Gmail receipts · 1 added by hand</div></div>
+    <button onClick="{{ goMail }}" style="height:44px;padding:0 18px;border:0;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #e7e8ef;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-envelope-simple" style="font-size:18px"></i>Scan Gmail</button>
+    <button onClick="{{ openAdd }}" style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-plus" style="font-size:18px"></i>Add manually</button>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px">
+    <div style="border-radius:24px;padding:20px 22px;background:#e8eeff;display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;font-weight:600">Per month</span><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">₹8,185</span></div>
+    <div style="border-radius:24px;padding:20px 22px;background:#ece8ff;display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;font-weight:600">Per year</span><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">₹98,220</span></div>
+    <div style="border-radius:24px;padding:20px 22px;background:#ffe9e5;display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;font-weight:600">Trial ending</span><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">1 · in 7 days</span></div>
+    <div style="border-radius:24px;padding:20px 22px;background:#fff4cf;display:flex;flex-direction:column;gap:12px"><span style="font-size:14px;font-weight:600">Cancelling</span><span style="font-size:34px;font-weight:800;letter-spacing:-.02em">2 plans</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;flex:1;min-height:0">
+    <div style="background:#fff;border-radius:26px;padding:12px 18px;display:flex;flex-direction:column;min-height:0">
+      <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 120px 100px 110px 100px 170px minmax(0,1fr) 24px;gap:14px;padding:12px 10px;font-size:12px;font-weight:600;color:#9a9daa"><span>Software</span><span>Status</span><span>Cycle</span><span>Amount</span><span>₹ / month</span><span>Next</span><span>Found in</span><span></span></div>
+      <div style="display:flex;flex-direction:column;gap:4px;overflow:auto;min-height:0">
+        <sc-for list="{{ subs }}" as="s" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 120px 100px 110px 100px 170px minmax(0,1fr) 24px;gap:14px;padding:10px;align-items:center;border-radius:16px;font-size:14px" style-hover="background:#f6f7fb">
+            <span style="display:flex;align-items:center;gap:12px;min-width:0"><span style="width:42px;height:42px;flex:none;border-radius:14px;display:grid;place-items:center;font-size:15px;font-weight:800;background:{{ s.tileBg }};color:{{ s.tileFg }}">{{ s.letter }}</span><span style="display:flex;flex-direction:column;min-width:0"><span style="font-weight:700">{{ s.name }}</span><span style="font-size:12px;color:#6e7180">{{ s.vendor }}</span></span></span>
+            <span><span style="height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:5px;background:{{ s.sBg }};color:{{ s.sFg }}">{{ s.status }}</span></span>
+            <span>{{ s.cycle }}</span><span style="font-weight:700">{{ s.amount }}</span><span>{{ s.monthly }}</span>
+            <span style="display:flex;flex-direction:column"><span style="font-weight:600">{{ s.next }}</span><span style="font-size:12px;font-weight:600;color:{{ s.noteFg }}">{{ s.nextNote }}</span></span>
+            <span style="display:flex;align-items:center;gap:6px;font-size:13px;color:#6e7180"><i class="ph {{ s.srcIcon }}" style="font-size:16px"></i>{{ s.src }}</span>
+            <i class="ph ph-dots-three-vertical" style="color:#9a9daa;font-size:18px"></i>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:16px">
+      <span style="font-size:18px;font-weight:800">Next 30 days</span>
+      <sc-for list="{{ timeline }}" as="t" hint-placeholder-count="5">
+        <div style="display:grid;grid-template-columns:56px 1fr;gap:14px;align-items:start">
+          <div style="height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1;background:{{ t.bg }};color:{{ t.fg }}"><span style="font-size:11px;font-weight:700">{{ t.mon }}</span><span style="font-size:19px;font-weight:800">{{ t.day }}</span></div>
+          <div style="display:flex;flex-direction:column;gap:2px;padding-top:6px"><span style="font-size:14px;font-weight:700">{{ t.title }}</span><span style="font-size:13px;color:#6e7180">{{ t.sub }}</span></div>
+        </div>
+      </sc-for>
+      <div style="margin-top:auto;padding:14px 16px;border-radius:18px;background:#ffe9e5;display:flex;gap:10px;align-items:flex-start"><i class="ph-fill ph-bell-ringing" style="color:#b8321f;font-size:20px"></i><span style="font-size:13px;line-height:1.5"><strong>Substance 3D</strong> turns into US$19.99 a month on 17 Oct. You'll get a desktop reminder 3 days before.</span></div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.mail }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Mail scan" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:4px;margin-right:auto"><div style="font-size:30px;font-weight:800;letter-spacing:-.02em">Mail scan</div><div style="font-size:14px;color:#6e7180">Read-only Gmail · s.rohit.261199@gmail.com</div></div>
+    <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px"><i class="ph ph-arrows-clockwise" style="font-size:18px"></i>Scan again</button>
+  </div>
+  <div style="border-radius:26px;padding:22px 26px;background:#ece8ff;display:flex;align-items:center;gap:40px">
+    <div style="width:56px;height:56px;border-radius:18px;background:#fff;display:grid;place-items:center;color:#5b48c2;font-size:26px"><i class="ph-fill ph-envelope-simple-open"></i></div>
+    <div style="display:flex;flex-direction:column"><span style="font-size:30px;font-weight:800;line-height:1.1">1,284</span><span style="font-size:13px;color:#5a5e6d;font-weight:600">messages read since 1 April</span></div>
+    <div style="display:flex;flex-direction:column"><span style="font-size:30px;font-weight:800;line-height:1.1">11</span><span style="font-size:13px;color:#5a5e6d;font-weight:600">matched to subscriptions & payments</span></div>
+    <div style="display:flex;flex-direction:column"><span style="font-size:30px;font-weight:800;line-height:1.1">{{ mailPending }}</span><span style="font-size:13px;color:#5a5e6d;font-weight:600">waiting for you</span></div>
+    <div style="margin-left:auto;display:flex;flex-direction:column;gap:6px;width:320px"><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600"><span>Last scan 4 min ago</span><span>Next in 11 min</span></div><div style="height:8px;border-radius:999px;background:#fff;overflow:hidden"><div style="height:8px;width:27%;border-radius:999px;background:#5b48c2"></div></div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:20px;flex:1;min-height:0">
+    <div style="display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto">
+      <span style="font-size:18px;font-weight:800">To review</span>
+      <sc-for list="{{ mailItems }}" as="m" hint-placeholder-count="3">
+        <div style="background:#fff;border-radius:24px;padding:20px 22px;display:flex;gap:18px;align-items:flex-start;opacity:{{ m.opacity }}">
+          <div style="width:52px;height:52px;flex:none;border-radius:16px;display:grid;place-items:center;font-size:24px;background:{{ m.tileBg }};color:{{ m.tileFg }}"><i class="ph-fill {{ m.icon }}"></i></div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;min-width:0">
+            <div style="display:flex;align-items:center;gap:8px"><span style="height:24px;padding:0 10px;border-radius:999px;font-size:11px;font-weight:700;display:flex;align-items:center;background:{{ m.tileBg }};color:{{ m.tileFg }}">{{ m.kind }}</span><span style="font-size:12px;color:#9a9daa;margin-left:auto">{{ m.date }}</span></div>
+            <span style="font-size:19px;font-weight:800">{{ m.title }}</span>
+            <span style="font-size:13px;color:#6e7180;display:flex;align-items:center;gap:6px"><i class="ph ph-envelope-simple"></i>{{ m.from }}</span>
+            <div style="display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{ m.chips }}" as="c" hint-placeholder-count="3"><span style="height:28px;padding:0 12px;border-radius:999px;background:#f3f4f9;font-size:12px;font-weight:600;display:flex;align-items:center">{{ c.t }}</span></sc-for></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch;width:180px">
+            <sc-if value="{{ m.pending }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ m.accept }}" style="height:40px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:13px;font-weight:600;cursor:pointer">{{ m.cta }}</button>
+              <button onClick="{{ m.ignore }}" style="height:40px;border:0;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;cursor:pointer">{{ m.no }}</button>
+            </sc-if>
+            <sc-if value="{{ m.resolved }}" hint-placeholder-val="{{ false }}"><span style="height:40px;border-radius:999px;background:{{ m.resBg }};color:{{ m.resFg }};font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px"><i class="ph-fill {{ m.resIcon }}"></i>{{ m.resText }}</span></sc-if>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;overflow:auto">
+        <span style="font-size:18px;font-weight:800">Already matched</span>
+        <sc-for list="{{ matched }}" as="x" hint-placeholder-count="8">
+          <div style="display:flex;align-items:center;gap:12px;font-size:13px"><span style="width:52px;color:#9a9daa;font-weight:600">{{ x.d }}</span><span style="flex:1;min-width:0;color:#3b3e4a">{{ x.mail }}</span><i class="ph ph-arrow-right" style="color:#9a9daa"></i><span style="height:26px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:700;display:flex;align-items:center;background:{{ x.bg }};color:{{ x.fg }}">{{ x.to }}</span></div>
+        </sc-for>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:18px;font-weight:800">Senders it watches</span>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          <span style="height:32px;padding:0 14px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Google Play</span><span style="height:32px;padding:0 14px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Stripe / Link</span><span style="height:32px;padding:0 14px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Chaos</span><span style="height:32px;padding:0 14px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Adobe</span><span style="height:32px;padding:0 14px;border-radius:999px;background:#e8eeff;color:#2f4fb8;font-size:13px;font-weight:600;display:flex;align-items:center">waveink.ae</span><span style="height:32px;padding:0 14px;border-radius:999px;background:#f9eafc;color:#8a2aa0;font-size:13px;font-weight:600;display:flex;align-items:center">metaztech.ai</span><span style="height:32px;padding:0 14px;border-radius:999px;border:1.5px dashed #c4c6d0;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px"><i class="ph ph-plus"></i>Add sender</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ r.settings }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Settings & import" style="display:flex;flex-direction:column;gap:20px;flex:1;min-height:0">
+  <div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:30px;font-weight:800;letter-spacing:-.02em">Settings & import</div><div style="font-size:14px;color:#6e7180">Bring in client sheets, connect Google, set currencies and folders</div></div>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 480px;gap:20px;flex:1;min-height:0">
+    <div style="background:#fff;border-radius:26px;padding:24px;display:flex;flex-direction:column;gap:18px;min-height:0">
+      <div style="border-radius:22px;border:2px dashed #c9cbe0;background:#f8f8fd;padding:28px;display:flex;align-items:center;gap:22px">
+        <div style="width:64px;height:64px;border-radius:20px;background:#e8eeff;color:#2f4fb8;display:grid;place-items:center;font-size:30px"><i class="ph-fill ph-file-arrow-up"></i></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font-size:18px;font-weight:800">Drop an Excel, CSV or PDF</span><span style="font-size:13px;color:#6e7180">Or paste a table copied from a client dashboard. Re-importing updates rows instead of duplicating them.</span></div>
+        <div style="display:flex;gap:6px"><span style="height:36px;padding:0 14px;border-radius:999px;background:#a9c1ff;font-size:13px;font-weight:700;display:flex;align-items:center">Waveink</span><span style="height:36px;padding:0 14px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">MetaZtech</span><span style="height:36px;padding:0 14px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Skeidar</span></div>
+        <button style="height:44px;padding:0 20px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Choose file</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:20px;background:#f6f7fb">
+        <div style="width:46px;height:46px;border-radius:14px;background:#e3f5ea;color:#1d7646;display:grid;place-items:center;font-size:24px"><i class="ph-fill ph-microsoft-excel-logo"></i></div>
+        <div style="flex:1;display:flex;flex-direction:column"><span style="font-size:15px;font-weight:700">Tech_Products Designer.xlsx</span><span style="font-size:13px;color:#6e7180">284 rows → 199 products, grouped by Jasani code · 142 already done</span></div>
+        <button style="height:40px;padding:0 16px;border:0;border-radius:999px;background:#fff;font-size:13px;font-weight:600;cursor:pointer">Preview rows</button>
+        <button style="height:40px;padding:0 16px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Import 199 models</button>
+      </div>
+      <span style="font-size:16px;font-weight:800">Column mapping</span>
+      <div style="display:flex;flex-direction:column;gap:6px;overflow:auto;min-height:0">
+        <div style="display:grid;grid-template-columns:220px minmax(0,1fr) 260px;gap:16px;padding:0 12px;font-size:12px;font-weight:600;color:#9a9daa"><span>Sheet column</span><span>First value</span><span>Goes into</span></div>
+        <sc-for list="{{ mapping }}" as="m" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:220px minmax(0,1fr) 260px;gap:16px;padding:8px 12px;align-items:center;border-radius:14px;font-size:14px" style-hover="background:#f6f7fb">
+            <span style="font-weight:700">{{ m.col }}</span><span style="color:#6e7180;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.sample }}</span>
+            <div style="height:38px;border-radius:12px;background:#f3f4f9;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-weight:600">{{ m.field }}<i class="ph ph-caret-down"></i></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:#f6f7fb"><i class="ph-fill ph-file-pdf" style="font-size:24px;color:#b8321f"></i><div style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">PP Apparel Hub catalogue 2025.pdf</span><span style="font-size:12px;color:#6e7180">39 apparel models · imported 1 Oct</span></div></div>
+        <div style="flex:1;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;background:#f6f7fb"><i class="ph-fill ph-table" style="font-size:24px;color:#8a2aa0"></i><div style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">MetaZtech CMS table</span><span style="font-size:12px;color:#6e7180">ID, name, status, complexity, rejections · remembered</span></div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:20px;min-height:0;overflow:auto">
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:18px;font-weight:800">Google account</span>
+        <div style="display:flex;align-items:center;gap:12px"><div style="width:44px;height:44px;border-radius:50%;background:#e3f5ea;color:#1d7646;display:grid;place-items:center;font-size:22px"><i class="ph-fill ph-check-circle"></i></div><div style="display:flex;flex-direction:column"><span style="font-size:14px;font-weight:700">s.rohit.261199@gmail.com</span><span style="font-size:12px;color:#6e7180">Read-only Gmail, Calendar and Drive</span></div><button style="margin-left:auto;height:34px;padding:0 14px;border:0;border-radius:999px;background:#f3f4f9;font-size:12px;font-weight:600;cursor:pointer">Disconnect</button></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600">Sync every<div style="display:flex;padding:3px;border-radius:999px;background:#f3f4f9"><span style="height:30px;padding:0 12px;font-size:12px;display:flex;align-items:center">5 min</span><span style="height:30px;padding:0 12px;border-radius:999px;background:#16171d;color:#fff;font-size:12px;display:flex;align-items:center">15 min</span><span style="height:30px;padding:0 12px;font-size:12px;display:flex;align-items:center">30 min</span><span style="height:30px;padding:0 12px;font-size:12px;display:flex;align-items:center">1 hour</span></div></div>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:18px;font-weight:800">Money</span>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+          <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:#6e7180;font-weight:600">Base currency</span><div style="height:42px;border-radius:12px;background:#f3f4f9;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:14px;font-weight:600">₹ INR<i class="ph ph-caret-down"></i></div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:#6e7180;font-weight:600">1 AED in ₹</span><div style="height:42px;border-radius:12px;background:#f3f4f9;display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600">24.00</div></div>
+          <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;color:#6e7180;font-weight:600">1 US$ in ₹</span><div style="height:42px;border-radius:12px;background:#f3f4f9;display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600">88.00</div></div>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:12px">
+        <span style="font-size:18px;font-weight:800">Folders</span>
+        <div style="height:44px;border-radius:12px;background:#f3f4f9;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:13px;font-weight:600"><i class="ph-fill ph-folder" style="color:#a3520f;font-size:18px"></i><span style="flex:1">D:\Files\Projects\Skediar\genrativeAI</span><span style="color:#2f4fb8">Change</span></div>
+        <div style="height:44px;border-radius:12px;background:#f3f4f9;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:13px;font-weight:600"><i class="ph-fill ph-google-drive-logo" style="color:#2f4fb8;font-size:18px"></i><span style="flex:1">Waveink · GLB upload folder</span><span style="color:#2f4fb8">Change</span></div>
+      </div>
+      <div style="background:#fff;border-radius:26px;padding:22px;display:flex;flex-direction:column;gap:14px">
+        <span style="font-size:18px;font-weight:800">App</span>
+        <sc-for list="{{ toggles }}" as="t" hint-placeholder-count="3">
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:14px;font-weight:600">{{ t.label }}<button onClick="{{ t.flip }}" style="width:46px;height:26px;border:0;border-radius:999px;padding:3px;cursor:pointer;display:flex;justify-content:{{ t.justify }};background:{{ t.bg }}"><span style="width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span></button></div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showAdd }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;background:rgba(22,23,29,.32);display:grid;place-items:center;z-index:5">
+  <div style="width:560px;background:#fff;border-radius:28px;padding:28px;display:flex;flex-direction:column;gap:16px;box-shadow:0 30px 70px rgba(20,22,40,.3)">
+    <div style="display:flex;align-items:center"><span style="font-size:22px;font-weight:800">Add a subscription</span><button onClick="{{ closeAdd }}" style="margin-left:auto;width:38px;height:38px;border:0;border-radius:50%;background:#f3f4f9;cursor:pointer;display:grid;place-items:center;font-size:16px"><i class="ph ph-x"></i></button></div>
+    <span style="font-size:13px;color:#6e7180;margin-top:-8px">For anything that doesn't send receipts to Gmail.</span>
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Name</span><div style="height:46px;border-radius:14px;background:#f3f4f9;display:flex;align-items:center;padding:0 14px;font-size:14px;font-weight:600;box-shadow:0 0 0 2px #16171d">Blender Studio</div></div>
+    <div style="display:grid;grid-template-columns:1fr 130px;gap:10px">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Amount</span><div style="height:46px;border-radius:14px;background:#f3f4f9;display:flex;align-items:center;padding:0 14px;font-size:14px;font-weight:600">11.50</div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Currency</span><div style="height:46px;border-radius:14px;background:#f3f4f9;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:600">US$<i class="ph ph-caret-down"></i></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Billed</span><div style="display:flex;gap:6px"><span style="height:38px;padding:0 16px;border-radius:999px;background:#16171d;color:#fff;font-size:13px;font-weight:600;display:flex;align-items:center">Monthly</span><span style="height:38px;padding:0 16px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Yearly</span><span style="height:38px;padding:0 16px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">One-off</span></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Next renewal</span><div style="height:46px;border-radius:14px;background:#f3f4f9;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:600">22 Oct 2026<i class="ph ph-calendar-blank"></i></div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Remind me</span><div style="height:46px;border-radius:14px;background:#f3f4f9;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-size:14px;font-weight:600">3 days before<i class="ph ph-caret-down"></i></div></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:12px;font-weight:600;color:#6e7180">Status</span><div style="display:flex;gap:6px"><span style="height:38px;padding:0 16px;border-radius:999px;background:#e3f5ea;color:#1d7646;font-size:13px;font-weight:700;display:flex;align-items:center">Active</span><span style="height:38px;padding:0 16px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Free trial</span><span style="height:38px;padding:0 16px;border-radius:999px;background:#f3f4f9;font-size:13px;font-weight:600;display:flex;align-items:center">Cancelling</span></div></div>
+    <div style="display:flex;gap:10px;margin-top:6px"><button onClick="{{ closeAdd }}" style="flex:1;height:48px;border:0;border-radius:999px;background:#f3f4f9;font-size:14px;font-weight:600;cursor:pointer">Cancel</button><button onClick="{{ closeAdd }}" style="flex:1;height:48px;border:0;border-radius:999px;background:#16171d;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Add subscription</button></div>
+  </div>
+</div>
+</sc-if>
+
+    </main>
+  </div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dashboard&quot;,&quot;waveink&quot;,&quot;metaztech&quot;,&quot;skeidar&quot;,&quot;payments&quot;,&quot;subscriptions&quot;,&quot;mail&quot;,&quot;settings&quot;],&quot;default&quot;:&quot;dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;App&quot;},&quot;dashboardLayout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;widgets&quot;,&quot;board&quot;],&quot;default&quot;:&quot;widgets&quot;,&quot;tsType&quot;:&quot;'widgets' | 'board'&quot;,&quot;section&quot;:&quot;App&quot;},&quot;hideDone&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;App&quot;}}">
+const C = {
+  waveink: { name: 'Waveink', main: '#a9c1ff', tint: '#e8eeff', deep: '#2f4fb8', icon: 'ph-cube' },
+  metaztech: { name: 'MetaZtech', main: '#eaa9f6', tint: '#f9eafc', deep: '#8a2aa0', icon: 'ph-cube-focus' },
+  skeidar: { name: 'Skeidar', main: '#f8ae6c', tint: '#feefe0', deep: '#a3520f', icon: 'ph-paint-brush' },
+  money: { name: 'Money', main: '#9fdcb8', tint: '#e3f5ea', deep: '#1d7646', icon: 'ph-wallet' },
+};
+const PILL = {
+  'To do': ['#eef0f5', '#5a5e6d'], 'In progress': ['#fff4cf', '#8a6a00'], 'Submitted': ['#ece8ff', '#5b48c2'], 'Under review': ['#ece8ff', '#5b48c2'],
+  'Rejected': ['#ffe9e5', '#b8321f'], 'Revision': ['#ffe9e5', '#b8321f'], 'Approved': ['#e3f5ea', '#1d7646'], 'Done': ['#e3f5ea', '#1d7646'],
+  'Done (R)': ['#e3f5ea', '#1d7646'], 'Live': ['#e8eeff', '#2f4fb8'], 'On hold': ['#eef0f5', '#5a5e6d'], 'Active': ['#e3f5ea', '#1d7646'],
+  'Trial': ['#ffe9e5', '#b8321f'], 'Cancelling': ['#fff4cf', '#8a6a00'], 'Paid': ['#e3f5ea', '#1d7646'], 'Pending': ['#ece8ff', '#5b48c2'],
+  'Late': ['#ffe9e5', '#b8321f'], 'Invoiced': ['#fff4cf', '#8a6a00'],
+};
+const DUE = { today: ['#ffe9e5', '#b8321f'], week: ['#fff4cf', '#8a6a00'], queue: ['#eef0f5', '#5a5e6d'] };
+const Q = [
+  ['q1', 'metaztech', 'today', 'Today', 'Fix rejection: Ergonomic mesh office chair', 'MZ-2318 · rejected 2× · UV seams on armrest', '₹1,200'],
+  ['q2', 'metaztech', 'today', 'Today', 'Fix rejection: Ceramic table lamp, linen shade', 'MZ-2297 · shade reads too glossy', '₹900'],
+  ['q3', 'money', 'today', 'Today', 'MetaZtech September payout not recorded', 'Window 3rd–10th closes today', '₹16,632'],
+  ['q4', 'metaztech', 'today', 'Today', 'Submit 1–2 files to the CMS', '0 submitted so far today', '0 / 2'],
+  ['q5', 'skeidar', 'week', '13 Oct', 'Oslo 3-seat sofa: 10 images left', '14 of 24 · 12 fabrics × 2 masters', 'AED 50'],
+  ['q6', 'waveink', 'week', '14 Oct', 'Continue: FYCAR Car Charger with Bluetooth Earbud', 'ITCC 701 · 60% · before Weekly Demo', ''],
+  ['q7', 'waveink', 'week', '16 Oct', 'Mark 2 Drive GLBs as submitted', 'ITSK 1174, ITGL 1257 are uploaded', ''],
+  ['q8', 'money', 'week', '17 Oct', 'Substance 3D trial ends', 'Becomes US$19.99 / mo unless cancelled', '$19.99'],
+  ['q9', 'metaztech', 'queue', 'Queue', 'Start: Walnut bookshelf, 5 tiers', 'MZ-2331 · Complex', '₹1,200'],
+  ['q10', 'waveink', 'queue', 'Row 5', 'Next in sheet: SVIVOR Svivel Car Charger', 'UI 1317 · Black / Silver', ''],
+  ['q11', 'waveink', 'queue', 'Row 15', 'Next in sheet: KAMEZ Wireless Deluxe Notebook', 'NBSN 5126 · Notebooks', ''],
+];
+const WI = [
+  ['ITCC 701', 'FYCAR - @memorii Car Charger With Bluetooth Earbud', 'Car accessories', 'In progress', '@memorii', 'Black', 2, 0],
+  ['ITWC 1153', 'MIO - @memorii 15W Car Mobile Mount Wireless Charger', 'Car accessories', 'Done (R)', '@memorii', 'Black', 3, 1],
+  ['ITSK 1174', 'SKROSS Car Phone Holder & Wireless Charger - Black', 'Car accessories', 'Under review', 'SKROSS', 'Black', 4, 1],
+  ['UI 1317', 'SVIVOR Svivel Car Charger Black-silver', 'Car accessories', 'To do', 'Unbranded', 'Black / Silver', 5, 0],
+  ['ITGL 1257', 'VIRTON - Giftology Magnetic Car Phone Holder and 15W Charger', 'Car accessories', 'In progress', 'Giftology', 'Black', 6, 1],
+  ['ITFO 1240', 'BERGMUND - Santhome 10000mAh Mag Wireless Powerbank - Black', 'Power banks', 'Done', 'Santhome', 'Black', 7, 1],
+  ['ITFO 5309', 'BERGMUND - Santhome 10000mAh Mag Wireless Powerbank - Navy', 'Power banks', 'Done', 'Santhome', 'Navy', 8, 1],
+  ['ITLB 531', 'CAZMA - Electric Lunch Box - Black', 'Lunch boxes', 'Done', 'Unbranded', 'Black', 9, 1],
+  ['ITLB 532', 'CAZMA - Electric Lunch Box - White', 'Lunch boxes', 'Done', 'Unbranded', 'White', 10, 1],
+  ['ITHL 534', 'CRIVITS - Smart Mug Warmer with Wireless Charger - Black', 'Mug warmers', 'Done', 'Unbranded', 'Black', 11, 1],
+  ['ITHL 1137', 'CRIVITS - Smart Mug Warmer with Wireless Charger - White', 'Mug warmers', 'Revision', 'Unbranded', 'White', 12, 0],
+  ['LSSN 1271', 'FULDA - CHANGE Collection RPET Laptop Case - Navy Blue', 'Laptop bags', 'Done', 'Santhome', 'Navy Blue', 13, 1],
+  ['ITFO 1233', 'GUBIN - Santhome 10000mAh Wireless Powerbank Organizer', 'Power banks', 'Done', 'Santhome', 'Grey', 14, 1],
+  ['NBSN 5126', 'KAMEZ - Santhome 15W Wireless Deluxe Notebook with Stand', 'Notebooks', 'To do', 'Santhome', 'Black', 15, 0],
+];
+const MZ = [
+  ['MZ-2318', 'Ergonomic mesh office chair', 'Complex', 'Rejected', 2, '₹1,200', 'Today 9:12', 'Fix now'],
+  ['MZ-2297', 'Ceramic table lamp, linen shade', 'Simple', 'Rejected', 1, '₹900', 'Yesterday', 'Fix now'],
+  ['MZ-2325', 'Rattan lounge chair', 'Super Complex', 'In progress', 0, '₹1,500', '8 Oct', 'Submit'],
+  ['MZ-2329', 'Fluted side table', 'Simple', 'In progress', 0, '₹900', '8 Oct', 'Submit'],
+  ['MZ-2302', 'Oak dining table, 6-seat', 'Complex', 'Submitted', 0, '₹1,200', '7 Oct', 'View'],
+  ['MZ-2309', 'Velvet ottoman', 'Simple', 'Submitted', 1, '₹900', '7 Oct', 'View'],
+  ['MZ-2312', 'Tempered glass coffee table', 'Simple', 'Submitted', 0, '₹900', '6 Oct', 'View'],
+  ['MZ-2314', 'Bouclé accent chair', 'Complex', 'Submitted', 0, '₹1,200', '6 Oct', 'View'],
+  ['MZ-2331', 'Walnut bookshelf, 5 tiers', 'Complex', 'To do', 0, '₹1,200', '5 Oct', 'Start'],
+  ['MZ-2340', 'Brass pendant light', 'Simple', 'To do', 0, '₹900', '5 Oct', 'Start'],
+  ['MZ-2288', 'Linen armchair', 'Complex', 'Approved', 0, '₹1,200', '3 Oct', 'View'],
+  ['MZ-2210', 'Sectional sofa with chaise', 'Super Complex-1', 'On hold', 0, '₹1,800', '27 Sep', 'View'],
+];
+const BOARD = [
+  ['To do', '#e6e8f0', '#3b3e4a', [['metaztech', 'MZ-2331', 'Walnut bookshelf, 5 tiers', 'NORMAL', 'Queue', '₹1,200'], ['metaztech', 'MZ-2340', 'Brass pendant light', 'LOW', 'Queue', '₹900'], ['waveink', 'UI 1317', 'SVIVOR Svivel Car Charger', 'NORMAL', 'Row 5', 'Car accessories'], ['waveink', 'APP-01', 'Premium Cotton T-Shirt 200 GSM', 'LOW', 'Apparel', 'T-Shirts']]],
+  ['In progress', '#fde2cf', '#a3520f', [['waveink', 'ITCC 701', 'FYCAR Car Charger with Bluetooth Earbud', 'HIGH', '14 Oct', '60% done'], ['skeidar', 'Job', 'Oslo 3-seat sofa, 12 fabrics', 'HIGH', '13 Oct', '14 / 24 images'], ['metaztech', 'MZ-2325', 'Rattan lounge chair', 'NORMAL', '12 Oct', '₹1,500']]],
+  ['In review', '#e3ddff', '#5b48c2', [['metaztech', 'MZ-2302', 'Oak dining table, 6-seat', 'NORMAL', '7 Oct', 'QA'], ['metaztech', 'MZ-2309', 'Velvet ottoman', 'NORMAL', '7 Oct', 'Client review'], ['waveink', 'ITSK 1174', 'SKROSS Phone Holder & Wireless Charger', 'NORMAL', '9 Oct', 'With Sibi']]],
+  ['Rejected', '#ffd9d3', '#b8321f', [['metaztech', 'MZ-2318', 'Ergonomic mesh office chair', 'URGENT', 'Today', 'Rejected 2×'], ['metaztech', 'MZ-2297', 'Ceramic table lamp, linen shade', 'URGENT', 'Today', 'Rejected 1×'], ['waveink', 'ITHL 1137', 'CRIVITS Mug Warmer, White', 'HIGH', '15 Oct', 'Logo area too small']]],
+  ['Done', '#d3f1de', '#1d7646', [['waveink', 'ITFO 1240', 'BERGMUND Mag Powerbank, Black', 'LOW', '5 Oct', 'GLB on Drive'], ['metaztech', 'MZ-2288', 'Linen armchair', 'LOW', '3 Oct', 'Approved ₹1,200'], ['skeidar', 'Job', 'Bergen armchair, 8 fabrics', 'LOW', '28 Sep', 'AED 80 paid']]],
+];
+const FLAG = { URGENT: '#e0402c', HIGH: '#d9730d', NORMAL: '#3a63d8', LOW: '#8a8d99' };
+const FAB = [['Bouclé Cream', '#ede3d1'], ['Velvet Moss', '#6f7d4f'], ['Linen Sand', '#d8c3a0'], ['Chenille Grey', '#9a9a9e'], ['Corduroy Rust', '#b2582f'], ['Wool Charcoal', '#3f4045'], ['Leather Cognac', '#9a5a2c'], ['Tweed Navy', '#2f3d5c'], ['Cotton Oat', '#e3d8c3'], ['Velvet Plum', '#6e3555'], ['Bouclé Stone', '#c9c2b6'], ['Jacquard Teal', '#2e6f6e']];
+const SUBS = [
+  ['Claude Pro', 'Anthropic · Google Play', 'C', '#f8e3d4', '#a3520f', 'Active', 'Monthly', '₹1,999', '₹1,999', '6 Nov', 'in 27 days', 'Google Play receipt', 'ph-envelope-simple', 0],
+  ['LinkedIn Premium', 'LinkedIn · Google Play', 'in', '#dbe6ff', '#2f4fb8', 'Active', 'Monthly', '₹1,850', '₹1,850', '4 Nov', 'in 25 days', 'Google Play receipt', 'ph-envelope-simple', 0],
+  ['Google AI Pro (5 TB)', 'Google One · Google Play', 'G', '#e3f5ea', '#1d7646', 'Active', 'Monthly', '₹210', '₹210', '9 Nov', 'renewed yesterday', 'Google Play receipt', 'ph-envelope-simple', 0],
+  ['Tripo AI Starter', 'Tripo AI · UPI via Link', 'T', '#ece8ff', '#5b48c2', 'Active', 'Yearly', '₹1,986.60', '₹166', '16 Sep 2027', 'in 341 days', 'Stripe / Link receipt', 'ph-envelope-simple', 0],
+  ['Chaos V-Ray', 'Chaos · annual licence', 'V', '#ffe9e5', '#b8321f', 'Cancelling', 'Yearly', 'US$540', '₹3,960', '28 Sep 2027', 'auto-renew off', 'Chaos account mail', 'ph-envelope-simple', 0],
+  ['ChatGPT Go', 'OpenAI · Google Play', 'G', '#eef0f5', '#3b3e4a', 'Cancelling', 'Yearly', '—', '—', '9 Nov', 'access ends', 'Google Play mail', 'ph-envelope-simple', 0],
+  ['Substance 3D Texturing', 'Adobe', 'S', '#ffe1ef', '#b0246b', 'Trial', 'Monthly', 'US$19.99', 'after trial', '17 Oct', 'trial ends in 7 days', 'Added by hand', 'ph-hand-pointing', 1],
+];
+const MAIL = [
+  { id: 'm1', kind: 'New subscription', icon: 'ph-receipt', tileBg: '#e8eeff', tileFg: '#2f4fb8', date: '8 Oct', title: 'Microsoft 365 Basic · ₹159 / month', from: 'Google Play · "Your Google Play Order Receipt from Oct 8, 2026"', chips: ['Renews 8 Nov', 'UPI: GPay', 'Work'], cta: 'Add subscription', no: 'Not a subscription', ok: 'Added to Subscriptions' },
+  { id: 'm2', kind: 'Payment received', icon: 'ph-currency-inr', tileBg: '#e3f5ea', tileFg: '#1d7646', date: 'Today 11:40', title: 'MetaZtech paid ₹16,632 for September', from: 'accounts@metaztech.ai · "Payment advice: September 2026"', chips: ['14 models', 'TDS ₹168', 'Clears the late payout'], cta: 'Record payment', no: 'Ignore', ok: 'Recorded in Payments' },
+  { id: 'm3', kind: 'One-off purchase', icon: 'ph-shopping-bag', tileBg: '#fff4cf', tileFg: '#8a6a00', date: '5 Oct', title: 'Blender Market · US$24', from: 'Stripe · "Your receipt from Blender Market"', chips: ['No renewal found', 'Card'], cta: 'Track as one-off', no: 'Ignore', ok: 'Tracked as one-off' },
+];
+const MATCHED = [
+  ['6 Oct', 'Google Play receipt', 'Claude Pro', 'metaztech'], ['4 Oct', 'Google Play receipt', 'LinkedIn', 'waveink'], ['3 Oct', 'Adobe trial started', 'Substance 3D', 'trial'],
+  ['1 Oct', 'Sibi · Salary Transfer Reference', 'Waveink pay', 'money'], ['28 Sep', 'Chaos · auto-renew off', 'V-Ray', 'trial'], ['16 Sep', 'Link (Stripe) receipt', 'Tripo AI', 'metaztech'],
+  ['9 Sep', 'Google Play receipt', 'Google AI Pro', 'money'], ['Aug', 'Google Play cancellation', 'ChatGPT Go', 'grey'],
+];
+const MCOL = { metaztech: ['#ece8ff', '#5b48c2'], waveink: ['#e8eeff', '#2f4fb8'], trial: ['#ffe9e5', '#b8321f'], money: ['#e3f5ea', '#1d7646'], grey: ['#eef0f5', '#5a5e6d'] };
+const MONTHS = [['Apr', 0, 0, 9600, 0], ['May', 0, 0, 12000, 0], ['Jun', 0, 0, 8400, 0], ['Jul', 0, 0, 10800, 0], ['Aug', 0, 0, 6000, 0], ['Sep', 72000, 16632, 7680, 0], ['Oct', 72000, 7722, 1680, 1]];
+const TXNS = [
+  ['Due 3–10 Oct', 'metaztech', 'September approvals (14)', '₹16,632', '₹16,632', 'Late', 'Waiting for payment advice', 'ph-hourglass-medium'],
+  ['Due 1 Nov', 'waveink', 'October retainer', 'AED 3,000', '₹72,000', 'Pending', 'Retainer rule', 'ph-repeat'],
+  ['On delivery', 'skeidar', 'Oslo 3-seat sofa · 14 of 24 images', 'AED 70', '₹1,680', 'Invoiced', 'Job tracker', 'ph-paint-brush'],
+  ['1 Oct', 'waveink', 'September retainer · ref 33TF068381319', 'AED 3,000', '₹72,000', 'Paid', 'Mail from Sibi', 'ph-envelope-simple'],
+  ['28 Sep', 'skeidar', '3 jobs · 64 images', 'AED 320', '₹7,680', 'Paid', 'Added by hand', 'ph-hand-pointing'],
+  ['30 Aug', 'skeidar', 'August jobs · 50 images', 'AED 250', '₹6,000', 'Paid', 'Added by hand', 'ph-hand-pointing'],
+];
+const MAP = [['Product Name', 'FYCAR - @memorii Car Charger With Bluetooth Earbud', 'Name'], ['Jasani Code', 'ITCC 701', 'Code (groups rows)'], ['Sub Category', 'Car Accessories', 'Subcategory'], ['3D Model Status', 'done (r)', 'Status'], ['Branding Areas', 'Front face', 'Branding areas'], ['Print Methods', 'UV print, laser engraving', 'Print methods'], ['Colour', 'Black', 'Colour']];
+const TITLES = { dashboard: 'Dashboard', waveink: 'Waveink', metaztech: 'MetaZtech', skeidar: 'Skeidar', payments: 'Payments', subscriptions: 'Subscriptions', mail: 'Mail scan', settings: 'Settings & import' };
+function initSk() { const o = {}; for (let i = 0; i < 7; i++) { o[i + ':0'] = true; o[i + ':1'] = true; } return o; }
+
+class Component extends DCLogic {
+  state = { route: null, layout: null, filter: 'all', done: {}, wiSel: 'ITCC 701', wiStatus: {}, sk: initSk(), mzTab: 'All', mail: {}, showAdd: false, tg: { a: true, b: false, c: true }, win: (() => { const W = window.innerWidth, H = window.innerHeight; if (!W || !H) return { s: 0.5, left: '0px', top: '0px' }; const s = Math.max(0.1, Math.min((W - 24) / 1920, (H - 24) / 1080, 1)); return { s, left: Math.max(0, Math.round((W - 1920 * s) / 2)) + 'px', top: Math.max(0, Math.round((H - 1080 * s) / 2)) + 'px' }; })() };
+  fit = () => {
+    const W = window.innerWidth || document.documentElement.clientWidth, H = window.innerHeight || document.documentElement.clientHeight;
+    if (!W || !H) return;
+    const s = Math.max(0.1, Math.min((W - 24) / 1920, (H - 24) / 1080, 1));
+    const win = { s, left: Math.max(0, Math.round((W - 1920 * s) / 2)) + 'px', top: Math.max(0, Math.round((H - 1080 * s) / 2)) + 'px' };
+    const p = this.state.win;
+    if (p.s !== win.s || p.left !== win.left || p.top !== win.top) this.setState({ win });
+  };
+  componentDidMount() {
+    this.fit();
+    requestAnimationFrame(this.fit);
+    this._t = setTimeout(this.fit, 300);
+    window.addEventListener('resize', this.fit);
+    if (window.ResizeObserver) { this._ro = new ResizeObserver(this.fit); this._ro.observe(document.documentElement); }
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.fit); clearTimeout(this._t); this._ro && this._ro.disconnect(); }
+
+  renderVals() {
+    const st = this.state;
+    const route = st.route ?? this.props.startScreen ?? 'dashboard';
+    const layout = st.layout ?? this.props.dashboardLayout ?? 'widgets';
+    const go = k => () => this.setState({ route: k });
+    const r = {}; Object.keys(TITLES).forEach(k => (r[k] = k === route));
+    const on = { bg: '#16171d', fg: '#fff' }, off = { bg: 'transparent', fg: '#16171d' };
+
+    const NAV = [
+      ['MENU', [['dashboard', 'Dashboard', 'ph-squares-four', null, '11']]],
+      ['CLIENTS', [['waveink', 'Waveink', null, C.waveink.main, '142/199'], ['metaztech', 'MetaZtech', null, C.metaztech.main, '2'], ['skeidar', 'Skeidar', null, C.skeidar.main, '1']]],
+      ['MONEY', [['payments', 'Payments', 'ph-wallet', null, ''], ['subscriptions', 'Subscriptions', 'ph-repeat', null, '7']]],
+      ['TOOLS', [['mail', 'Mail scan', 'ph-envelope-simple-open', null, '3'], ['settings', 'Settings & import', 'ph-gear-six', null, '']]],
+    ];
+    const nav = NAV.map(([label, items]) => ({ label, items: items.map(([k, l, icon, dot, badge]) => {
+      const a = k === route;
+      return { label: l, icon, dot, hasDot: !!dot, hasIcon: !dot, badge, go: go(k), bg: a ? '#16171d' : 'transparent', fg: a ? '#fff' : '#16171d', shadow: a ? '0 8px 18px rgba(22,23,29,.22)' : 'none', badgeBg: a ? 'rgba(255,255,255,.18)' : '#fff', badgeFg: a ? '#fff' : '#3b3e4a' };
+    }) }));
+
+    const items = Q.map(([id, c, due, dueText, title, detail, meta]) => {
+      const d = !!st.done[id];
+      return { id, c, title, detail, meta, dueText, clientName: C[c].name, icon: C[c].icon, tint: C[c].tint, deep: C[c].deep, dueBg: DUE[due][0], dueFg: DUE[due][1], opacity: d ? 0.45 : 1, deco: d ? 'line-through' : 'none', ring: d ? '#16171d' : '#d5d7e0', fill: d ? '#16171d' : '#fff', toggle: () => this.setState(s => ({ done: { ...s.done, [id]: !s.done[id] } })) };
+    });
+    const hide = this.props.hideDone ?? false;
+    const queue = items.filter(i => (st.filter === 'all' || i.c === st.filter) && !(hide && st.done[i.id]));
+    const filters = [['all', 'All', null], ['waveink', 'Waveink', C.waveink.main], ['metaztech', 'MetaZtech', C.metaztech.main], ['skeidar', 'Skeidar', C.skeidar.main], ['money', 'Money', C.money.main]].map(([k, label, dot]) => ({ label, dot, set: () => this.setState({ filter: k }), bg: st.filter === k ? '#16171d' : '#f3f4f9', bgBoard: st.filter === k ? '#16171d' : '#fff', fg: st.filter === k ? '#fff' : '#16171d' }));
+
+    const clientCards = [
+      ['waveink', '142/199', 'Tech models done · 0 of 39 apparel', '71%'],
+      ['metaztech', '2 rejected', '4 in QA · 20 approved · 0/2 today', '61%'],
+      ['skeidar', `${Object.values(st.sk).filter(Boolean).length}/24`, 'Oslo sofa variations · AED 5 each', Math.round(Object.values(st.sk).filter(Boolean).length / 24 * 100) + '%'],
+      ['money', '₹90,312', 'owed to you · ₹16,632 late today', '58%'],
+    ].map(([k, big, sub, pct]) => ({ ...C[k], big, sub, pct, go: go(k === 'money' ? 'payments' : k) }));
+
+    const cal = [];
+    const EV = { 1: ['#9fdcb8', '#16171d'], 12: ['#f9eafc', '#8a2aa0'], 14: ['#a9c1ff', '#16171d'], 16: ['#a9c1ff', '#16171d'], 17: ['#f0523f', '#fff'] };
+    for (let i = 0; i < 35; i++) {
+      const n = i - 2, col = i % 7, valid = n >= 1 && n <= 31;
+      const inBand = valid && n >= 3 && n <= 10;
+      let bg = 'transparent', fg = valid ? '#16171d' : 'transparent';
+      if (EV[n]) [bg, fg] = EV[n];
+      if (n === 10) { bg = '#16171d'; fg = '#fff'; }
+      if (inBand && n !== 10) fg = '#8a2aa0';
+      const L = n === 3 || col === 0, R = n === 10 || col === 6;
+      cal.push({ n: valid ? n : '', bg, fg, band: inBand ? '#f9eafc' : 'transparent', bandR: `${L ? 21 : 0}px ${R ? 21 : 0}px ${R ? 21 : 0}px ${L ? 21 : 0}px` });
+    }
+
+    const bars = (k) => MONTHS.map(([m, w, mz, sk, pend]) => {
+      const hatch = (a, b) => `repeating-linear-gradient(135deg,${a} 0 4px,${b} 4px 8px)`;
+      const segs = [];
+      if (sk) segs.push({ h: Math.max(3, Math.round(sk * k)) + 'px', bg: C.skeidar.main });
+      if (mz) segs.push({ h: Math.round(mz * k) + 'px', bg: pend || m === 'Sep' ? hatch(C.metaztech.main, C.metaztech.tint) : C.metaztech.main });
+      if (w) segs.push({ h: Math.round(w * k) + 'px', bg: pend ? hatch(C.waveink.main, C.waveink.tint) : C.waveink.main });
+      const t = w + mz + sk;
+      return { m, segs, total: '₹' + (t >= 1000 ? (t / 1000).toFixed(t >= 10000 ? 0 : 1) + 'k' : t), labelFg: m === 'Oct' ? '#16171d' : '#9a9daa' };
+    });
+
+    const renewSoon = [['S', '#ffe1ef', '#b0246b', 'Substance 3D trial', '17 Oct · trial ends', '#b8321f', '$19.99'], ['in', '#dbe6ff', '#2f4fb8', 'LinkedIn Premium', '4 Nov · in 25 days', '#6e7180', '₹1,850'], ['C', '#f8e3d4', '#a3520f', 'Claude Pro', '6 Nov · in 27 days', '#6e7180', '₹1,999'], ['G', '#e3f5ea', '#1d7646', 'Google AI Pro', '9 Nov · in 30 days', '#6e7180', '₹210']]
+      .map(([letter, tileBg, tileFg, name, when, whenFg, amount]) => ({ letter, tileBg, tileFg, name, when, whenFg, amount }));
+
+    const board = BOARD.map(([name, bg, fg, cards]) => {
+      const cs = cards.filter(c => st.filter === 'all' || c[0] === st.filter).map(([c, code, title, flag, date, meta]) => ({ dot: C[c].main, clientName: C[c].name, code, title, flag, flagFg: FLAG[flag], date, dateFg: date === 'Today' ? '#e0402c' : '#6e7180', meta }));
+      return { name, bg, fg, count: cs.length, cards: cs };
+    });
+
+    const mzTabsDef = [['All', 33], ['To do', 2], ['In progress', 2], ['Submitted', 4], ['Rejected', 2], ['Approved', 20], ['On hold', 3]];
+    const mzTabs = mzTabsDef.map(([label, count]) => { const a = st.mzTab === label; return { label, count, set: () => this.setState({ mzTab: label }), bg: a ? '#16171d' : '#fff', fg: a ? '#fff' : '#16171d', cBg: a ? 'rgba(255,255,255,.18)' : (label === 'Rejected' ? '#ffe9e5' : '#f3f4f9'), cFg: a ? '#fff' : (label === 'Rejected' ? '#b8321f' : '#3b3e4a') }; });
+    const mz = MZ.filter(m => st.mzTab === 'All' || m[3] === st.mzTab).map(([id, name, cx, status, rej, fee, upd, action]) => ({ id, name, cx, status, sBg: PILL[status][0], sFg: PILL[status][1], rej: rej ? rej + '×' : '—', rejFg: rej ? '#b8321f' : '#9a9daa', fee, upd, action, rowBg: status === 'Rejected' ? '#fff7f5' : 'transparent', aBg: action === 'Fix now' ? '#16171d' : '#f3f4f9', aFg: action === 'Fix now' ? '#fff' : '#16171d' }));
+
+    const isDone = s => s.startsWith('Done') || s === 'Live';
+    const wiRows = WI.map(([code, name, sub, status, brand, colour, row, drive]) => {
+      const s = st.wiStatus[code] ?? status, sel = code === st.wiSel;
+      return { code, name, sub, status: s, brand, colour, row, drive: !!drive, sBg: PILL[s][0], sFg: PILL[s][1], bg: sel ? '#e8eeff' : 'transparent', ring: sel ? 'inset 0 0 0 1.5px #a9c1ff' : 'none', select: () => this.setState({ wiSel: code }) };
+    });
+    const c0 = wiRows.find(w => w.code === st.wiSel), changed = st.wiStatus[c0.code];
+    const history = [{ when: '5 Oct', text: `Imported from Tech_Products Designer.xlsx, row ${c0.row}` }];
+    if (c0.status === 'In progress' || changed) history.push({ when: '8 Oct', text: 'Moved to In progress' });
+    if (changed) history.push({ when: 'Today', text: `Marked ${changed}` });
+    const cur = { ...c0, history, driveText: c0.drive ? `${c0.code}.glb · modified 9 Oct` : 'Not uploaded yet' };
+    const techDone = 142 + wiRows.filter(w => isDone(w.status)).length - WI.filter(w => isDone(w[3])).length;
+    const wiOpts = ['To do', 'In progress', 'Under review', 'Revision', 'Done', 'Live'].map(s => { const a = cur.status === s || (s === 'Done' && cur.status === 'Done (R)'); return { label: s, bg: a ? '#16171d' : '#f3f4f9', fg: a ? '#fff' : '#16171d', set: () => this.setState(x => ({ wiStatus: { ...x.wiStatus, [cur.code]: s } })) }; });
+
+    const skRows = [['Master A · front', 'oslo_front.png'], ['Master B · ¾ angle', 'oslo_34.png']].map(([label, file], i) => ({ label, file, cells: FAB.map(([, color], fi) => { const k = fi + ':' + i, d = !!st.sk[k]; return { done: d, notDone: !d, bg: d ? color : '#f6f7fb', border: d ? '0' : '2px dashed #d5d7e0', toggle: () => this.setState(s => ({ sk: { ...s.sk, [k]: !s.sk[k] } })) }; }) }));
+    const skDone = Object.values(st.sk).filter(Boolean).length;
+
+    const mailItems = MAIL.filter(m => st.mail[m.id] !== 'ignored').map(m => { const v = st.mail[m.id]; return { ...m, chips: m.chips.map(t => ({ t })), pending: !v, resolved: !!v, opacity: 1, resBg: '#e3f5ea', resFg: '#1d7646', resIcon: 'ph-check-circle', resText: m.ok, accept: () => this.setState(s => ({ mail: { ...s.mail, [m.id]: 'added' } })), ignore: () => this.setState(s => ({ mail: { ...s.mail, [m.id]: 'ignored' } })) }; });
+
+    const tgDef = [['a', 'Desktop reminders'], ['b', 'Start with Windows'], ['c', 'Minimise to system tray']];
+    const toggles = tgDef.map(([k, label]) => ({ label, bg: st.tg[k] ? '#16171d' : '#d5d7e0', justify: st.tg[k] ? 'flex-end' : 'flex-start', flip: () => this.setState(s => ({ tg: { ...s.tg, [k]: !s.tg[k] } })) }));
+
+    return {
+      win: st.win, title: TITLES[route], r, nav,
+      goMail: go('mail'), goSettings: go('settings'), goPayments: go('payments'), goSubs: go('subscriptions'),
+      isWidgets: layout === 'widgets', isBoard: layout === 'board',
+      lw: layout === 'widgets' ? on : off, lb: layout === 'board' ? on : off,
+      setWidgets: () => this.setState({ layout: 'widgets' }), setBoard: () => this.setState({ layout: 'board' }),
+      remaining: items.filter(i => !st.done[i.id]).length, queue, filters, clientCards, cal,
+      barsSm: bars(150 / 100000), barsLg: bars(200 / 100000), renewSoon, board, mzTabs, mz,
+      wiRows, cur, wiOpts, techDone, techPct: Math.round(techDone / 199 * 100) + '%',
+      wiDoneLabel: isDone(cur.status) ? 'Marked done' : 'Mark done',
+      wiMarkDone: () => this.setState(x => ({ wiStatus: { ...x.wiStatus, [cur.code]: 'Done' } })),
+      fabrics: FAB.map(([name, color]) => ({ name, color })), skRows, skDone, skDeg: Math.round(skDone / 24 * 360) + 'deg', skEarned: skDone * 5, skRemain: (24 - skDone) * 5,
+      txns: TXNS.map(([date, c, f, amount, inr, status, src, icon]) => ({ date, client: C[c].name, dot: C[c].main, for: f, amount, inr, status: status === 'Late' ? 'Late today' : status, sBg: PILL[status][0], sFg: PILL[status][1], src, icon })),
+      subs: SUBS.map(([name, vendor, letter, tileBg, tileFg, status, cycle, amount, monthly, next, nextNote, src, srcIcon, warn]) => ({ name, vendor, letter, tileBg, tileFg, status, sBg: PILL[status][0], sFg: PILL[status][1], cycle, amount, monthly, next, nextNote, noteFg: warn ? '#b8321f' : '#9a9daa', src, srcIcon })),
+      timeline: [['OCT', '17', '#ffe9e5', '#b8321f', 'Substance 3D trial ends', 'US$19.99 / mo after this'], ['NOV', '4', '#e8eeff', '#2f4fb8', 'LinkedIn Premium renews', '₹1,850 · UPI: GPay'], ['NOV', '6', '#f8e3d4', '#a3520f', 'Claude Pro renews', '₹1,999 · UPI: GPay'], ['NOV', '9', '#e3f5ea', '#1d7646', 'Google AI Pro renews', '₹210 · UPI: GPay'], ['NOV', '9', '#eef0f5', '#3b3e4a', 'ChatGPT Go access ends', 'Already cancelled']].map(([mon, day, bg, fg, title, sub]) => ({ mon, day, bg, fg, title, sub })),
+      mailItems, mailPending: MAIL.filter(m => !st.mail[m.id]).length,
+      matched: MATCHED.map(([d, mail, to, k]) => ({ d, mail, to, bg: MCOL[k][0], fg: MCOL[k][1] })),
+      mapping: MAP.map(([col, sample, field]) => ({ col, sample, field })), toggles,
+      showAdd: st.showAdd, openAdd: () => this.setState({ showAdd: true }), closeAdd: () => this.setState({ showAdd: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>
