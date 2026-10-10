@@ -1,13 +1,15 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import type { AppState, CompanyConfig, Model } from '../../shared/types';
-import { isComplete, statusEvents } from '../../shared/status';
+import { isComplete } from '../../shared/status';
 import { formatMoney, localDate, tierFee } from '../../shared/money';
+import { paceFor, weekProgress, type Target } from '../../shared/pace';
 import { mailLine } from '../../shared/planner';
 import { hub } from '../hub';
 import { Icon, useApp } from '../ui';
 
-/** Ritu's ask on Teams: 1–2 files a day. */
+/** Ritu's ask on Teams: 1–2 files a day. Used when MetaZtech's job details have no output target. */
 export const DAILY_TARGET = 2;
+const FALLBACK: Target = { count: DAILY_TARGET, per: 'day', unit: 'files', counts: 'submitted' };
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
 /** Teams lines that read like a warning from management get a red bubble. */
@@ -89,30 +91,36 @@ export function MzPop({
   );
 }
 
-/** Files sent for review today (local date) against the daily target, as a ring. */
-export function DailyTarget({ all, now }: { all: Model[]; now: Date }) {
-  const today = localDate(now);
-  const sent = all.filter(m => statusEvents(m).some(h => h.to === 'review' && localDate(h.at) === today)).length;
-  const rejected = all.filter(m => m.status === 'revision').length;
-  const met = sent >= DAILY_TARGET;
+/** Work counted today (or this week) against the output target in MetaZtech's job details, as a ring. */
+export function DailyTarget({ state, now }: { state: AppState; now: Date }) {
+  const cfg = state.companies.find(c => c.id === 'metaztech')!;
+  const p = weekProgress(state, 'metaztech', now) ?? paceFor(state, cfg, FALLBACK, now);
+  const rejected = state.models.filter(m => m.company === 'metaztech' && m.status === 'revision').length;
+  const day = p.per === 'day';
+  const goal = day && p.target === 2 && p.counts === 'submitted' ? `1–2 ${p.unit} a day` : `${p.target} ${p.unit} a ${p.per}`;
+  const verb = p.counts === 'submitted' ? 'Submit' : 'Finish';
+  const met = p.done >= p.target;
   const fix = rejected === 1 ? 'Fix the rejection first, it counts toward review.' : `Fix the ${NUM[rejected] ?? rejected} rejections first, they count toward review.`;
   const text = met
-    ? `Target met for today.${rejected ? ` ${rejected === 1 ? 'One rejection is' : `${rejected} rejections are`} still waiting.` : ' Anything more is a head start on tomorrow.'}`
-    : `Submit 1–2 files a day. ${rejected ? fix : `${DAILY_TARGET - sent} more to reach today's target.`}`;
+    ? `Target met ${day ? 'for today' : 'for the week'}.${rejected ? ` ${rejected === 1 ? 'One rejection is' : `${rejected} rejections are`} still waiting.` : ` Anything more is a head start on ${day ? 'tomorrow' : 'next week'}.`}`
+    : day && !p.workday
+      ? `Not a working day. ${verb} ${goal}; anything sent today is a head start.`
+      : `${verb} ${goal}. ${rejected ? fix : p.behind && !day ? `${p.short} behind where the week should be.` : `${p.target - p.done} more to reach ${day ? "today's" : "this week's"} target.`}`;
   // A small nub at zero marks where the ring starts filling.
-  const fill = sent ? Math.min(100, Math.round((sent / DAILY_TARGET) * 100)) : 4;
+  const fill = p.done ? Math.min(100, Math.round((p.done / Math.max(1, p.target)) * 100)) : 4;
+  const label = `${p.unit[0].toUpperCase()}${p.unit.slice(1)} ${p.counts === 'submitted' ? 'submitted' : p.counts === 'images' ? 'made' : 'finished'} ${day ? 'today' : 'this week'}`;
   return (
-    <section className="panel mz-target" aria-label="Daily target">
-      <div className="mz-ring" style={{ '--p': `${fill}%` } as CSSProperties} role="progressbar" aria-label="Files submitted today" aria-valuemin={0} aria-valuemax={DAILY_TARGET} aria-valuenow={sent}>
+    <section className="panel mz-target" aria-label={day ? 'Daily target' : 'Weekly target'}>
+      <div className="mz-ring" style={{ '--p': `${fill}%` } as CSSProperties} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={p.target} aria-valuenow={p.done}>
         <div>
           <b className="tabular">
-            {sent}/{DAILY_TARGET}
+            {p.done}/{p.target}
           </b>
-          <span>today</span>
+          <span>{day ? 'today' : 'this week'}</span>
         </div>
       </div>
       <div className="mz-target-txt">
-        <h2>Daily target</h2>
+        <h2>{day ? 'Daily target' : 'Weekly target'}</h2>
         <p>{text}</p>
       </div>
     </section>

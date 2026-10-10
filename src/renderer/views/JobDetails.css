@@ -1,0 +1,421 @@
+/* Job details: the card on a client's screen (or in a drawer) and the editor dialog. Classes are prefixed jd-. */
+
+/* ---------- card ---------- */
+.jd {
+  gap: 16px;
+}
+.jd-bare {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.jd-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.jd-head h2 {
+  font-size: 18px;
+  margin-right: auto;
+}
+.jd-ic {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.jd .jd-edit {
+  gap: 6px;
+}
+.jd-blank {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.jd-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.jd-facts li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.jd-facts .icon {
+  color: var(--muted);
+  flex: none;
+}
+.jd-facts b {
+  color: var(--text);
+  font-weight: 700;
+}
+.jd-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.jd-pace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 12px;
+  border-radius: 18px;
+  background: var(--hover);
+}
+.jd-bare .jd-pace {
+  background: var(--fill);
+}
+.jd-pace-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.jd-pace-num {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.jd-pace-num b {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.jd-pace-num span {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.jd-bar {
+  position: relative;
+  height: 8px;
+  margin: 2px 0;
+  border-radius: 999px;
+  background: var(--track);
+}
+.jd-bar > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--done);
+  border-radius: inherit;
+  background: var(--c, var(--ink));
+}
+.jd-bar > i {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: var(--due);
+  width: 3px;
+  margin-left: -1px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.jd-pace small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.jd-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jd-dl {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.jd-dl li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.jd-date {
+  width: 44px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+  flex: none;
+}
+.jd-date small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.jd-date b {
+  font-size: 17px;
+  font-weight: 800;
+}
+.jd-dl-t {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.jd-dl-t b {
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jd-dl-t span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.jd-notes {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- editor dialog ---------- */
+.modal:has(.jd-editor) {
+  width: 680px;
+}
+.jd-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.jd-lede {
+  margin-top: -8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.jd-h {
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-2);
+  font-size: 15px;
+}
+.jd-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.jd-row.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.jd-static {
+  height: 46px;
+  border-radius: 14px;
+  background: var(--fill);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.jd-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.jd-editor .jd-swatch {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--sw, var(--c));
+  box-shadow: inset 0 0 0 1px rgba(22, 23, 29, 0.08);
+  color: var(--on-pastel);
+  flex: none;
+}
+.jd-editor .jd-swatch:hover {
+  background: var(--sw, var(--c));
+  transform: scale(1.06);
+}
+.jd-editor .jd-swatch.on {
+  box-shadow:
+    0 0 0 2px var(--panel),
+    0 0 0 4px var(--ink);
+}
+.jd-editor span.jd-swatch {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+}
+.jd-editor span.jd-swatch.on {
+  box-shadow: none;
+}
+.jd-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.jd-editor .jd-pills button {
+  height: 38px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--fill);
+  box-shadow: none;
+}
+.jd-editor .jd-pills button:hover {
+  background: var(--line);
+}
+.jd-editor .jd-pills button.on {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.jd-editor .jd-days button {
+  width: 44px;
+  padding: 0;
+}
+.jd-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--hover);
+}
+.jd-tiers dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 14px;
+  margin: 0;
+  font-size: 13px;
+}
+.jd-tiers dl > div {
+  display: contents;
+}
+.jd-tiers dt {
+  color: var(--muted);
+}
+.jd-tiers dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+.jd-tiers small {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.jd-target {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+.jd-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.jd-dl-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 128px 40px;
+  gap: 8px;
+  align-items: center;
+}
+.jd-link-row {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+}
+.jd-editor .jd-rows .icon-btn {
+  color: var(--muted);
+}
+.jd-editor .jd-rows .icon-btn:hover {
+  color: var(--st-bad);
+}
+.jd-editor .jd-add {
+  align-self: flex-start;
+  gap: 6px;
+}
+.jd-folder {
+  display: flex;
+  gap: 8px;
+}
+.jd-folder input {
+  flex: 1;
+  min-width: 0;
+}
+.jd-editor .jd-folder button {
+  height: 46px;
+  flex: none;
+}
+.jd-more > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding-top: 4px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.jd-more > summary::-webkit-details-marker {
+  display: none;
+}
+.jd-more > summary:hover {
+  color: var(--text);
+}
+.jd-more > summary .icon {
+  transition: transform 0.15s ease;
+}
+.jd-more[open] > summary .icon {
+  transform: rotate(90deg);
+}
+.jd-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+/* ---------- phone ---------- */
+@media (max-width: 760px) {
+  .modal:has(.jd-editor) {
+    width: 100%;
+  }
+  .jd-row,
+  .jd-row.three {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .jd-target {
+    grid-template-columns: 110px minmax(0, 1fr);
+  }
+  .jd-target > :last-child {
+    grid-column: 1 / -1;
+  }
+  .jd-dl-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+  }
+  .jd-dl-row > input:first-child {
+    grid-column: 1 / -1;
+  }
+  .jd-link-row {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+  .jd-link-row > input:nth-child(2) {
+    grid-row: 2;
+  }
+  .jd-editor .jd-days button {
+    width: 40px;
+  }
+}

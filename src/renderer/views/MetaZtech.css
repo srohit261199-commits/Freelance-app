@@ -986,3 +986,16 @@
     align-items: flex-start;
   }
 }
+
+/* ---------- job details chip ---------- */
+.mz-page .mz-chip-btn {
+  gap: 5px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text);
+}
+.mz-page .mz-chip-btn:hover {
+  background: var(--hover);
+}
+.mz-page .mz-chip-btn .icon {
+  color: var(--muted);
+}

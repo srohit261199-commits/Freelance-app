@@ -7,6 +7,8 @@ import { hub } from '../hub';
 import { ClientTile, Drawer, Empty, Icon, Modal, relTime, useApp } from '../ui';
 import { modelPriority, PRIORITY_LABEL } from '../priority';
 import { AddWaveinkModel, Pop, WaveinkDetail, WiStatus } from './WaveinkDetail';
+import { JobDrawer } from './JobDetails';
+import { nextDeadlines, paceText, weekProgress } from '../../shared/pace';
 import './Waveink.css';
 
 type Sort = 'queue' | 'sheet' | 'status' | 'updated' | 'name';
@@ -56,6 +58,7 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
   const [sel, setSel] = useState<string | undefined>(openId);
   const [adding, setAdding] = useState(false);
   const [brief, setBrief] = useState(false);
+  const [job, setJob] = useState(false);
   const detailBox = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -115,6 +118,8 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
   const total = base.filter(m => m.status !== 'skipped').length;
   const pct = total ? Math.round((done / total) * 100) : 0;
   const report = cfg.notes.match(new RegExp(`\\bto ([A-Z][a-z]+) every (${DAYS})`));
+  const pace = weekProgress(state, 'waveink', now);
+  const dueToday = nextDeadlines(cfg, now, 0);
   const driveWaiting = all.filter(m => m.driveFileUrl && (m.status === 'todo' || m.status === 'in_progress'));
   const picked = shown.filter(m => selected.has(m.id)).map(m => m.id);
   const allPicked = shown.length > 0 && picked.length === shown.length;
@@ -180,6 +185,15 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                 Report to {report[1]} every {report[2]}
               </span>
             )}
+            {pace && <span className={`wi-chip ${pace.behind && pace.per === 'week' ? 'warn' : ''}`}>{paceText(pace)}</span>}
+            {dueToday.map(d => (
+              <span key={d.id} className={`wi-chip ${d.passed ? '' : 'bad'}`}>
+                {d.label} today{d.time ? ` ${d.time}` : ''}
+              </span>
+            ))}
+            <button type="button" className="wi-chip wi-chip-btn" onClick={() => setJob(true)}>
+              <Icon name="calendar" size={13} /> Job details
+            </button>
           </div>
         </div>
         <div className="wi-prog">
@@ -234,6 +248,17 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                 >
                   <Icon name="info" size={15} />
                   <span className="grow">Brief & pay terms</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    setJob(true);
+                  }}
+                >
+                  <Icon name="calendar" size={15} />
+                  <span className="grow">Job details & files</span>
                 </button>
               </>
             )}
@@ -479,6 +504,7 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
         )}
       </div>
 
+      {job && <JobDrawer state={state} company="waveink" now={now} onClose={() => setJob(false)} />}
       {!wide && current && (
         <Drawer onClose={() => setSel(undefined)} title={current.name}>
           {detail}

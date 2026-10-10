@@ -9,6 +9,7 @@ import { modelPriority, PRIORITY_LABEL, PRIORITY_ORDER, type Priority } from '..
 import { AddModel, ModelDrawer } from './Models';
 import { PortalImport } from './PortalImport';
 import { DailyTarget, FeeTiers, FromTeams, MzPop, when } from './MetaZtechParts';
+import { JobDrawer } from './JobDetails';
 import './MetaZtech.css';
 
 type Sort = 'queue' | 'status' | 'updated' | 'name';
@@ -45,6 +46,7 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState<'pull' | 'paste' | null>(null);
   const [brief, setBrief] = useState(false);
+  const [job, setJob] = useState(false);
 
   useEffect(() => {
     setOpenModel(openId);
@@ -143,6 +145,9 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
                 </span>
               </>
             )}
+            <button type="button" className="mz-chip mz-chip-btn" onClick={() => setJob(true)}>
+              <Icon name="calendar" size={13} /> Job details
+            </button>
           </div>
         </div>
         <div className="mz-actions">
@@ -197,6 +202,17 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
                 >
                   <Icon name="info" size={15} />
                   <span className="grow">Brief & pay terms</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    setJob(true);
+                  }}
+                >
+                  <Icon name="calendar" size={15} />
+                  <span className="grow">Job details & files</span>
                 </button>
               </>
             )}
@@ -505,7 +521,7 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
         </section>
 
         <aside className="mz-side" aria-label="Today and the team">
-          <DailyTarget all={all} now={now} />
+          <DailyTarget state={state} now={now} />
           <FromTeams state={state} cfg={cfg} now={now} />
           <FeeTiers
             cfg={cfg}
@@ -519,6 +535,7 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
       </div>
 
       {current && <ModelDrawer model={current} state={state} onClose={() => setOpenModel(undefined)} />}
+      {job && <JobDrawer state={state} company="metaztech" now={now} onClose={() => setJob(false)} />}
       {adding && <AddModel company="metaztech" groups={projects} onClose={() => setAdding(false)} />}
       {importing && <PortalImport state={state} mode={importing} onClose={() => setImporting(null)} />}
       {brief && (

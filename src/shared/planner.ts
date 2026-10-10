@@ -1,10 +1,11 @@
-import type { AppState, CompanyId, EmailItem, Model, StatusEvent } from './types';
+import type { AppState, CompanyConfig, CompanyId, EmailItem, Model, StatusEvent } from './types';
 import { companyEarnings, daysUntil, formatMoney, jobOutputs, localDate, monthLabel, ordinal, rollRenewal, tierFee } from './money';
-import { isComplete, statusEvents, statusLabel } from './status';
+import { isComplete, statusLabel } from './status';
+import { meetingFor, nextDeadlines, WEEKDAYS, weekProgress } from './pace';
 
 export type ActionTarget =
   | { view: 'company'; company: CompanyId; modelId?: string }
-  | { view: 'skeidar'; jobId?: string }
+  | { view: 'skeidar'; company?: CompanyId; jobId?: string }
   | { view: 'inbox'; emailId?: string }
   | { view: 'earnings' }
   | { view: 'subscriptions' }
@@ -24,6 +25,15 @@ export interface NextAction {
 }
 
 const DAY = 86400000;
+const BUILT_IN = new Set<CompanyId>(['waveink', 'metaztech', 'skeidar']);
+/** Wording the built-in clients' actions have always had. */
+const TARGET_NOTE: Record<string, string> = { metaztech: 'Ritu asked for 1–2 files per day if you skip weekends.' };
+const VERB = { submitted: 'submit', done: 'finish', images: 'make' } as const;
+
+/** Where a client's own screen is. */
+export function clientTarget(c: Pick<CompanyConfig, 'id' | 'workflow'>): ActionTarget {
+  return c.id === 'skeidar' ? { view: 'skeidar' } : c.workflow === 'variations' ? { view: 'skeidar', company: c.id } : { view: 'company', company: c.id };
+}
 
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
@@ -48,8 +58,10 @@ export function waveinkQueue(models: Model[]): Model[] {
 
 export function nextActions(state: AppState, now: Date): NextAction[] {
   const out: NextAction[] = [];
-  const cfg = (id: CompanyId) => state.companies.find(c => c.id === id)!;
-  const name = (id: CompanyId) => cfg(id).name;
+  const name = (id: CompanyId) => state.companies.find(c => c.id === id)?.name ?? id;
+  const live = state.companies.filter(c => !c.archived);
+  const gone = new Set(state.companies.filter(c => c.archived).map(c => c.id));
+  const today = localDate(now);
 
   // Meetings in the next 24 hours
   for (const m of state.meetings) {
@@ -83,8 +95,8 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
       });
     }
   }
-  const mz = cfg('metaztech');
-  if (mz.pay.kind === 'tiered' && now.getDate() >= mz.pay.payoutFrom && now.getDate() <= mz.pay.payoutTo + 2) {
+  const mz = state.companies.find(c => c.id === 'metaztech');
+  if (mz && mz.pay.kind === 'tiered' && now.getDate() >= mz.pay.payoutFrom && now.getDate() <= mz.pay.payoutTo + 2) {
     const e = companyEarnings(state, 'metaztech', now);
     const thisMonth = localDate(now).slice(0, 7);
     // What last month's (and older) approvals are worth minus what has been recorded against them
@@ -114,36 +126,91 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
       modelId: m.id,
     });
   }
-  const submittedToday = mzModels.filter(m =>
-    statusEvents(m).some(h => h.to === 'review' && sameDay(new Date(h.at), now)),
-  ).length;
-  const mzOpen = mzModels.filter(m => m.status === 'todo' || m.status === 'in_progress').length;
-  if (mzModels.length && submittedToday < 2 && mzOpen) {
+  // Clients added by hand: revisions first, like MetaZtech's rejections
+  for (const m of state.models.filter(m => m.status === 'revision' && !BUILT_IN.has(m.company) && !gone.has(m.company))) {
     out.push({
-      id: `mz-target-${now.toDateString()}`,
-      priority: 2,
-      company: 'metaztech',
-      title: `MetaZtech daily target: submit 1–2 files (${submittedToday} today)`,
-      detail: 'Ritu asked for 1–2 files per day if you skip weekends.',
-      target: { view: 'company', company: 'metaztech' },
+      id: `fix-${m.id}`,
+      priority: 1,
+      company: m.company,
+      title: `Fix revision: ${m.name}`,
+      detail: [m.code, m.notes].filter(Boolean).join(' · '),
+      target: { view: 'company', company: m.company, modelId: m.id },
+      modelId: m.id,
     });
   }
 
-  // Waveink weekly report goes to Sibi every Friday by end of day
-  const dow = now.getDay();
-  if (dow === 4 || dow === 5) {
+  // Output targets from each client's job details: today's target, or behind pace on a weekly one
+  for (const c of live) {
+    const p = weekProgress(state, c.id, now);
+    if (!p) continue;
+    const open =
+      p.counts === 'images'
+        ? state.skeidarJobs.some(j => (j.company ?? 'skeidar') === c.id && j.status === 'open')
+        : state.models.some(m => m.company === c.id && (m.status === 'todo' || m.status === 'in_progress'));
+    if (!open) continue;
+    if (p.per === 'day' && p.behind) {
+      out.push({
+        id: c.id === 'metaztech' ? `mz-target-${now.toDateString()}` : `target-${c.id}-${today}`,
+        priority: 2,
+        company: c.id,
+        title: `${c.name} daily target: ${VERB[p.counts]} ${c.id === 'metaztech' && p.target === 2 ? '1–2' : p.target} ${p.unit} (${p.done} today)`,
+        detail: TARGET_NOTE[c.id] ?? `${p.remaining} more to reach today's target.`,
+        target: clientTarget(c),
+      });
+    } else if (p.per === 'week' && p.behind) {
+      out.push({
+        id: `pace-${c.id}-${p.from}`,
+        priority: 2,
+        company: c.id,
+        title: `Behind pace on ${c.name}: ${p.done} of ${p.target} ${p.unit} this week`,
+        detail: `${p.short} short of where the week should be by now; ${p.remaining} to go this week.`,
+        target: clientTarget(c),
+      });
+    }
+  }
+
+  // Recurring deadlines due today or tomorrow (a calendar meeting for the same thing already has its own row)
+  for (const c of live) {
+    for (const d of nextDeadlines(c, now, 1)) {
+      if (meetingFor(state.meetings, d)) continue;
+      const friday = d.id === 'wi-report' && d.at.getDay() === 5;
+      const when = d.days === 0 ? 'today' : 'tomorrow';
+      out.push({
+        id: `dl-${c.id}-${d.id}-${d.date}`,
+        priority: d.days === 0 ? 1 : 2,
+        company: c.id,
+        title: friday
+          ? d.days === 0
+            ? 'Send the Waveink daily update log to Sibi today (Friday EOD)'
+            : 'Waveink update log is due tomorrow (Friday EOD)'
+          : `${d.label} · ${when}${d.time ? ` ${d.time}` : ''}`,
+        detail: friday
+          ? 'Export Excel on the Waveink page builds the Daily Update Log sheet from your status changes.'
+          : `Every ${WEEKDAYS[d.at.getDay()]}${d.time ? ` at ${d.time}` : ''}`,
+        target: clientTarget(c),
+      });
+    }
+  }
+
+  // A job that starts today or within the week
+  for (const c of live) {
+    const n = c.startDate ? daysUntil(c.startDate, now) : -1;
+    if (n < 0 || n > 7) continue;
+    const t = c.expectations?.target;
     out.push({
-      id: `wi-report-${now.toDateString()}`,
-      priority: dow === 5 ? 1 : 2,
-      company: 'waveink',
-      title: dow === 5 ? 'Send the Waveink daily update log to Sibi today (Friday EOD)' : 'Waveink update log is due tomorrow (Friday EOD)',
-      detail: 'Export Excel on the Waveink page builds the Daily Update Log sheet from your status changes.',
-      target: { view: 'company', company: 'waveink' },
+      id: `start-${c.id}-${c.startDate}`,
+      priority: n === 0 ? 1 : 2,
+      company: c.id,
+      title: n === 0 ? `${c.name} starts today` : `${c.name} starts ${n === 1 ? 'tomorrow' : `in ${n} days`}`,
+      detail: [c.role, t ? `${t.count} ${t.unit} a ${t.per}` : '', c.expectations?.deadlines?.length ? `${c.expectations.deadlines.length} recurring deadline${c.expectations.deadlines.length > 1 ? 's' : ''}` : '']
+        .filter(Boolean)
+        .join(' · '),
+      target: clientTarget(c),
     });
   }
 
   // Work in progress, any company
-  for (const m of state.models.filter(m => m.status === 'in_progress')) {
+  for (const m of state.models.filter(m => m.status === 'in_progress' && !gone.has(m.company))) {
     out.push({
       id: `cont-${m.id}`,
       priority: 2,
@@ -169,16 +236,17 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
   }
 
   // Skeidar jobs with images left
-  for (const job of state.skeidarJobs.filter(j => j.status === 'open')) {
+  for (const job of state.skeidarJobs.filter(j => j.status === 'open' && !gone.has(j.company ?? 'skeidar'))) {
     const { total, done } = jobOutputs(job);
+    const cid = job.company ?? 'skeidar';
     if (done < total) {
       out.push({
         id: `sk-${job.id}`,
         priority: 2,
-        company: 'skeidar',
-        title: `Skeidar: ${job.name}, ${total - done} image${total - done > 1 ? 's' : ''} left`,
+        company: cid,
+        title: `${name(cid)}: ${job.name}, ${total - done} image${total - done > 1 ? 's' : ''} left`,
         detail: `${done}/${total} done · ${job.fabrics.length} fabrics × ${job.images.length} images`,
-        target: { view: 'skeidar', jobId: job.id },
+        target: cid === 'skeidar' ? { view: 'skeidar', jobId: job.id } : { view: 'skeidar', company: cid, jobId: job.id },
       });
     }
   }
@@ -220,7 +288,7 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
       priority: 2,
       company: 'metaztech',
       title: `Start: ${m.name}`,
-      detail: [m.code, m.complexity ? `₹${tierFee(mz, m.complexity)}` : ''].filter(Boolean).join(' · '),
+      detail: [m.code, m.complexity && mz ? `₹${tierFee(mz, m.complexity)}` : ''].filter(Boolean).join(' · '),
       target: { view: 'company', company: 'metaztech', modelId: m.id },
       modelId: m.id,
     });
@@ -235,6 +303,25 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
       target: { view: 'company', company: 'waveink', modelId: m.id },
       modelId: m.id,
     });
+  }
+  // Clients added by hand: the next models to start, sooner when the client is behind pace
+  for (const c of live.filter(c => !BUILT_IN.has(c.id) && c.workflow !== 'variations')) {
+    const behind = !!weekProgress(state, c.id, now)?.behind;
+    const next = state.models
+      .filter(m => m.company === c.id && m.status === 'todo')
+      .sort((a, b) => (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || Number(!!b.starred) - Number(!!a.starred) || a.createdAt.localeCompare(b.createdAt))
+      .slice(0, 2);
+    for (const m of next) {
+      out.push({
+        id: `next-${m.id}`,
+        priority: behind ? 2 : 3,
+        company: c.id,
+        title: `Start: ${m.name}`,
+        detail: [m.code, m.group, m.dueDate ? `due ${m.dueDate}` : ''].filter(Boolean).join(' · '),
+        target: { view: 'company', company: c.id, modelId: m.id },
+        modelId: m.id,
+      });
+    }
   }
   for (const t of state.portfolioTasks.filter(t => !t.done).slice(0, 2)) {
     out.push({ id: `pf-${t.id}`, priority: 3, company: 'portfolio', title: `Portfolio: ${t.title}`, detail: t.detail, target: { view: 'portfolio' } });
