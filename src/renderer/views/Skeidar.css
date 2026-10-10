@@ -476,6 +476,173 @@
   flex: none;
 }
 
+/* A tile ticked off by a file in the output folder carries a small file mark. */
+.sk-page .sk-tile.on.file {
+  position: relative;
+}
+.sk-page .sk-tile.on.file::after {
+  content: '';
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  width: 10px;
+  height: 12px;
+  border-radius: 2px 5px 2px 2px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+/* ---------- prompts ---------- */
+.sk-page .sk-pr-head {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.sk-page .sk-pr-head > div:first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.sk-page .sk-pr-head h2 {
+  font-size: 18px;
+}
+.sk-page .sk-pr-head p {
+  max-width: 72ch;
+}
+.sk-page .sk-pr-photos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sk-page .sk-pr-photo {
+  height: auto;
+  padding: 6px 14px 6px 6px;
+  gap: 10px;
+  border-radius: 16px;
+  background: var(--hover);
+  box-shadow: none;
+  font-weight: 400;
+  text-align: left;
+}
+.sk-page .sk-pr-photo.on {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+.sk-page .sk-pr-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  object-fit: cover;
+  flex: none;
+  background: var(--panel);
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+}
+.sk-page .sk-pr-photo-txt {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.sk-page .sk-pr-photo-txt b {
+  font-size: 14px;
+  font-weight: 700;
+}
+.sk-page .sk-pr-photo-txt small {
+  font-size: 12px;
+  opacity: 0.72;
+}
+.sk-page .sk-pr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sk-page .sk-pr-list li {
+  border-radius: 16px;
+  background: var(--hover);
+  min-width: 0;
+}
+.sk-page .sk-pr-list li.made {
+  opacity: 0.7;
+}
+.sk-page .sk-pr-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 10px 12px 10px 14px;
+}
+.sk-page .sk-pr-row .sk-swatch {
+  width: 22px;
+  height: 22px;
+  box-shadow:
+    0 0 0 2px var(--hover),
+    0 0 0 3px var(--line);
+}
+.sk-page .sk-pr-name {
+  flex: 1 1 220px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.sk-page .sk-pr-name b {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.sk-page .sk-pr-ids {
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.sk-page .sk-pr-name small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.sk-page .sk-pr-btns {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.sk-page .sk-pr-list .tag {
+  align-self: center;
+}
+.sk-page .sk-pr-text {
+  margin: 0 12px 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--panel);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-2);
+}
+.sk-pr-copy {
+  width: 100%;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.sk-page .sk-pr-done {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: var(--st-ok-bg);
+  color: var(--st-ok);
+  font-weight: 600;
+}
+
+/* ---------- job details and files ---------- */
+.sk-page .sk-bottom {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
 /* ---------- narrower windows ---------- */
 @media (max-width: 1360px) {
   .sk-page .sk-info {
@@ -490,6 +657,9 @@
 @media (max-width: 1100px) {
   .sk-page .sk-past {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .sk-page .sk-bottom {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 760px) {

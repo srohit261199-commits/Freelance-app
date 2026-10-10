@@ -200,11 +200,11 @@ const hub: Hub = {
     notice('In the app this opens a Windows folder picker.');
     return defaultPath ?? null;
   },
-  async scanFolder() {
-    return SAMPLE_FOLDER;
+  async scanFolder(root) {
+    return mockAssets.scanSample(root) ?? SAMPLE_FOLDER;
   },
   async countImages(dir) {
-    return SAMPLE_FOLDER.find(f => f.path === dir)?.images ?? 0;
+    return mockAssets.countSample(dir) ?? SAMPLE_FOLDER.find(f => f.path === dir)?.images ?? 0;
   },
   async exportExcel(scope) {
     try {

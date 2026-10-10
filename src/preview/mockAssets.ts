@@ -2,7 +2,7 @@
 // labelled sample: Skeidar's "Justin stol" job (the real supplier sheet, three placeholder photos, a few finished images)
 // and a handful of files for Waveink and MetaZtech.
 import type { FolderSyncResult } from '../shared/api';
-import type { AppState, AssetFile, CompanyId, JobFolderInfo } from '../shared/types';
+import type { AppState, AssetFile, CompanyId, FolderEntry, JobFolderInfo } from '../shared/types';
 import { applyJobFolders, classifyJobFiles, clientFolder, fileKind, parseProductSheet, samePath } from '../shared/assets';
 import { JUSTIN_SHEET } from './sampleJob';
 
@@ -59,6 +59,33 @@ function filesUnder(folder: string): AssetFile[] {
       const name = own.split('\\').pop()!;
       return { path: `${root}\\${rel}`, name, rel: own, kind: fileKind(name), size: kb * 1024, modified: new Date(modified).toISOString() };
     });
+}
+
+const IMAGE = /\.(jpe?g|png|webp|tiff?|bmp)$/i;
+
+/** Subfolders of a sample root with their image counts, like the app's folder scan; null for folders outside the sample. */
+export function scanSample(folder: string): FolderEntry[] | null {
+  const files = filesUnder(folder);
+  if (!files.length) return null;
+  const groups = new Map<string, AssetFile[]>();
+  for (const f of files) {
+    const top = f.rel.includes('\\') ? f.rel.split('\\')[0] : '';
+    groups.set(top, [...(groups.get(top) ?? []), f]);
+  }
+  return [...groups]
+    .map(([top, fs]) => {
+      const images = fs.filter(f => IMAGE.test(f.name));
+      const last = fs.map(f => f.modified).sort().pop() ?? null;
+      return { name: top || '(files in this folder)', path: top ? `${folder}\\${top}` : folder, images: images.length, lastModified: last, samples: images.slice(0, 3).map(f => f.name) };
+    })
+    .filter(e => e.name !== '(files in this folder)' || e.images > 0)
+    .sort((a, b) => (b.lastModified ?? '').localeCompare(a.lastModified ?? ''));
+}
+
+/** Images in a sample folder and its subfolders, or null outside the sample. */
+export function countSample(folder: string): number | null {
+  const files = filesUnder(folder);
+  return files.length ? files.filter(f => IMAGE.test(f.name)).length : null;
 }
 
 export async function listAssets(ctx: MockCtx, folder: string): Promise<AssetFile[]> {
