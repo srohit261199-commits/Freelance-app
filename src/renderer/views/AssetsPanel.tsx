@@ -35,8 +35,11 @@ export function LocalThumb({ path, alt = '', className = '' }: { path?: string; 
   return src ? <img className={className} src={src} alt={alt} /> : <span className={`${className} ph`} aria-hidden="true"><Icon name="image" size={18} /></span>;
 }
 
-/** Files in the client's watched folder (or one job's folder), grouped by type, each opening in its own app. */
-export function AssetsPanel({ state, company, folder, title = 'Files' }: { state: AppState; company: CompanyId; folder?: string; title?: string }) {
+/**
+ * Files in the client's watched folder (or one job's folder), grouped by type, each opening in its own app.
+ * bare drops the panel box, for a section inside another panel.
+ */
+export function AssetsPanel({ state, company, folder, title = 'Files', bare }: { state: AppState; company: CompanyId; folder?: string; title?: string; bare?: boolean }) {
   const { toast } = useApp();
   const now = useNow();
   const cfg = state.companies.find(c => c.id === company);
@@ -71,26 +74,22 @@ export function AssetsPanel({ state, company, folder, title = 'Files' }: { state
     toast(`${cfg.name} now reads files from ${p}`);
   };
 
+  const box = `ap ${bare ? 'ap-bare' : 'panel'}`;
   if (!root) {
     return (
-      <section className="panel ap" aria-label={title}>
+      <section className={box} aria-label={title}>
         <h3>{title}</h3>
-        <div className="ap-empty">
-          <span className="ap-empty-ic" aria-hidden="true">
-            <Icon name="folderOpen" size={22} weight="fill" />
-          </span>
-          <p>Link the folder where you keep {cfg?.name ?? 'this client'}’s sheets, briefs, photos and 3D files. The app lists them here and reads new ones as they appear.</p>
-          <button type="button" className="primary" onClick={link}>
-            <Icon name="folder" size={16} /> Link a folder
-          </button>
-        </div>
+        <p className="ap-empty">Link the folder with {cfg?.name ?? 'this client'}’s sheets, briefs, photos and 3D files to list them here.</p>
+        <button type="button" className="mini ap-link" onClick={link}>
+          <Icon name="folder" size={14} /> Link a folder
+        </button>
       </section>
     );
   }
 
   const groups = GROUPS.map(g => ({ ...g, files: (files ?? []).filter(f => f.kind === g.kind) })).filter(g => g.files.length);
   return (
-    <section className="panel ap" aria-label={title}>
+    <section className={box} aria-label={title}>
       <div className="ap-head">
         <div className="grow">
           <h3>{title}</h3>
@@ -98,7 +97,7 @@ export function AssetsPanel({ state, company, folder, title = 'Files' }: { state
             {root}
           </button>
         </div>
-        <button type="button" className="icon-btn soft" aria-label="Refresh the file list" title="Refresh" onClick={() => setTick(t => t + 1)}>
+        <button type="button" className="icon-btn mini ghost" aria-label="Refresh the file list" title="Refresh" onClick={() => setTick(t => t + 1)}>
           <Icon name="sync" size={16} />
         </button>
         {!folder && (
@@ -124,7 +123,7 @@ export function AssetsPanel({ state, company, folder, title = 'Files' }: { state
                       <LocalThumb path={f.path} className="ap-thumb" />
                     ) : (
                       <span className={`ap-ic k-${g.kind}`} aria-hidden="true">
-                        <Icon name={g.icon} size={16} />
+                        <Icon name={g.icon} size={15} />
                       </span>
                     )}
                     <span className="ap-txt">

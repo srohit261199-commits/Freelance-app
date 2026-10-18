@@ -1,16 +1,27 @@
-import { useState, type CSSProperties } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { AppState, CompanyConfig, CompanyId, Complexity, Currency, Expectations, PayRule } from '../../shared/types';
 import { COMPLEXITY_LABELS } from '../../shared/status';
 import { daysUntil, formatMoney, localDate, ordinal } from '../../shared/money';
 import { DEFAULT_WORKDAYS, nextDeadlines, paceText, weekProgress, weeksIn, WEEKDAYS, type Deadline, type Target } from '../../shared/pace';
 import { hub } from '../hub';
-import { CLIENT_ICON, ConfirmButton, Drawer, Field, Icon, Modal, fmtDate, useApp, type IconName } from '../ui';
+import { CLIENT_ICON, ConfirmButton, Drawer, Field, Icon, MenuButton, MenuCheck, Modal, fmtDate, useApp, type IconName } from '../ui';
 import { samePath } from '../../shared/assets';
 import { AssetsPanel } from './AssetsPanel';
 import './JobDetails.css';
 
-/** Pastel colours for clients added by hand; they carry dark text like the built-in ones. */
-export const PALETTE = ['#6a8cc0', '#9b74b2', '#c4884b', '#46a07f', '#4f9aa8', '#b56576', '#8c8f3e', '#7b7f87'];
+/** Colours for clients added by hand: mid tones for the client's dot, mixed into its tint and icon colour. */
+export const PALETTE = [
+  { hex: '#6a8cc0', name: 'Blue' },
+  { hex: '#9b74b2', name: 'Purple' },
+  { hex: '#c4884b', name: 'Amber' },
+  { hex: '#46a07f', name: 'Green' },
+  { hex: '#4f9aa8', name: 'Teal' },
+  { hex: '#b56576', name: 'Rose' },
+  { hex: '#8c8f3e', name: 'Olive' },
+  { hex: '#7b7f87', name: 'Grey' },
+];
+/** The dots Waveink, MetaZtech, Skeidar and Money already show (styles.css), so a new client's colour starts as another one. */
+const BUILT_IN_DOTS = ['#6a8cc0', '#9b74b2', '#c4884b', '#46a07f'];
 const BUILT_IN = new Set(['waveink', 'metaztech', 'skeidar']);
 const RESERVED = new Set([...BUILT_IN, 'money', 'portfolio', 'other', 'all', 'open']);
 /** Monday first. */
@@ -40,6 +51,9 @@ export function daysText(days: number[]): string {
   return run ? `${SHORT_DAY[d[0]]}–${SHORT_DAY[d[d.length - 1]]}` : d.map(x => SHORT_DAY[x]).join(', ');
 }
 
+/** "Tue 20 Oct". */
+const fmtDay = (d: Date) => `${SHORT_DAY[d.getDay()]} ${d.getDate()} ${d.toLocaleDateString('en-GB', { month: 'short' })}`;
+
 function payText(c: CompanyConfig): string {
   const p = c.pay;
   if (p.kind === 'retainer') return `${formatMoney(p.amount, c.currency)} a month, paid on the ${ordinal(p.payday)}`;
@@ -49,7 +63,7 @@ function payText(c: CompanyConfig): string {
 }
 export { payText as jobPayText };
 
-/** A client's job details for its screen: start date, this period's pace, next deadlines and notes. */
+/** A client's job details: start date, this period's pace, next deadlines and notes. bare drops the panel box, for a section inside another panel or a drawer. */
 export function JobDetails({ state, company, now, bare }: { state: AppState; company: CompanyId; now: Date; bare?: boolean }) {
   const [editing, setEditing] = useState(false);
   const cfg = state.companies.find(c => c.id === company);
@@ -62,71 +76,63 @@ export function JobDetails({ state, company, now, bare }: { state: AppState; com
   const ended = cfg.endDate ? daysUntil(cfg.endDate, now) < 0 : false;
   const blank = !cfg.startDate && !ex.target && !ex.deadlines?.length && !ex.notes?.trim();
   const pct = (n: number) => (pace && pace.target ? Math.min(100, Math.round((n / pace.target) * 100)) : 0);
+  const Title = bare ? 'h3' : 'h2';
+  // Sections sit one level under the title, and look like an h3 either way.
+  const Sub = bare ? 'h4' : 'h3';
 
   return (
-    <section className={`jd ${bare ? 'jd-bare' : 'panel'} c-${company}`} aria-labelledby={`jd-${company}`}>
+    <section className={`jd ${bare ? 'jd-bare' : 'panel'}`} aria-labelledby={`jd-${company}`}>
       <div className="jd-head">
-        <span className="jd-ic c-soft" aria-hidden="true">
-          <Icon name="calendar" size={18} weight="fill" />
-        </span>
-        <h2 id={`jd-${company}`}>Job details</h2>
-        <button type="button" className="mini jd-edit" onClick={() => setEditing(true)}>
-          <Icon name="pencil" size={14} /> Edit job details
+        <Title id={`jd-${company}`}>Job details</Title>
+        <button type="button" className="mini" aria-label="Edit job details" title="Edit job details" onClick={() => setEditing(true)}>
+          <Icon name="pencil" size={14} /> Edit
         </button>
       </div>
 
       {blank ? (
-        <p className="jd-blank">Add the start date, what the client expects each week and any recurring deadlines. The app uses them to decide what's urgent.</p>
+        <p className="jd-blank">Add the start date, weekly target and deadlines; the app uses them to decide what's urgent.</p>
       ) : (
         <>
-          <ul className="jd-facts">
-            {cfg.startDate && (
-              <li>
-                <Icon name="play" size={15} />
-                <span>
-                  {startsIn !== undefined && startsIn > 0 ? (
-                    <>
-                      Starts <b>{fmtDate(cfg.startDate)}</b> · in {startsIn} day{startsIn === 1 ? '' : 's'}
-                    </>
-                  ) : (
-                    <>
-                      Started <b>{fmtDate(cfg.startDate)}</b>
-                      {weeks !== null && ` · ${weeks === 0 ? 'first week' : `${weeks} week${weeks === 1 ? '' : 's'} in`}`}
-                    </>
-                  )}
-                </span>
-              </li>
-            )}
-            {cfg.endDate && (
-              <li>
-                <Icon name="flag" size={15} />
-                <span>
-                  {ended ? 'Ended' : 'Ends'} <b>{fmtDate(cfg.endDate)}</b>
-                </span>
-              </li>
-            )}
-            {ex.target && (
-              <li>
-                <Icon name="clock" size={15} />
-                <span>
-                  {ex.target.count} {ex.target.unit} a {ex.target.per} · {daysText(ex.workdays?.length ? ex.workdays : DEFAULT_WORKDAYS)}
-                </span>
-              </li>
-            )}
-          </ul>
+          {(cfg.startDate || cfg.endDate || ex.target) && (
+            <dl className="jd-facts">
+              {cfg.startDate && (
+                <div>
+                  <dt>{startsIn !== undefined && startsIn > 0 ? 'Starts' : 'Started'}</dt>
+                  <dd>
+                    {fmtDate(cfg.startDate)}
+                    {startsIn !== undefined && startsIn > 0
+                      ? ` · in ${startsIn} day${startsIn === 1 ? '' : 's'}`
+                      : weeks !== null && ` · ${weeks === 0 ? 'first week' : `${weeks} week${weeks === 1 ? '' : 's'} in`}`}
+                  </dd>
+                </div>
+              )}
+              {cfg.endDate && (
+                <div>
+                  <dt>{ended ? 'Ended' : 'Ends'}</dt>
+                  <dd>{fmtDate(cfg.endDate)}</dd>
+                </div>
+              )}
+              {ex.target && (
+                <div>
+                  <dt>Target</dt>
+                  <dd>
+                    {ex.target.count} {ex.target.unit} a {ex.target.per} · {daysText(ex.workdays?.length ? ex.workdays : DEFAULT_WORKDAYS)}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          )}
 
-          {pace && (
-            <div className="jd-pace">
+          {/* A week the job hasn't reached yet (it starts at the weekend) has nothing to count */}
+          {pace && pace.target > 0 && (
+            <div className="jd-sec">
               <div className="jd-pace-top">
-                <span className="jd-label">{pace.per === 'day' ? 'Today' : 'This week'}</span>
+                <Sub className="jd-sub">{pace.per === 'day' ? 'Today' : 'This week'}</Sub>
                 {pace.behind && pace.per === 'week' && <span className="tag warn">{pace.short} behind</span>}
-                {!pace.remaining && pace.target > 0 && <span className="tag ok">Target met</span>}
+                {!pace.remaining && <span className="tag ok">Target met</span>}
                 {pace.per === 'day' && !pace.workday && <span className="tag">Day off</span>}
-              </div>
-              <div className="jd-pace-num">
-                <b className="tabular">{pace.done}</b>
-                <span>
-                  of {pace.target} {pace.unit}
+                <span className="jd-pace-num">
+                  <b className="tabular">{pace.done}</b> of {pace.target} {pace.unit}
                 </span>
               </div>
               <div
@@ -151,22 +157,13 @@ export function JobDetails({ state, company, now, bare }: { state: AppState; com
 
           {deadlines.length > 0 && (
             <div className="jd-sec">
-              <span className="jd-label">Next deadlines</span>
+              <Sub className="jd-sub">Next deadlines</Sub>
               <ul className="jd-dl">
                 {deadlines.map(d => (
-                  <li key={`${d.id}-${d.date}`}>
-                    <span className="jd-date c-soft" aria-hidden="true">
-                      <small>{SHORT_DAY[d.at.getDay()].toUpperCase()}</small>
-                      <b>{d.at.getDate()}</b>
-                    </span>
-                    <span className="jd-dl-t">
-                      <b>{d.label}</b>
-                      <span>
-                        {d.days === 0 ? 'Today' : d.days === 1 ? 'Tomorrow' : fmtDate(d.date)}
-                        {d.time ? ` · ${d.time}` : ' · end of day'} · every {WEEKDAYS[d.at.getDay()]}
-                      </span>
-                    </span>
-                    {d.days === 0 && <span className={`tag ${d.passed ? '' : 'bad'}`}>{d.passed ? 'Passed' : 'Today'}</span>}
+                  <li key={`${d.id}-${d.date}`} title={`${d.label}: every ${WEEKDAYS[d.at.getDay()]}${d.time ? ` at ${d.time}` : ''}`}>
+                    <span className={`jd-when ${d.days === 0 && !d.passed ? 'bad-text' : ''}`}>{d.days === 0 ? 'Today' : d.days === 1 ? 'Tomorrow' : fmtDay(d.at)}</span>
+                    <span className="jd-dl-t">{d.label}</span>
+                    <span className="jd-time">{d.passed ? 'Passed' : (d.time ?? 'End of day')}</span>
                   </li>
                 ))}
               </ul>
@@ -175,7 +172,7 @@ export function JobDetails({ state, company, now, bare }: { state: AppState; com
 
           {ex.notes?.trim() && (
             <div className="jd-sec">
-              <span className="jd-label">Notes</span>
+              <Sub className="jd-sub">Notes</Sub>
               <p className="jd-notes">{ex.notes}</p>
             </div>
           )}
@@ -190,9 +187,9 @@ export function JobDetails({ state, company, now, bare }: { state: AppState; com
 export function JobDrawer({ state, company, now, onClose }: { state: AppState; company: CompanyId; now: Date; onClose(): void }) {
   const cfg = state.companies.find(c => c.id === company);
   return (
-    <Drawer onClose={onClose} title="Job details" subtitle={cfg ? `${cfg.name} · ${cfg.role}` : undefined}>
+    <Drawer onClose={onClose} title={cfg?.name ?? 'Job details'} subtitle={cfg?.role || undefined}>
       <JobDetails state={state} company={company} now={now} bare />
-      <AssetsPanel state={state} company={company} />
+      <AssetsPanel state={state} company={company} bare />
     </Drawer>
   );
 }
@@ -228,13 +225,13 @@ interface Draft {
 const num = (s: string) => (s.trim() === '' ? NaN : Number(s));
 
 function draftOf(c: CompanyConfig | undefined, state: AppState, today: string): Draft {
-  const taken = new Set(state.companies.map(x => x.color.toLowerCase()));
+  const taken = new Set([...BUILT_IN_DOTS, ...state.companies.map(x => x.color.toLowerCase())]);
   const pay = c?.pay;
   const ex = c?.expectations;
   return {
     name: c?.name ?? '',
     role: c?.role ?? '',
-    color: c?.color ?? PALETTE.find(p => !taken.has(p)) ?? PALETTE[state.companies.length % PALETTE.length],
+    color: c?.color ?? (PALETTE.find(p => !taken.has(p.hex)) ?? PALETTE[state.companies.length % PALETTE.length]).hex,
     currency: c?.currency ?? state.settings.baseCurrency,
     payKind: pay?.kind ?? 'per-item',
     amount: pay?.kind === 'retainer' ? String(pay.amount) : '',
@@ -271,17 +268,50 @@ function newId(name: string, taken: Set<string>): string {
   return id;
 }
 
-function Pills<T extends string | number>({ label, value, options, onPick }: { label: string; value: T; options: [T, string][]; onPick(v: T): void }) {
+/** Two or three short options that exclude each other, as a segmented control with a field label. */
+function Seg<T extends string>({ label, value, options, onPick }: { label: string; value: T; options: [T, string][]; onPick(v: T): void }) {
   return (
-    <div className="field">
+    <div className="field jd-seg">
       <span>{label}</span>
-      <div className="jd-pills" role="group" aria-label={label}>
+      <div className="seg" role="group" aria-label={label}>
         {options.map(([v, text]) => (
-          <button key={String(v)} type="button" className={value === v ? 'on' : ''} aria-pressed={value === v} onClick={() => onPick(v)}>
+          <button key={v} type="button" className={value === v ? 'on' : ''} aria-pressed={value === v} onClick={() => onPick(v)}>
             {text}
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** An amount with its currency in front, as one control: [USD ▾ | 40]. */
+function MoneyField({ label, value, onChange, currency, onCurrency, step }: { label: string; value: string; onChange(v: string): void; currency: Currency; onCurrency(c: Currency): void; step: string }) {
+  return (
+    <div className="field">
+      <span>{label}</span>
+      <div className="jd-money">
+        <select aria-label="Currency" value={currency} onChange={e => onCurrency(e.target.value as Currency)}>
+          <option value="INR">INR</option>
+          <option value="AED">AED</option>
+          <option value="USD">USD</option>
+        </select>
+        <input type="number" min="0" step={step} inputMode="decimal" aria-label={label} value={value} onChange={e => onChange(e.target.value)} placeholder="0" />
+      </div>
+    </div>
+  );
+}
+
+/** A list of rows (deadlines, links) under a label with an Add button beside it. */
+function RowList({ label, add, onAdd, children }: { label: string; add: string; onAdd(): void; children: ReactNode }) {
+  return (
+    <div className="field">
+      <div className="jd-list-head">
+        <span>{label}</span>
+        <button type="button" className="mini ghost" aria-label={add} onClick={onAdd}>
+          <Icon name="plus" size={14} /> Add
+        </button>
+      </div>
+      {children}
     </div>
   );
 }
@@ -297,6 +327,8 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
   const setRow = (i: number, patch: Partial<Deadline>) => set({ deadlines: d.deadlines.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   const setLink = (i: number, patch: Partial<{ label: string; url: string }>) => set({ links: d.links.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
   const tiers = existing?.pay.kind === 'tiered' ? existing.pay : undefined;
+  const colour = PALETTE.find(p => p.hex === d.color);
+  const currency = { currency: d.currency, onCurrency: (c: Currency) => set({ currency: c }) };
 
   const save = async () => {
     const fail = (text: string) => toast(text, 'error');
@@ -382,7 +414,7 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
           ) : (
             <ConfirmButton label="Archive client" confirmLabel="Click again to archive" onConfirm={() => archive(true)} />
           ))}
-          <button type="button" className="soft" onClick={onClose}>
+          <button type="button" onClick={onClose}>
             Cancel
           </button>
           <button type="button" className="primary" onClick={() => void save()}>
@@ -392,7 +424,7 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
       }
     >
       <div className="jd-editor">
-        {!existing && <p className="jd-lede">A client or job you work for. It gets its own screen, its own colour, and its weekly target and deadlines feed what's urgent.</p>}
+        {!existing && <p className="jd-lede">It gets its own screen; its target and deadlines decide what's urgent.</p>}
 
         <div className="jd-row">
           {builtIn ? (
@@ -408,50 +440,74 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
           <Field label="Your role">
             <input value={d.role} onChange={e => set({ role: e.target.value })} placeholder="e.g. 3D artist, contract" />
           </Field>
+          <div className="field jd-colour">
+            <span>Colour</span>
+            {builtIn ? (
+              <div className="jd-static" title={`Fixed for ${existing!.name}`}>
+                <span className={`jd-swatch c-${existing!.id}`} aria-hidden="true" /> Fixed
+              </div>
+            ) : (
+              <MenuButton
+                label="Colour"
+                align="start"
+                className="select-btn jd-pick"
+                text={
+                  <>
+                    <span className="jd-swatch" style={{ '--sw': d.color } as CSSProperties} aria-hidden="true" />
+                    <span className="select-value">
+                      <span className="sr-only">Colour: </span>
+                      {colour?.name ?? 'Custom'}
+                    </span>
+                  </>
+                }
+              >
+                {close =>
+                  PALETTE.map(p => (
+                    <button
+                      key={p.hex}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={d.color === p.hex}
+                      onClick={() => {
+                        close();
+                        set({ color: p.hex });
+                      }}
+                    >
+                      <span className="jd-swatch" style={{ '--sw': p.hex } as CSSProperties} aria-hidden="true" />
+                      <span className="grow">{p.name}</span>
+                      <span className="mk">{d.color === p.hex && <Icon name="check" size={14} />}</span>
+                    </button>
+                  ))
+                }
+              </MenuButton>
+            )}
+          </div>
         </div>
 
-        {builtIn ? (
-          <div className="field">
-            <span>Colour</span>
-            <div className="jd-static">
-              <span className={`jd-swatch on c-${existing!.id}`} aria-hidden="true" /> Fixed for {existing!.name}
-            </div>
-          </div>
-        ) : (
-          <div className="field">
-            <span>Colour</span>
-            <div className="jd-swatches" role="radiogroup" aria-label="Colour">
-              {PALETTE.map(p => (
-                <button
-                  key={p}
-                  type="button"
-                  role="radio"
-                  aria-checked={d.color === p}
-                  aria-label={`Colour ${p}`}
-                  className={`jd-swatch ${d.color === p ? 'on' : ''}`}
-                  style={{ '--sw': p } as CSSProperties}
-                  onClick={() => set({ color: p })}
-                >
-                  {d.color === p && <Icon name="check" size={14} weight="bold" />}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="jd-row">
+          {!existing && (
+            <Field label="How work comes in">
+              <select
+                value={d.workflow}
+                onChange={e => {
+                  const workflow = e.target.value as Draft['workflow'];
+                  set({ workflow, ...(workflow === 'variations' ? { tunit: 'images', counts: 'images', unit: d.unit === 'model' ? 'image' : d.unit } : { tunit: 'models', counts: 'done', unit: d.unit === 'image' ? 'model' : d.unit }) });
+                }}
+              >
+                <option value="models">A list of models</option>
+                <option value="variations">Image variations (like Skeidar)</option>
+              </select>
+            </Field>
+          )}
+          <Field label="Started on">
+            <input type="date" value={d.startDate} onChange={e => set({ startDate: e.target.value })} />
+          </Field>
+          <Field label="Ends on">
+            <input type="date" value={d.endDate} onChange={e => set({ endDate: e.target.value })} title="Leave empty if it's ongoing" />
+          </Field>
+        </div>
 
-        {!existing && (
-          <Pills
-            label="How the work comes in"
-            value={d.workflow}
-            onPick={workflow => set({ workflow, ...(workflow === 'variations' ? { tunit: 'images', counts: 'images', unit: d.unit === 'model' ? 'image' : d.unit } : { tunit: 'models', counts: 'done', unit: d.unit === 'image' ? 'model' : d.unit }) })}
-            options={[
-              ['models', 'A list of models'],
-              ['variations', 'Image variations (like Skeidar)'],
-            ]}
-          />
-        )}
-
-        <h4 className="jd-h">Pay</h4>
+        <h3 className="jd-h">Pay</h3>
         {tiers ? (
           <div className="jd-tiers">
             <dl>
@@ -467,72 +523,48 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
             </small>
           </div>
         ) : (
-          <>
+          <div className="jd-row">
             {!builtIn && (
-              <Pills
+              <Seg
                 label="Paid"
                 value={d.payKind}
                 onPick={payKind => set({ payKind })}
                 options={[
                   ['per-item', 'Per item'],
-                  ['retainer', 'Monthly retainer'],
+                  ['retainer', 'Retainer'],
                 ]}
               />
             )}
             {d.payKind === 'retainer' ? (
-              <div className="jd-row three">
-                <Field label="Each month">
-                  <input type="number" min="0" step="1" inputMode="decimal" value={d.amount} onChange={e => set({ amount: e.target.value })} placeholder="0" />
-                </Field>
+              <>
+                <MoneyField label="Each month" value={d.amount} onChange={amount => set({ amount })} step="1" {...currency} />
                 <Field label="Paid on day">
                   <input type="number" min="1" max="28" step="1" value={d.payday} onChange={e => set({ payday: e.target.value })} />
                 </Field>
                 <Field label="Retainer from">
                   <input type="date" value={d.payStart} onChange={e => set({ payStart: e.target.value })} />
                 </Field>
-              </div>
+              </>
             ) : (
-              <div className="jd-row">
-                <Field label="Rate">
-                  <input type="number" min="0" step="0.01" inputMode="decimal" value={d.rate} onChange={e => set({ rate: e.target.value })} placeholder="0" />
-                </Field>
+              <>
+                <MoneyField label="Rate" value={d.rate} onChange={rate => set({ rate })} step="0.01" {...currency} />
                 <Field label="Per">
                   <input value={d.unit} onChange={e => set({ unit: e.target.value })} placeholder="model" />
                 </Field>
-              </div>
+              </>
             )}
-          </>
+          </div>
         )}
-        <div className="jd-row">
-          <Field label="Currency">
-            <select value={d.currency} onChange={e => set({ currency: e.target.value as Currency })} disabled={!!tiers}>
-              <option value="INR">₹ INR</option>
-              <option value="AED">AED</option>
-              <option value="USD">US$ USD</option>
-            </select>
-          </Field>
-          <div />
-        </div>
 
-        <h4 className="jd-h">Dates</h4>
+        <h3 className="jd-h">Expectations</h3>
         <div className="jd-row">
-          <Field label="Started on">
-            <input type="date" value={d.startDate} onChange={e => set({ startDate: e.target.value })} />
-          </Field>
-          <Field label="Ends on" hint="Leave empty if it's ongoing">
-            <input type="date" value={d.endDate} onChange={e => set({ endDate: e.target.value })} />
-          </Field>
-        </div>
-
-        <h4 className="jd-h">Weekly expectations</h4>
-        <div className="jd-target">
-          <Field label="Output target" hint="Leave empty for none">
-            <input type="number" min="1" step="1" value={d.count} onChange={e => set({ count: e.target.value })} placeholder="None" aria-label="Output target, how many" />
+          <Field label="Target">
+            <input type="number" min="1" step="1" value={d.count} onChange={e => set({ count: e.target.value })} placeholder="None" title="Leave empty for no target" aria-label="Output target, how many" />
           </Field>
           <Field label="Of">
             <input value={d.tunit} onChange={e => set({ tunit: e.target.value })} placeholder="models" />
           </Field>
-          <Pills
+          <Seg
             label="Per"
             value={d.per}
             onPick={per => set({ per })}
@@ -542,31 +574,40 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
             ]}
           />
         </div>
-        <Field label="What counts">
-          <select value={d.counts} onChange={e => set({ counts: e.target.value as Target['counts'] })}>
-            {COUNTS.map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <div className="field">
-          <span>Working days</span>
-          <div className="jd-pills jd-days" role="group" aria-label="Working days">
-            {WEEK_ORDER.map(w => {
-              const on = d.workdays.includes(w);
-              return (
-                <button key={w} type="button" className={on ? 'on' : ''} aria-pressed={on} aria-label={WEEKDAYS[w]} onClick={() => set({ workdays: on ? d.workdays.filter(x => x !== w) : [...d.workdays, w] })}>
-                  {SHORT_DAY[w].slice(0, 2)}
-                </button>
-              );
-            })}
+        <div className="jd-row">
+          <label className="field jd-wide">
+            <span>What counts</span>
+            <select value={d.counts} onChange={e => set({ counts: e.target.value as Target['counts'] })}>
+              {COUNTS.map(([k, v]) => (
+                <option key={k} value={k}>
+                  {v}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="field">
+            <span>Working days</span>
+            <MenuButton
+              label="Working days"
+              align="start"
+              className="select-btn jd-pick"
+              text={
+                <span className="select-value">
+                  <span className="sr-only">Working days: </span>
+                  {d.workdays.length ? daysText(d.workdays) : 'None'}
+                </span>
+              }
+            >
+              {() =>
+                WEEK_ORDER.map(w => (
+                  <MenuCheck key={w} label={WEEKDAYS[w]} checked={d.workdays.includes(w)} onChange={on => set({ workdays: on ? [...d.workdays, w] : d.workdays.filter(x => x !== w) })} />
+                ))
+              }
+            </MenuButton>
           </div>
         </div>
 
-        <div className="field">
-          <span>Recurring deadlines</span>
+        <RowList label="Recurring deadlines" add="Add a deadline" onAdd={() => set({ deadlines: [...d.deadlines, { id: `dl-${Date.now().toString(36)}`, label: '', weekday: 5, time: '18:00' }] })}>
           {d.deadlines.length > 0 && (
             <ul className="jd-rows">
               {d.deadlines.map((x, i) => (
@@ -580,20 +621,17 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
                     ))}
                   </select>
                   <input type="time" aria-label={`Time for ${x.label || 'the deadline'}`} value={x.time ?? ''} onChange={e => setRow(i, { time: e.target.value })} />
-                  <button type="button" className="ghost icon-btn" aria-label={`Remove ${x.label || 'this deadline'}`} onClick={() => set({ deadlines: d.deadlines.filter((_, j) => j !== i) })}>
-                    <Icon name="trash" size={16} />
+                  <button type="button" className="ghost icon-btn mini" aria-label={`Remove ${x.label || 'this deadline'}`} title="Remove" onClick={() => set({ deadlines: d.deadlines.filter((_, j) => j !== i) })}>
+                    <Icon name="trash" size={15} />
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          <button type="button" className="mini jd-add" onClick={() => set({ deadlines: [...d.deadlines, { id: `dl-${Date.now().toString(36)}`, label: '', weekday: 5, time: '18:00' }] })}>
-            <Icon name="plus" size={14} /> Add a deadline
-          </button>
-        </div>
+        </RowList>
 
-        <Field label="Notes" hint="What the client expects: file format, where to upload, who to report to">
-          <textarea rows={3} value={d.notes} onChange={e => set({ notes: e.target.value })} />
+        <Field label="Notes">
+          <textarea rows={2} value={d.notes} onChange={e => set({ notes: e.target.value })} placeholder="What the client expects: file format, where to upload, who to report to" />
         </Field>
 
         <details className="jd-more">
@@ -604,25 +642,21 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
             <Field label="Brief & pay terms">
               <textarea rows={3} value={d.brief} onChange={e => set({ brief: e.target.value })} />
             </Field>
-            <div className="field">
-              <span>Links</span>
+            <RowList label="Links" add="Add a link" onAdd={() => set({ links: [...d.links, { label: '', url: '' }] })}>
               {d.links.length > 0 && (
                 <ul className="jd-rows">
                   {d.links.map((l, i) => (
                     <li key={i} className="jd-link-row">
                       <input aria-label="Link name" value={l.label} onChange={e => setLink(i, { label: e.target.value })} placeholder="Name" />
                       <input aria-label="Link address" value={l.url} onChange={e => setLink(i, { url: e.target.value })} placeholder="https://…" />
-                      <button type="button" className="ghost icon-btn" aria-label={`Remove link ${l.label || l.url}`} onClick={() => set({ links: d.links.filter((_, j) => j !== i) })}>
-                        <Icon name="trash" size={16} />
+                      <button type="button" className="ghost icon-btn mini" aria-label={`Remove link ${l.label || l.url}`} title="Remove" onClick={() => set({ links: d.links.filter((_, j) => j !== i) })}>
+                        <Icon name="trash" size={15} />
                       </button>
                     </li>
                   ))}
                 </ul>
               )}
-              <button type="button" className="mini jd-add" onClick={() => set({ links: [...d.links, { label: '', url: '' }] })}>
-                <Icon name="plus" size={14} /> Add a link
-              </button>
-            </div>
+            </RowList>
             <div className="field">
               <span>Watched folder</span>
               <div className="jd-folder">

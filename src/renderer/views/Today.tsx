@@ -5,7 +5,7 @@ import { allEarnings, convert, daysUntil, formatMoney, jobOutputs, localDate, mo
 import { agenda, deadlinesBetween, paceText, weekProgress, type DeadlineHit, type Pace } from '../../shared/pace';
 import { isComplete, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
-import { ClientTile, Icon, useApp, type ClientKey, type IconName } from '../ui';
+import { Dropdown, Icon, PageHead, useApp, type Choice, type ClientKey, type IconName } from '../ui';
 import { AddModel } from './Models';
 import { Board } from './Board';
 import { DashMenu, type MenuItem } from './DashMenu';
@@ -19,9 +19,15 @@ const LAYOUT_KEY = 'fh-dash-layout';
 const DONE_KEY = 'fh-dash-done';
 const BUILT_INS: CompanyId[] = ['waveink', 'metaztech', 'skeidar'];
 const STACK: CompanyId[] = ['skeidar', 'metaztech', 'waveink'];
-const LETTER_TONES: ClientKey[] = ['metaztech', 'waveink', 'skeidar', 'money'];
 /** "This week" lists this many deadlines at most. */
 const WEEK_ROWS = 5;
+/** Up next shows this many rows until "Show N more" is clicked, so the page scrolls instead of the list. */
+const NEXT_ROWS = 8;
+/** Height in pixels of the best month's bar in the earnings chart. */
+const BAR_PX = 72;
+/** What a calendar day can be marked with, in the order its dots show. */
+type Mark = 'due' | 'pay' | 'trial';
+const MARKS: Mark[] = ['due', 'pay', 'trial'];
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -106,7 +112,8 @@ interface Tile {
   name: string;
   big: string;
   sub: string;
-  pct: number;
+  /** How full the bar is; no bar when there is nothing to measure. */
+  pct?: number;
   title: string;
   /** This period's progress against the client's output target, when it has one. */
   pace?: Pace;
@@ -117,6 +124,7 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
   const { go, toast } = useApp();
   const [layout, setLayoutState] = useState<Layout>(readLayout);
   const [filter, setFilter] = useState<Filter>('all');
+  const [allRows, setAllRows] = useState(false);
   const [adding, setAdding] = useState<CompanyId | null>(null);
   const [checked, setChecked] = useState<Map<string, Checked>>(new Map());
   const today = localDate(now);
@@ -242,8 +250,18 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
   }, [actions, checked]);
   const rows = display.filter(a => shownFilter === 'all' || a.company === shownFilter).map(describe);
   const isDone = (id: string) => checked.has(id) || doneIds.includes(id);
-  const remaining = actions.filter(a => !doneIds.includes(a.id)).length;
-  const urgent = actions.find(a => a.priority === 1 && !doneIds.includes(a.id));
+  const pending = actions.filter(a => !doneIds.includes(a.id));
+  const remaining = pending.length;
+  const urgent = pending.find(a => a.priority === 1);
+  const filterOptions = filters.map(
+    (f): Choice<Filter> => ({
+      value: f,
+      label: f === 'all' ? 'All clients' : clientName(f),
+      short: f === 'all' ? 'All' : undefined,
+      client: f === 'all' ? undefined : f,
+      count: pending.filter(a => f === 'all' || a.company === f).length,
+    }),
+  );
 
   const setLocal = (ids: string[]) => {
     setLocalDone({ date: today, ids });
@@ -333,7 +351,6 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
     .filter(x => x.date && x.s.status !== 'cancelled' && daysUntil(x.date, now) >= 0 && daysUntil(x.date, now) <= 30)
     .sort((a, b) => a.date!.localeCompare(b.date!))
     .slice(0, 4);
-  const tone = (name: string) => LETTER_TONES[[...name].reduce((s, ch) => s + ch.charCodeAt(0), 0) % LETTER_TONES.length];
 
   const addItems: MenuItem[] = [
     { label: 'Waveink model', icon: 'cube', client: 'waveink', onSelect: () => setAdding('waveink') },
@@ -372,7 +389,7 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
         ...base,
         big: open.length ? `${out.done}/${out.total}` : 'No open jobs',
         sub: `${open.length === 1 ? `${open[0].name} variations` : open.length ? `${open.length} open jobs` : 'New jobs land here'}${each}`,
-        pct: out.total ? out.done / out.total : 0,
+        pct: out.total ? out.done / out.total : undefined,
         title: `${out.done} of ${out.total} images made across open jobs`,
       };
     }
@@ -385,16 +402,21 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
       sub: list.length
         ? ['models done', count('revision') && `${count('revision')} to fix`, `${count('in_progress')} in progress`, count('review') && `${count('review')} in review`].filter(Boolean).join(' · ')
         : 'Add the first one on its screen',
-      pct: list.length ? done / list.length : 0,
+      pct: list.length ? done / list.length : undefined,
       title: `${done} of ${list.length} models done`,
     };
   };
-  // A client with an output target shows this period's pace under its figures, and its bar follows the pace.
+  // A client with an output target shows this period's pace after its figures, and its bar follows the pace (none on a day off).
   const paced = (t: Tile): Tile => {
     const p = weekProgress(state, t.client, now);
     // Nothing to pace in a week the job hasn't reached yet
     if (!p || !p.target) return t;
-    return { ...t, pace: p, pct: p.target ? p.done / p.target : 0, title: `${paceText(p)}${p.per === 'week' && p.expected ? ` · ${p.expected} expected by now` : ''}` };
+    return {
+      ...t,
+      pace: p,
+      pct: p.per === 'day' && !p.workday ? undefined : p.done / p.target,
+      title: `${paceText(p)}${p.per === 'week' && p.expected ? ` · ${p.expected} expected by now` : ''}`,
+    };
   };
 
   const clientTiles: Tile[] = [
@@ -404,7 +426,7 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
       name: cfg('waveink').name,
       big: `${doneCount(wiTech)}/${wiTech.length}`,
       sub: wiApparel.length ? `Tech models done · ${doneCount(wiApparel)} of ${wiApparel.length} apparel` : `${wi.filter(m => m.status === 'in_progress').length} in progress · ${wi.filter(m => m.status === 'review').length} in review`,
-      pct: wiTech.length ? doneCount(wiTech) / wiTech.length : 0,
+      pct: wiTech.length ? doneCount(wiTech) / wiTech.length : undefined,
       title: `${doneCount(wiTech)} of ${wiTech.length} tech models done`,
       open: () => go({ view: 'company', company: 'waveink' }),
     },
@@ -414,7 +436,6 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
       name: cfg('metaztech').name,
       big: !mz.length ? 'No models' : mzRejected ? `${mzRejected} rejected` : `${mzApprovedMonth} approved`,
       sub: !mz.length ? 'Pull them from the portal' : mzRejected ? `${mzApprovedMonth} approved this month · ${mzReview} in review` : `this month · ${mzReview} in review`,
-      pct: 0,
       title: `${mzApprovedMonth} approved this month`,
       open: () => go({ view: 'company', company: 'metaztech' }),
     },
@@ -424,7 +445,7 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
       name: sk.name,
       big: skOpen.length ? `${skOut.done}/${skOut.total}` : 'No open jobs',
       sub: `${skOpen.length === 1 ? `${skOpen[0].name} variations` : skOpen.length ? `${skOpen.length} open jobs` : 'New jobs land here'} · ${formatMoney(skRate, sk.currency)} each`,
-      pct: skOut.total ? skOut.done / skOut.total : 0,
+      pct: skOut.total ? skOut.done / skOut.total : undefined,
       title: `${skOut.done} of ${skOut.total} images made across open jobs`,
       open: () => go({ view: 'skeidar' }),
     },
@@ -438,7 +459,6 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
       name: 'Money',
       big: formatMoney(owed, base),
       sub: `owed to you · ${late > 0.5 ? `${formatMoney(late, base)} late` : 'nothing late'}`,
-      pct: received + owed ? received / (received + owed) : 0,
       title: `${Math.round(received + owed ? (received / (received + owed)) * 100 : 0)}% of what you've earned has been paid`,
       open: () => go({ view: 'earnings' }),
     },
@@ -447,12 +467,11 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
 
   return (
     <div className={`page dash ${layout}`}>
-      <header className="dash-head">
-        <div className="dash-hello">
-          <h1>Hello, Rohit</h1>
-          <div className="dash-sub">
+      <PageHead
+        title="Hello, Rohit"
+        meta={
+          <>
             <span>{`${now.toLocaleDateString('en-GB', { weekday: 'long' })}, ${now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`}</span>
-            <span className="dash-sep" aria-hidden="true" />
             <span>
               <b>
                 {remaining} {remaining === 1 ? 'task' : 'tasks'}
@@ -460,90 +479,85 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
               on your plate
             </span>
             {urgent && (
-              <button type="button" className="dash-alert" title={urgent.title} onClick={() => urgent.target && go(urgent.target)}>
-                {urgentLabel(urgent)}
-              </button>
+              <span>
+                <button type="button" className="dash-alert" title={urgent.title} onClick={() => urgent.target && go(urgent.target)}>
+                  {urgentLabel(urgent)}
+                </button>
+              </span>
             )}
-          </div>
-        </div>
-        <div className="dash-actions">
-          <div className="seg" role="group" aria-label="Dashboard layout">
-            <button type="button" className={layout === 'widgets' ? 'on' : ''} aria-pressed={layout === 'widgets'} onClick={() => setLayout('widgets')}>
-              <Icon name="dashboard" /> Widgets
-            </button>
-            <button type="button" className={layout === 'board' ? 'on' : ''} aria-pressed={layout === 'board'} onClick={() => setLayout('board')}>
-              <Icon name="kanban" /> Board
-            </button>
-          </div>
-          <button type="button" className="lg" onClick={() => go({ view: 'settings' })}>
-            <Icon name="fileUp" size={18} /> Import sheet
+          </>
+        }
+      >
+        <div className="seg" role="group" aria-label="Dashboard layout">
+          <button type="button" className={layout === 'widgets' ? 'on' : ''} aria-pressed={layout === 'widgets'} onClick={() => setLayout('widgets')}>
+            <Icon name="dashboard" /> Widgets
           </button>
-          <DashMenu label="Add task" icon="plus" className="primary lg" items={addItems} />
-          <DashMenu
-            iconOnly
-            icon="dots"
-            label="More actions"
-            className="dash-more-btn"
-            items={[{ label: 'Export everything to Excel', icon: 'excel', onSelect: () => void exportAll() }]}
-          />
+          <button type="button" className={layout === 'board' ? 'on' : ''} aria-pressed={layout === 'board'} onClick={() => setLayout('board')}>
+            <Icon name="kanban" /> Board
+          </button>
         </div>
-      </header>
+        <DashMenu label="Add task" icon="plus" className="primary" items={addItems} />
+        <DashMenu
+          iconOnly
+          icon="dots"
+          label="More actions"
+          items={[
+            { label: 'Import sheet', icon: 'fileUp', onSelect: () => go({ view: 'settings' }) },
+            { label: 'Export to Excel', icon: 'excel', onSelect: () => void exportAll() },
+          ]}
+        />
+      </PageHead>
 
       {layout === 'board' ? (
         <Board state={state} now={now} addItems={addItems} />
       ) : (
         <>
           {/* More than four tiles wrap into rows of even length (five as 3 + 2, six as 3 + 3) */}
-          <section className={`dash-tiles ${tiles.length > 4 ? 'many' : ''}`} style={{ '--tile-cols': Math.ceil(tiles.length / Math.ceil(tiles.length / 4)) } as CSSProperties} aria-label="Clients">
+          <section className={`kpis dash-kpis ${tiles.length > 4 ? 'many' : ''}`} style={{ '--tile-cols': Math.ceil(tiles.length / Math.ceil(tiles.length / 4)) } as CSSProperties} aria-label="Clients">
             {tiles.map(t => (
-              <button key={t.client} type="button" className={`dash-tile c-${t.client} c-fill ${t.pace ? 'paced' : ''}`} onClick={t.open} title={t.title}>
-                <span className="dash-tile-top">
-                  <span className="dash-tile-ic">
-                    <Icon name={t.icon} size={18} weight="fill" />
-                  </span>
-                  <span className="dash-tile-name">{t.name}</span>
-                  <span className="dash-tile-go">
-                    <Icon name="arrowUpRight" />
+              <button key={t.client} type="button" className={`kpi dash-kpi c-${t.client}`} onClick={t.open} title={t.title}>
+                <span className="kpi-top">
+                  <Icon name={t.icon} weight="fill" />
+                  <span className="ellipsis">{t.name}</span>
+                  <span className="dash-kpi-go">
+                    <Icon name="arrowUpRight" size={14} />
                   </span>
                 </span>
-                <span className="dash-tile-big">{t.big}</span>
-                <span className="dash-tile-sub">{t.sub}</span>
-                {t.pace && (
-                  <span className="dash-tile-pace">
-                    {t.pace.behind && <Icon name="flag" size={12} weight="fill" />}
-                    <span className="ellipsis">{paceText(t.pace)}</span>
+                <span className="kpi-num ellipsis">{t.big}</span>
+                <span className="dash-kpi-sub">
+                  {t.sub}
+                  {t.pace && (
+                    <>
+                      {' · '}
+                      <span className={t.pace.behind ? 'bad-text' : ''}>{paceText(t.pace)}</span>
+                    </>
+                  )}
+                </span>
+                {t.pct !== undefined && (
+                  <span className="dash-kpi-bar">
+                    <span style={{ width: `${Math.round(Math.min(1, t.pct) * 100)}%` }} />
+                    {/* Where a weekly target should be by now */}
+                    {t.pace?.per === 'week' && t.pace.expected > 0 && t.pace.expected < t.pace.target && <i style={{ left: `${pctOf(t.pace.expected, t.pace)}%` }} />}
                   </span>
                 )}
-                <span className="dash-tile-bar">
-                  <span style={{ width: `${Math.round(Math.min(1, t.pct) * 100)}%` }} />
-                  {/* Where a weekly target should be by now */}
-                  {t.pace?.per === 'week' && t.pace.expected > 0 && t.pace.expected < t.pace.target && <i style={{ left: `${pctOf(t.pace.expected, t.pace)}%` }} />}
-                </span>
               </button>
             ))}
           </section>
 
           <div className="dash-row2">
             <section className="panel dash-next" aria-label="Up next">
-              <div className="dash-next-head">
+              <div className="dash-panel-head">
                 <h2>Up next</h2>
                 <span className="dash-count">{remaining}</span>
-                <div className="chips" role="group" aria-label="Show client">
-                  {filters.map(f => (
-                    <button key={f} type="button" className={`chip ${f !== 'all' ? `c-${f}` : ''} ${shownFilter === f ? 'on' : ''}`} aria-pressed={shownFilter === f} onClick={() => setFilter(f)}>
-                      {f !== 'all' && <span className="dot" />}
-                      {f === 'all' ? 'All' : clientName(f)}
-                    </button>
-                  ))}
-                </div>
-                <span className="dash-smart" title="Sorted by what's due today, then this week, then the queue">
-                  <Icon name="sparkle" size={15} /> Smart order
+                <span className="dash-smart" role="img" aria-label="Smart order" title="Sorted by what's due today, then this week, then the queue">
+                  <Icon name="sparkle" />
                 </span>
+                <Dropdown label="Client" prefix="Client" value={shownFilter} options={filterOptions} onChange={setFilter} align="end" />
               </div>
               <div className="dash-scroll">
                 {!rows.length && <p className="muted dash-none">{actions.length ? 'Nothing for this client right now.' : 'Nothing pressing. Pick the next model from a client screen.'}</p>}
                 <ul className="dash-list">
-                  {rows.map(r => {
+                  {(allRows ? rows : rows.slice(0, NEXT_ROWS)).map(r => {
                     const done = isDone(r.a.id);
                     return (
                       <li key={r.a.id} className={`dash-row ${done ? 'done' : ''}`} onClick={e => !(e.target as HTMLElement).closest('button') && r.a.target && go(r.a.target)}>
@@ -555,9 +569,11 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
                           title={done ? 'Undo' : r.check}
                           onClick={() => void (done ? undo(r.a) : check(r))}
                         >
-                          <Icon name="check" size={13} weight="bold" />
+                          <Icon name="check" size={12} weight="bold" />
                         </button>
-                        <ClientTile client={r.client} icon={r.icon} />
+                        <span className={`dash-row-ic c-${r.client}`} aria-hidden="true">
+                          <Icon name={r.icon} weight="fill" />
+                        </span>
                         <button type="button" className="dash-row-main" onClick={() => r.a.target && go(r.a.target)}>
                           <span className="t">{r.a.title}</span>
                           <span className="d">{r.detail}</span>
@@ -567,52 +583,49 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
                             Undo
                           </button>
                         ) : (
-                          <span className={`pill st-${r.due.tone} dash-due`}>
-                            <Icon name="flag" size={11} weight="fill" />
-                            {r.due.text}
-                          </span>
+                          <span className={`pill st-${r.due.tone} dash-due`}>{r.due.text}</span>
                         )}
                         <span className="dash-val">{r.value}</span>
-                        <span className="dash-go" aria-hidden="true">
-                          <Icon name="caretRight" />
-                        </span>
                       </li>
                     );
                   })}
                 </ul>
+                {rows.length > NEXT_ROWS && (
+                  <button type="button" className="ghost mini dash-more" aria-expanded={allRows} onClick={() => setAllRows(!allRows)}>
+                    {allRows ? 'Show fewer' : `Show ${rows.length - NEXT_ROWS} more`}
+                  </button>
+                )}
               </div>
             </section>
 
-            <div className="dash-col">
+            <div className="panel dash-sched">
               <Calendar state={state} now={now} />
-              <section className="panel dash-week" aria-label="This week">
-                <h2>This week</h2>
+              <section className="dash-week" aria-label="This week">
+                <h3>This week</h3>
                 {!week.length && <p className="muted small">Nothing due in the next 7 days.</p>}
-                <ul>
+                <ul className="dash-lines">
                   {week.map(d => {
-                    const c = find(d.company);
+                    // Deadlines come from the clients' own settings, so the client is always there.
+                    const c = find(d.company)!;
                     // Waveink's Friday log is built from the status changes, so its row offers the export.
                     const log = d.company === 'waveink' && d.id === 'wi-report';
                     return (
                       <li key={`dl-${d.company}-${d.id}-${d.date}`}>
-                        <span className={`dash-date c-${d.company} c-soft`} aria-hidden="true">
-                          <small>{d.at.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase()}</small>
+                        <span className="dash-date">
+                          <small>{d.at.toLocaleDateString('en-GB', { weekday: 'short' })}</small>
                           <b>{d.at.getDate()}</b>
                         </span>
-                        <span className="grow dash-week-t">
+                        <button type="button" className="dash-line" title={`Open ${c.name}`} onClick={() => go(clientTarget(c))}>
                           <b className="ellipsis">{d.label}</b>
-                          <span className="ellipsis">{[clientName(d.company), dueText(d)].join(' · ')}</span>
-                        </span>
-                        {log ? (
+                          <span className="ellipsis">
+                            <span className={`cdot c-${d.company}`} />
+                            {[clientName(d.company), dueText(d)].join(' · ')}
+                          </span>
+                        </button>
+                        {log && (
                           <button type="button" className="mini" onClick={() => void exportLog()} title="Builds the Daily Update Log sheet from your status changes">
                             Export
                           </button>
-                        ) : (
-                          c && (
-                            <button type="button" className="mini" onClick={() => go(clientTarget(c))} aria-label={`Open ${c.name}`}>
-                              Open
-                            </button>
-                          )
                         )}
                       </li>
                     );
@@ -621,8 +634,8 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
               </section>
             </div>
 
-            <div className="dash-col">
-              <section className="panel dash-earn" aria-label="Earnings" onClick={e => !(e.target as HTMLElement).closest('button') && go({ view: 'earnings' })}>
+            <div className="panel dash-money">
+              <section className="dash-earn" aria-label="Earnings" onClick={e => !(e.target as HTMLElement).closest('button') && go({ view: 'earnings' })}>
                 <div className="dash-panel-head">
                   <h2>
                     <button type="button" className="dash-h-link" onClick={() => go({ view: 'earnings' })}>
@@ -630,7 +643,7 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
                     </button>
                   </h2>
                   {best && (
-                    <span className="tag ok dash-best">
+                    <span className="tag ok">
                       <Icon name="trendUp" /> {monthShort(best.month)} best month
                     </span>
                   )}
@@ -647,49 +660,50 @@ export function Today({ state, now }: { state: AppState; now: Date }) {
                         title={`${monthShort(b.month)}: ${formatMoney(b.total, base)} earned${b.segs.some(s => s.owed > 0.5) ? `, ${formatMoney(b.segs.reduce((s, x) => s + x.owed, 0), base)} not paid yet` : ''}${b.month === month ? ' (this month, paid next month)' : ''}`}
                       >
                         {b.segs.flatMap(s => [
-                          s.paid > 0.5 && <i key={`${s.cid}p`} className={`c-${s.cid}`} style={{ height: Math.max(3, Math.round((s.paid / maxBar) * 124)) }} />,
-                          s.owed > 0.5 && <i key={`${s.cid}o`} className={`c-${s.cid} owed`} style={{ height: Math.max(3, Math.round((s.owed / maxBar) * 124)) }} />,
+                          s.paid > 0.5 && <i key={`${s.cid}p`} className={`c-${s.cid}`} style={{ height: Math.max(3, Math.round((s.paid / maxBar) * BAR_PX)) }} />,
+                          s.owed > 0.5 && <i key={`${s.cid}o`} className={`c-${s.cid} owed`} style={{ height: Math.max(3, Math.round((s.owed / maxBar) * BAR_PX)) }} />,
                         ])}
                       </div>
                       <small>{monthShort(b.month)}</small>
                     </div>
                   ))}
                 </div>
-                <div className="dash-earn-line">
-                  <span>Owed to you</span>
-                  <b>{formatMoney(owed, base)}</b>
-                </div>
-                <div className="dash-earn-line">
-                  <span>Earning this month, paid next month</span>
-                  <b>{formatMoney(earningMonth, base)}</b>
-                </div>
+                <dl className="dash-earn-lines">
+                  <div>
+                    <dt>Owed to you</dt>
+                    <dd>{formatMoney(owed, base)}</dd>
+                  </div>
+                  <div>
+                    <dt>Earning this month, paid next month</dt>
+                    <dd>{formatMoney(earningMonth, base)}</dd>
+                  </div>
+                </dl>
               </section>
 
-              <section className="panel dash-renew" aria-label="Renewing soon" onClick={e => !(e.target as HTMLElement).closest('button') && go({ view: 'subscriptions' })}>
+              <section className="dash-renew" aria-label="Renewing soon" onClick={e => !(e.target as HTMLElement).closest('button') && go({ view: 'subscriptions' })}>
                 <div className="dash-panel-head">
-                  <h2>
+                  <h3>
                     <button type="button" className="dash-h-link" onClick={() => go({ view: 'subscriptions' })}>
                       Renewing soon
                     </button>
-                  </h2>
-                  <span className="muted dash-monthly">{formatMoney(monthly, base)} / mo</span>
+                  </h3>
+                  <span className="muted small nowrap">{formatMoney(monthly, base)} / mo</span>
                 </div>
                 {!renewals.length && <p className="muted small">Nothing renews in the next 30 days.</p>}
-                <ul>
+                <ul className="dash-lines">
                   {renewals.map(({ s, date }) => {
                     const d = daysUntil(date!, now);
-                    const verb = s.status === 'cancelling' ? 'ends' : s.status === 'trial' ? 'trial ends' : '';
+                    const verb = s.status === 'cancelling' ? 'Ends' : s.status === 'trial' ? 'Trial ends' : 'Renews';
                     const rel = d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`;
                     return (
                       <li key={s.id}>
-                        <span className={`dash-letter c-${tone(s.name)} c-soft`} aria-hidden="true">
-                          {s.name.trim()[0]?.toUpperCase()}
+                        <span className="dash-date">
+                          <small>{MONTHS[Number(date!.slice(5, 7)) - 1]}</small>
+                          <b>{Number(date!.slice(8, 10))}</b>
                         </span>
-                        <span className="grow dash-week-t">
+                        <span className="dash-line">
                           <b className="ellipsis">{s.name}</b>
-                          <span className={s.status === 'trial' ? 'bad-text' : ''}>
-                            {dayMonth(date!)} · {verb ? `${verb} ${rel}` : rel}
-                          </span>
+                          <span className={s.status === 'trial' ? 'bad-text' : ''}>{`${verb} ${rel}`}</span>
                         </span>
                         <b className="tabular">{s.amount != null ? formatMoney(s.amount, s.currency, s.amount % 1 ? 2 : 0) : '—'}</b>
                       </li>
@@ -722,8 +736,8 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
   const count = new Date(y, first.getMonth() + 1, 0).getDate();
   const lead = (first.getDay() + 6) % 7;
   const today = localDate(now);
-  const marks = new Map<number, { kind: 'trial' | 'due' | 'pay'; label: string }[]>();
-  const add = (date: string | undefined, kind: 'trial' | 'due' | 'pay', label: string) => {
+  const marks = new Map<number, { kind: Mark; label: string }[]>();
+  const add = (date: string | undefined, kind: Mark, label: string) => {
     if (!date?.startsWith(key)) return;
     const d = Number(date.slice(8, 10));
     marks.set(d, [...(marks.get(d) ?? []), { kind, label }]);
@@ -741,20 +755,17 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
   const events = [...marks.entries()].sort((a, b) => a[0] - b[0]).flatMap(([d, ms]) => ms.map(m => `${d}: ${m.label}`));
 
   return (
-    <section className="panel dash-cal" aria-label="Calendar">
-      <div className="dash-cal-head">
-        <span className="dash-cal-ic" aria-hidden="true">
-          <Icon name="calendar" size={18} />
-        </span>
+    <section className="dash-cal" aria-label="Calendar">
+      <div className="dash-panel-head">
         <h2 aria-live="polite">
           {first.toLocaleDateString('en-GB', { month: 'long' })}
           {y !== now.getFullYear() ? ` ${y}` : ''}
         </h2>
         <span className="dash-cal-nav">
-          <button type="button" aria-label="Previous month" onClick={() => setOffset(o => o - 1)}>
+          <button type="button" className="icon-btn mini ghost" aria-label="Previous month" title="Previous month" onClick={() => setOffset(o => o - 1)}>
             <Icon name="caretLeft" />
           </button>
-          <button type="button" aria-label="Next month" onClick={() => setOffset(o => o + 1)}>
+          <button type="button" className="icon-btn mini ghost" aria-label="Next month" title="Next month" onClick={() => setOffset(o => o + 1)}>
             <Icon name="caretRight" />
           </button>
         </span>
@@ -773,12 +784,19 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
           const dow = (lead + i) % 7;
           const band = !!win && d >= win[0] && d <= win[1];
           const ms = marks.get(d) ?? [];
-          const mark = `${key}-${pad(d)}` === today ? 'today' : (['trial', 'due', 'pay'] as const).find(k => ms.some(m => m.kind === k)) ?? '';
+          const kinds = MARKS.filter(k => ms.some(m => m.kind === k));
           const labels = [...(band ? ['MetaZtech payout window'] : []), ...ms.map(m => m.label)];
-          const cls = ['dash-day', band && 'band', band && (d === win![0] || dow === 0) && 'band-l', band && (d === win![1] || dow === 6) && 'band-r', mark && `is-${mark}`].filter(Boolean).join(' ');
+          const cls = ['dash-day', band && 'band', band && (d === win![0] || dow === 0) && 'band-l', band && (d === win![1] || dow === 6) && 'band-r', `${key}-${pad(d)}` === today && 'today'].filter(Boolean).join(' ');
           return (
             <span key={d} className={cls} title={labels.join('\n') || undefined}>
               <span>{d}</span>
+              {!!kinds.length && (
+                <span className="dash-dots">
+                  {kinds.map(k => (
+                    <i key={k} className={`m-${k}`} />
+                  ))}
+                </span>
+              )}
             </span>
           );
         })}
@@ -791,19 +809,19 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
       </ul>
       <div className="dash-legend">
         <span>
-          <i className="mz" />
+          <i className="m-mz c-metaztech" />
           MetaZtech payout
         </span>
         <span>
-          <i className="due" />
+          <i className="m-due" />
           Deadline
         </span>
         <span>
-          <i className="trial" />
+          <i className="m-trial" />
           Trial ends
         </span>
         <span>
-          <i className="pay" />
+          <i className="m-pay" />
           Payday
         </span>
       </div>

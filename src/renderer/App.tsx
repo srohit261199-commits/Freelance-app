@@ -144,7 +144,7 @@ export function App() {
           <div className="brand">
             <Logo />
             <span className="name">Freelance Hub</span>
-            {title && <span className="where">— {title}</span>}
+            {title && <span className="where">{title}</span>}
           </div>
           <Omni state={state} screens={screens} onGo={go} />
           <div className="end" />
@@ -157,7 +157,7 @@ export function App() {
                 <b>Rohit Sharma</b>
                 <small>Freelance 3D artist</small>
               </span>
-              <Icon name="caretUpDown" />
+              <Icon name="gear" />
             </button>
             {sections.map(sec => (
               <div key={sec} className="nav-sec">
@@ -166,14 +166,14 @@ export function App() {
                   .filter(s => s.section === sec)
                   .map(s => (
                     <button key={s.label} type="button" className={`nav-item ${active(s.route) ? 'on' : ''}`} aria-current={active(s.route) ? 'page' : undefined} onClick={() => setRoute(s.route)}>
-                      {s.client ? <span className={`swatch c-${s.client}`} /> : <Icon name={s.icon} size={18} />}
+                      {s.client ? <span className={`swatch c-${s.client}`} /> : <Icon name={s.icon} />}
                       <span className="label">{s.label}</span>
                       {s.badge !== undefined && <span className="badge">{s.badge}</span>}
                     </button>
                   ))}
                 {sec === 'Clients' && (
                   <button type="button" className="nav-item add" onClick={() => setAddingClient(true)}>
-                    <Icon name="plus" size={20} />
+                    <Icon name="plus" />
                     <span className="label">Add client</span>
                   </button>
                 )}
@@ -203,6 +203,7 @@ export function App() {
       <div className="toasts" role="status" aria-atomic="false">
         {toasts.map(t => (
           <div key={t.id} className={`toast ${t.kind}`} onClick={() => dismiss(t.id)} title="Click to dismiss">
+            <Icon name={t.kind === 'error' ? 'warning' : 'checkCircle'} weight="fill" />
             <span className="grow">{t.text}</span>
             <button type="button" className="toast-x" aria-label="Dismiss">
               <Icon name="close" size={14} />
@@ -214,13 +215,13 @@ export function App() {
   );
 }
 
-/** CSS variables for clients added by hand, mixed from their colour so tints work in both themes. */
+/** CSS variables for clients added by hand, mixed from their colour so tints work in both themes (the tint as strong as the built-in ones, so a header tile shows on the page). */
 function clientColours(companies: CompanyConfig[]): string {
   return companies
     .filter(c => !c.builtIn && /^[a-z0-9-]+$/i.test(c.id) && /^#[0-9a-f]{3,8}$/i.test(c.color))
     .map(
       c =>
-        `.c-${c.id}{--c:color-mix(in srgb,${c.color} 16%,var(--panel));--c-tint:color-mix(in srgb,${c.color} 9%,var(--panel));--c-deep:color-mix(in srgb,${c.color} 70%,var(--text));--c-dot:${c.color}}`,
+        `.c-${c.id}{--c:color-mix(in srgb,${c.color} 16%,var(--panel));--c-tint:color-mix(in srgb,${c.color} 14%,var(--panel));--c-deep:color-mix(in srgb,${c.color} 70%,var(--text));--c-dot:${c.color}}`,
     )
     .join('');
 }

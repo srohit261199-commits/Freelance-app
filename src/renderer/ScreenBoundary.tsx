@@ -26,10 +26,12 @@ export class ScreenBoundary extends Component<{ screen: string; children: ReactN
     return (
       <div className="page">
         <section className="panel screen-error" role="alert">
-          <span className="screen-error-ic" aria-hidden="true">
-            <Icon name="warning" size={22} weight="fill" />
-          </span>
-          <h2>This screen ran into a problem</h2>
+          <div className="row gap">
+            <span className="screen-error-ic" aria-hidden="true">
+              <Icon name="warning" size={18} weight="fill" />
+            </span>
+            <h2>This screen ran into a problem</h2>
+          </div>
           <p>Your data is safe and the rest of the app still works. Pick another screen in the sidebar, or try this one again.</p>
           <pre>{error.message}</pre>
           <div className="row gap wrap">

@@ -1,9 +1,9 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import type { AppState, Currency, FolderEntry, SkeidarJob, CompanyId } from '../../shared/types';
 import { formatMoney, jobOutputs, localDate } from '../../shared/money';
 import { uid } from '../../shared/ops';
 import { hub } from '../hub';
-import { ConfirmButton, Empty, Field, Icon, Modal, relTime, useApp } from '../ui';
+import { ConfirmButton, Dropdown, Empty, Field, Icon, MenuButton, Modal, PageHead, relTime, useApp, type Choice } from '../ui';
 import { jobPriority, PRIORITY_LABEL } from '../priority';
 import { clientFolder, promptFor, promptList, suggestedFileName, withFolder } from '../../shared/assets';
 import { AssetsPanel, LocalThumb } from './AssetsPanel';
@@ -73,6 +73,7 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
   const [flashId, setFlashId] = useState<string | undefined>();
   const [allPast, setAllPast] = useState(false);
   const [count, setCount] = useState<{ path: string; n: number } | null>(null);
+  const [view, setView] = useState<'grid' | 'prompts'>('grid');
   const heroRef = useRef<HTMLElement>(null);
 
   const scan = async () => {
@@ -107,6 +108,11 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
     if (!p) return;
     await hub.upsert('companies', { ...withFolder(cfg, p) });
     if (company === 'skeidar') await hub.patchSettings({ skeidarFolder: p });
+  };
+  const exportExcel = async () => {
+    const r = await hub.exportExcel(company === 'skeidar' ? 'skeidar' : `client:${company}`);
+    if (r.path) toast(`Saved ${r.path}`);
+    else if (r.error) toast(r.error, 'error');
   };
 
   // A route with a job id (from Dashboard or search) selects that job and flashes it once.
@@ -204,61 +210,112 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
   const entry = cur?.folder ? folder?.find(f => f.path === cur.folder) : undefined;
   const files = cur?.folder ? (count?.path === cur.folder ? count.n : entry?.images) : undefined;
   const pastShown = allPast ? delivered : delivered.slice(0, 3);
+  // The open jobs, plus a delivered one picked from the list, to switch between in the job's title.
+  const switchable = cur ? [...open, ...(cur.status === 'delivered' ? [cur] : [])] : [];
+  const jobChoices: Choice[] = switchable.map(j => {
+    const o = jobOutputs(j);
+    return { value: j.id, label: `${j.name} · ${j.status === 'open' ? `${o.done}/${o.total}` : 'delivered'}`, short: j.name };
+  });
+  const canPrompt = !!cur && cur.fabrics.length > 0 && cur.images.length > 0;
+  const shown = canPrompt ? view : 'grid';
+  const views = (
+    <div className="seg" role="group" aria-label="Show">
+      <button type="button" className={shown === 'grid' ? 'on' : ''} aria-pressed={shown === 'grid'} onClick={() => setView('grid')}>
+        Variations
+      </button>
+      <button
+        type="button"
+        className={shown === 'prompts' ? 'on' : ''}
+        aria-pressed={shown === 'prompts'}
+        disabled={!canPrompt}
+        title={canPrompt ? 'Prompts for the image tool' : 'Add the fabrics and master images first'}
+        onClick={() => setView('prompts')}
+      >
+        Prompts
+      </button>
+    </div>
+  );
 
   return (
     <div className={`page sk-page c-${company}`}>
-      <header className="sk-head">
-        <span className="client-tile c-fill" aria-hidden="true">
-          <Icon name="brush" size={30} weight="fill" />
-        </span>
-        <div className="sk-title">
-          <h1>{cfg.name}</h1>
-          <div className="sk-chips">
-            <span className="sk-chip">{cfg.role}</span>
-            <span className="sk-chip c-soft">{formatMoney(rate, cur$)} per image</span>
+      <PageHead
+        title={cfg.name}
+        icon="brush"
+        meta={
+          <>
+            {cfg.role && <span>{cfg.role}</span>}
+            <span>{formatMoney(rate, cur$)} per image</span>
             {totals.done > 0 && (
-              <span className="sk-chip">
+              <span>
                 {plural(totals.done, 'image')} made · {formatMoney(totals.done * rate, cur$)} earned
               </span>
             )}
-          </div>
-        </div>
-        <div className="sk-actions">
-          <button
-            type="button"
-            className="lg"
-            onClick={async () => {
-              const r = await hub.exportExcel(company === 'skeidar' ? 'skeidar' : `client:${company}`);
-              if (r.path) toast(`Saved ${r.path}`);
-              else if (r.error) toast(r.error, 'error');
-            }}
-          >
-            <Icon name="excel" size={18} /> Export Excel
-          </button>
-          <button type="button" className="lg" onClick={() => newJob()}>
-            <Icon name="plus" size={18} /> New job
-          </button>
-        </div>
-      </header>
-
-      {open.length > 0 && (open.length > 1 || cur?.status === 'delivered') && (
-        <div className="tabs sk-tabs" role="group" aria-label="Open jobs">
-          {open.map(j => {
-            const o = jobOutputs(j);
-            return (
-              <button key={j.id} type="button" className={`tab ${cur?.id === j.id ? 'on' : ''}`} aria-pressed={cur?.id === j.id} onClick={() => pick(j.id)}>
-                <span className="ellipsis">{j.name}</span>
-                <span className="n tabular">
-                  {o.done}/{o.total}
-                </span>
+          </>
+        }
+      >
+        <MenuButton label="More actions" icon="dots">
+          {close => (
+            <>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={!root}
+                onClick={async () => {
+                  close();
+                  await scan();
+                  await syncFolders();
+                }}
+              >
+                <Icon name="sync" />
+                <span className="grow">Sync job folders</span>
               </button>
-            );
-          })}
-        </div>
-      )}
+              {root && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  title={root}
+                  onClick={() => {
+                    close();
+                    hub.openPath(root);
+                  }}
+                >
+                  <Icon name="folderOpen" />
+                  <span className="grow">Open project folder</span>
+                </button>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  close();
+                  void changeRoot();
+                }}
+              >
+                <Icon name="folder" />
+                <span className="grow">{root ? 'Change project folder' : 'Link project folder'}</span>
+              </button>
+              <hr />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  close();
+                  void exportExcel();
+                }}
+              >
+                <Icon name="excel" />
+                <span className="grow">Export to Excel</span>
+              </button>
+            </>
+          )}
+        </MenuButton>
+        <button type="button" className="primary" onClick={() => newJob()}>
+          <Icon name="plus" /> New job
+        </button>
+      </PageHead>
 
       {cur ? (
-        <JobHero
+        <JobPanel
           key={cur.id}
           heroRef={heroRef}
           job={cur}
@@ -267,143 +324,136 @@ export function Skeidar({ state, now, openId, company = 'skeidar' }: { state: Ap
           currency={cur$}
           viaTeams={viaTeams}
           flash={flashId === cur.id}
+          picker={switchable.length > 1 && <Dropdown label="Job" value={cur.id} options={jobChoices} onChange={pick} className="sk-pick" />}
           onEdit={() => setEditing(cur)}
           onDeliver={() => deliver(cur)}
           onScan={() => (cur.folder ? scanJob(cur) : linkFolder(cur))}
-        />
-      ) : (
-        <section ref={heroRef} className="sk-hero sk-hero-empty">
-          <Empty title="No open jobs">
-            When a Teams message brings 2 images and a fabric list, add a job: paste the fabrics, one per line. Click each tile as you finish that image.
-          </Empty>
-          <button type="button" className="primary lg" onClick={() => newJob()}>
-            <Icon name="plus" size={18} /> New job
-          </button>
-        </section>
-      )}
-
-      {cur && (
-        <section className="panel sk-var" aria-labelledby="sk-var-title">
-          <div className="sk-var-head">
-            <h2 id="sk-var-title">Variations</h2>
-            <p>
-              Click a tile once that fabric is generated
-              {files !== undefined && ` · folder scan found ${plural(files, 'image')}`}
-              {files !== undefined && entry?.lastModified && `, newest ${relTime(entry.lastModified, now)}`}
-            </p>
-          </div>
-          <Variations job={cur} onToggle={toggle} onFabric={fabricAll} />
-        </section>
-      )}
-
-      {cur && cur.fabrics.length > 0 && cur.images.length > 0 && <Prompts key={`prompts-${cur.id}`} job={cur} />}
-
-      {delivered.length > 0 && (
-        <section className="sk-past-wrap" aria-label="Past jobs">
-          <div className="sk-past">
-            {pastShown.map(j => {
-              const o = jobOutputs(j);
-              const on = cur?.id === j.id;
-              return (
-                <button key={j.id} type="button" className={`sk-past-card ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => pick(on ? undefined : j.id)}>
-                  <span className="sk-past-ic" aria-hidden="true">
-                    <Icon name="checkCircle" size={22} weight="fill" />
-                  </span>
-                  <span className="sk-past-txt">
-                    <b>
-                      {j.name} · {j.images.length} × {j.fabrics.length}
-                    </b>
-                    <small>
-                      Delivered {shortDate(j.deliveredAt ?? j.receivedAt, now)} · {o.done === o.total ? plural(o.done, 'image') : `${o.done} of ${o.total} images`}
-                    </small>
-                  </span>
-                  <span className="sk-past-amt">{formatMoney(o.done * rate, cur$)}</span>
-                </button>
-              );
-            })}
-          </div>
-          {delivered.length > 3 && (
-            <button type="button" className="ghost sk-more" onClick={() => setAllPast(!allPast)}>
-              {allPast ? 'Show fewer' : `Show all ${delivered.length} delivered jobs`}
-            </button>
+        >
+          {shown === 'prompts' ? (
+            <Prompts key={`prompts-${cur.id}`} job={cur} lead={views} />
+          ) : (
+            <>
+              <div className="sk-bar">
+                {views}
+                <p className="sk-hint">
+                  Click a tile once that fabric is made
+                  {files !== undefined && ` · folder scan found ${plural(files, 'image')}`}
+                  {files !== undefined && entry?.lastModified && `, newest ${relTime(entry.lastModified, now)}`}
+                </p>
+              </div>
+              <Variations job={cur} onToggle={toggle} onFabric={fabricAll} />
+            </>
           )}
+        </JobPanel>
+      ) : (
+        <section ref={heroRef} className="sk-none" aria-label="Current job">
+          <Empty title="No open jobs">Add a job with its master images and fabric list, or save its folder in the project folder and sync.</Empty>
         </section>
       )}
 
-      <section className="panel sk-folder" aria-labelledby="sk-folder-title">
-        <div className="sk-folder-head">
-          <div className="grow">
+      <div className="sk-bottom">
+        <div className="sk-col">
+          {delivered.length > 0 && (
+            <section className="panel sk-past" aria-labelledby="sk-past-title">
+              <h2 id="sk-past-title">
+                Delivered jobs <span className="sk-n">{delivered.length}</span>
+              </h2>
+              <ul>
+                {pastShown.map(j => {
+                  const o = jobOutputs(j);
+                  const on = cur?.id === j.id;
+                  return (
+                    <li key={j.id}>
+                      <button type="button" className={`sk-row ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => pick(on ? undefined : j.id)}>
+                        <span className="sk-past-ic" aria-hidden="true">
+                          <Icon name="checkCircle" size={16} weight="fill" />
+                        </span>
+                        <span className="sk-row-txt">
+                          <b>
+                            {j.name} · {j.images.length} × {j.fabrics.length}
+                          </b>
+                          <small>
+                            Delivered {shortDate(j.deliveredAt ?? j.receivedAt, now)} · {o.done === o.total ? plural(o.done, 'image') : `${o.done} of ${o.total} images`}
+                          </small>
+                        </span>
+                        <span className="sk-amt">{formatMoney(o.done * rate, cur$)}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              {delivered.length > 3 && (
+                <button type="button" className="ghost mini" onClick={() => setAllPast(!allPast)}>
+                  {allPast ? 'Show fewer' : `Show all ${delivered.length}`}
+                </button>
+              )}
+            </section>
+          )}
+          <JobDetails state={state} company={company} now={now} />
+        </div>
+
+        <section className="panel sk-folder" aria-labelledby="sk-folder-title">
+          <div>
             <h2 id="sk-folder-title">Project folder</h2>
-            <p className="small muted break">{root || 'No folder linked yet'}</p>
-            <p className="small muted">
-              Each new subfolder becomes a job: put the client's sheet and the master photos in it, save finished images in an output folder inside it. Folders that were
-              already there more than two weeks before you linked the folder are older projects: click Make job on any you want to track.
-            </p>
-          </div>
-          <div className="row gap wrap">
-            <button
-              type="button"
-              className="mini primary"
-              disabled={!root}
-              onClick={async () => {
-                await scan();
-                await syncFolders();
-              }}
-            >
-              <Icon name="sync" size={14} /> Sync folder
-            </button>
-            <button type="button" className="mini" onClick={changeRoot}>
-              {root ? 'Change' : 'Link folder'}
-            </button>
-            {root && (
-              <button type="button" className="mini" onClick={() => hub.openPath(root)}>
-                <Icon name="folder" size={14} /> Open
+            {root ? (
+              <button type="button" className="link-btn sk-path" title="Open the project folder" onClick={() => hub.openPath(root)}>
+                {root}
               </button>
+            ) : (
+              <p className="small muted">No folder linked yet</p>
             )}
           </div>
-        </div>
-        {folderErr && <p className="small warn-text">{folderErr}</p>}
-        {folder && folder.length === 0 && <p className="small muted">No subfolders or images yet.</p>}
-        {folder && folder.length > 0 && (
-          <ul className="sk-folders">
-            {folder.map(f => (
-              <li key={f.path}>
-                <span className="sk-f-ic" aria-hidden="true">
-                  <Icon name="folder" size={18} weight="fill" />
-                </span>
-                <div className="grow">
-                  <b className="ellipsis" title={f.name}>
-                    {f.name}
-                  </b>
-                  <small>
-                    {plural(f.images, 'image')}
-                    {f.lastModified && ` · ${relTime(f.lastModified, now)}`}
-                  </small>
-                </div>
-                {linked.has(f.path) ? (
-                  <span className="tag ok">Has a job</span>
-                ) : (
-                  f.name !== '(files in this folder)' && (
-                    <button type="button" className="mini" onClick={() => makeJob(f)}>
-                      Make job
-                    </button>
-                  )
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <div className="sk-bottom">
-        <JobDetails state={state} company={company} now={now} />
-        <AssetsPanel state={state} company={company} folder={cur?.folder} title={cur?.folder ? `Files in ${cur.name}` : 'Files'} />
+          {root ? (
+            <p className="small muted">Each subfolder is a job: its sheet gives the fabrics, and finished images saved in its output folder tick themselves off.</p>
+          ) : (
+            <button type="button" className="mini" onClick={changeRoot}>
+              <Icon name="folder" size={14} /> Link a folder
+            </button>
+          )}
+          {folderErr && <p className="small warn-text">{folderErr}</p>}
+          {folder && folder.length === 0 && <p className="small muted">No subfolders or images yet.</p>}
+          {folder && folder.length > 0 && (
+            <ul className="sk-folders">
+              {folder.map(f => (
+                <li key={f.path}>
+                  <Icon name="folder" size={16} />
+                  <span className="sk-row-txt">
+                    <b className="ellipsis" title={f.name}>
+                      {f.name}
+                    </b>
+                    <small>
+                      {plural(f.images, 'image')}
+                      {f.lastModified && ` · ${relTime(f.lastModified, now)}`}
+                    </small>
+                  </span>
+                  {linked.has(f.path) ? (
+                    <span className="tag ok">Has a job</span>
+                  ) : (
+                    f.name !== '(files in this folder)' && (
+                      <button
+                        type="button"
+                        className="mini"
+                        title="Folders that were there more than two weeks before you linked the project folder are older projects: make a job for any you want to track"
+                        onClick={() => makeJob(f)}
+                      >
+                        Make job
+                      </button>
+                    )
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(root || cur?.folder) && <AssetsPanel state={state} company={company} folder={cur?.folder || root} title={cur?.folder ? `Files in ${cur.name}` : 'Files'} bare />}
+        </section>
       </div>
       {editing && <JobEditor job={editing === 'new' ? undefined : editing} prefill={prefill} rate={rate} currency={cur$} clientName={cfg.name} company={company} onClose={() => setEditing(null)} />}
     </div>
   );
 }
 
-function JobHero({
+/** The current job: its name, facts, money and progress, its actions, then its grid or prompts. */
+function JobPanel({
   heroRef,
   job,
   now,
@@ -411,9 +461,11 @@ function JobHero({
   currency,
   viaTeams,
   flash,
+  picker,
   onEdit,
   onDeliver,
   onScan,
+  children,
 }: {
   heroRef: RefObject<HTMLElement | null>;
   job: SkeidarJob;
@@ -422,100 +474,140 @@ function JobHero({
   currency: Currency;
   viaTeams: boolean;
   flash: boolean;
+  /** Switches to another job; it stands in for the visible title. */
+  picker: ReactNode;
   onEdit(): void;
   onDeliver(): void;
   onScan(): void;
+  children: ReactNode;
 }) {
   const { done, total } = jobOutputs(job);
   const isOpen = job.status === 'open';
   const p = jobPriority(job, now);
-  const label = `${done}/${total}`;
+  const pct = total ? Math.round((done / total) * 100) : 0;
   return (
-    <section ref={heroRef} className={`sk-hero ${flash ? 'flash' : ''}`} aria-label={`Job: ${job.name}`}>
-      <div
-        className="sk-ring"
-        role="progressbar"
-        aria-label="Images made"
-        aria-valuemin={0}
-        aria-valuemax={total}
-        aria-valuenow={done}
-        style={{ '--deg': `${total ? (done / total) * 360 : 0}deg` } as CSSProperties}
-      >
-        <div>
-          <b className={label.length > 7 ? 'xs' : label.length > 5 ? 'sm' : ''}>{label}</b>
-          <span>images</span>
-        </div>
-      </div>
-      <div className="sk-info">
-        <div className="sk-info-top">
-          {isOpen ? (
-            <span className="sk-badge">
-              {viaTeams && <Icon name="teams" size={14} />}
-              Received {shortDate(job.receivedAt, now)}
-              {viaTeams && ' on Teams'}
+    <section ref={heroRef} className={`panel sk-job ${flash ? 'flash' : ''}`} aria-labelledby="sk-job-title">
+      <div className="sk-job-head">
+        <div className="sk-job-main">
+          <div className="sk-job-top">
+            <h2 id="sk-job-title" className={picker ? 'sr-only' : ''}>
+              {job.name}
+            </h2>
+            {picker}
+            {isOpen ? (
+              <span className={`flag ${p}`}>
+                <Icon name="flag" weight="fill" size={12} />
+                {PRIORITY_LABEL[p]}
+              </span>
+            ) : (
+              <span className="tag ok">
+                <Icon name="checkCircle" size={13} weight="fill" />
+                Delivered {shortDate(job.deliveredAt ?? job.receivedAt, now)}
+              </span>
+            )}
+          </div>
+          <p className="meta-line">
+            {isOpen && (
+              <span>
+                {viaTeams && <Icon name="teams" size={14} />}
+                Received {shortDate(job.receivedAt, now)}
+                {viaTeams && ' on Teams'}
+              </span>
+            )}
+            <span>
+              {plural(job.images.length, 'master image')} × {plural(job.fabrics.length, 'fabric')}
             </span>
-          ) : (
-            <span className="sk-badge ok">
-              <Icon name="checkCircle" size={14} weight="fill" />
-              Delivered {shortDate(job.deliveredAt ?? job.receivedAt, now)}
-            </span>
-          )}
-          {isOpen && (
-            <span className={`flag ${p}`}>
-              <Icon name="flag" weight="fill" size={12} />
-              {PRIORITY_LABEL[p]}
-            </span>
-          )}
-        </div>
-        <div className="sk-name">
-          <h2>{job.name}</h2>
-          <button type="button" className="icon-btn ghost" aria-label="Edit job" title="Edit job" onClick={onEdit}>
-            <Icon name="pencil" size={18} />
-          </button>
-        </div>
-        <p className="sk-meta">
-          <span className="nowrap">{plural(job.images.length, 'master image')} × {plural(job.fabrics.length, 'fabric')}</span>
-          {job.folder && (
-            <>
-              {' · '}
-              <button type="button" className="link-btn sk-path" title="Open folder" aria-label={`Open folder ${job.folder}`} onClick={() => hub.openPath(job.folder!)}>
-                {job.folder}
-              </button>
-            </>
-          )}
-        </p>
-        {job.sheet && (
-          <p className="sk-meta small">
-            From {job.sheet.split(/[\\/]/).pop()}
-            {job.options && job.options.length > 1 && ` · ${job.options.length} ${/leg/i.test(job.options.join(' ')) ? 'leg finishes' : 'options'} in the sheet (${job.options.join(', ')}) don't need their own images`}
+            {job.sheet && <span>From {job.sheet.split(/[\\/]/).pop()}</span>}
+            {job.folder && (
+              <span>
+                <button type="button" className="link-btn" title={job.folder} aria-label={`Open folder ${job.folder}`} onClick={() => hub.openPath(job.folder!)}>
+                  <Icon name="folder" size={14} />
+                  {job.folder.split(/[\\/]/).filter(Boolean).pop()}
+                </button>
+              </span>
+            )}
           </p>
-        )}
-        {job.notes && <p className="sk-notes clamp">{job.notes}</p>}
-      </div>
-      <div className="sk-stats">
-        <div className="sk-stat">
-          <span>Earned</span>
-          <b>{formatMoney(done * rate, currency)}</b>
+          {job.options && job.options.length > 1 && (
+            <p className="sk-note">
+              {job.options.length} {/leg/i.test(job.options.join(' ')) ? 'leg finishes' : 'options'} in the sheet ({job.options.join(', ')}) don't need their own images
+            </p>
+          )}
+          {job.notes && <p className="sk-note clamp">{job.notes}</p>}
         </div>
-        <div className="sk-stat">
-          <span>Still to make</span>
-          <b>{formatMoney((total - done) * rate, currency)}</b>
+        <dl className="sk-stats">
+          <div>
+            <dt>Images</dt>
+            <dd>
+              {done}/{total}
+            </dd>
+          </div>
+          <div>
+            <dt>Earned</dt>
+            <dd>{formatMoney(done * rate, currency)}</dd>
+          </div>
+          <div>
+            <dt>Still to make</dt>
+            <dd>{formatMoney((total - done) * rate, currency)}</dd>
+          </div>
+        </dl>
+        <div className="sk-job-actions">
+          <MenuButton label="Edit the job and its folder" icon="dots">
+            {close => (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    onEdit();
+                  }}
+                >
+                  <Icon name="pencil" />
+                  <span className="grow">Edit job</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close();
+                    onScan();
+                  }}
+                >
+                  <Icon name={job.folder ? 'folderDashed' : 'folder'} />
+                  <span className="grow">{job.folder ? 'Scan job folder' : 'Link a folder'}</span>
+                </button>
+                {job.folder && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title={job.folder}
+                    onClick={() => {
+                      close();
+                      hub.openPath(job.folder!);
+                    }}
+                  >
+                    <Icon name="folderOpen" />
+                    <span className="grow">Open job folder</span>
+                  </button>
+                )}
+              </>
+            )}
+          </MenuButton>
+          {isOpen ? (
+            <button type="button" onClick={onDeliver}>
+              <Icon name="send" /> Mark delivered
+            </button>
+          ) : (
+            <button type="button" onClick={onDeliver}>
+              <Icon name="repeat" /> Reopen
+            </button>
+          )}
         </div>
       </div>
-      <div className="sk-hero-actions">
-        {isOpen ? (
-          <button type="button" className="primary lg" onClick={onDeliver}>
-            <Icon name="send" size={18} /> Mark delivered
-          </button>
-        ) : (
-          <button type="button" className="lg" onClick={onDeliver}>
-            <Icon name="repeat" size={18} /> Reopen
-          </button>
-        )}
-        <button type="button" className="sk-scan" onClick={onScan}>
-          <Icon name={job.folder ? 'folderDashed' : 'folder'} size={16} /> {job.folder ? 'Scan folder' : 'Link folder'}
-        </button>
+      <div className="progress" role="progressbar" aria-label="Images made" aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+        <div style={{ width: `${pct}%` }} />
       </div>
+      {children}
     </section>
   );
 }
@@ -538,7 +630,7 @@ function Variations({ job, onToggle, onFabric }: { job: SkeidarJob; onToggle(j: 
               onClick={() => onFabric(job, fi, !all)}
             >
               <span className="sk-swatch" style={{ background: colours[fi] }} />
-              <span>{f}</span>
+              <span className="sk-fab-name">{f}</span>
             </button>
           );
         })}
@@ -551,7 +643,7 @@ function Variations({ job, onToggle, onFabric }: { job: SkeidarJob; onToggle(j: 
                   <LocalThumb path={job.imageFiles[ii]} className="sk-thumb" alt={im} />
                 ) : (
                   <span className="sk-thumb ph" aria-hidden="true">
-                    <Icon name="image" size={22} />
+                    <Icon name="image" size={18} />
                   </span>
                 )}
                 <div>
@@ -578,10 +670,10 @@ function Variations({ job, onToggle, onFabric }: { job: SkeidarJob; onToggle(j: 
                   >
                     {on ? (
                       <span className="sk-check">
-                        <Icon name="check" size={15} weight="bold" />
+                        <Icon name="check" size={13} weight="bold" />
                       </span>
                     ) : (
-                      <Icon name="plus" size={20} />
+                      <Icon name="plus" size={16} />
                     )}
                   </button>
                 );
@@ -625,9 +717,9 @@ const PROMPT_ROWS = 8;
 
 /**
  * Prompts for the image tool, one per fabric for the chosen master photo. Each comes with the file name to save the
- * result under; once that file is in the job's output folder, the tile ticks itself off.
+ * result under; once that file is in the job's output folder, the tile ticks itself off. lead starts the toolbar.
  */
-function Prompts({ job }: { job: SkeidarJob }) {
+function Prompts({ job, lead }: { job: SkeidarJob; lead: ReactNode }) {
   const { copy, dialog } = useCopy();
   const [image, setImage] = useState(0);
   const [shown, setShown] = useState<number | null>(null);
@@ -642,52 +734,43 @@ function Prompts({ job }: { job: SkeidarJob }) {
   const photo = promptList(job, { image: ii, onlyMissing: true });
   const left = promptList(job, { onlyMissing: true });
   const photoName = job.images[ii];
+  const photos: Choice[] = job.images.map((im, i) => {
+    const n = job.fabrics.filter((_, fi) => !job.done[`${fi}:${i}`]).length;
+    return { value: String(i), label: `${im} · ${n ? `${n} to make` : 'all made'}`, short: im };
+  });
 
   return (
-    <section className="panel sk-prompts" aria-labelledby="sk-pr-title">
-      <div className="sk-pr-head">
-        <div className="grow">
-          <h2 id="sk-pr-title">Prompts for the image tool</h2>
-          <p className="small muted">Attach the master photo, paste its prompt, then save the result under the file name shown, in the job's output folder. The app ticks it off.</p>
-        </div>
-        <div className="row gap wrap">
-          <button type="button" className="mini primary" disabled={!photo.count} onClick={() => copy(photo.text, `${plural(photo.count, 'prompt')} for ${photoName}`)}>
+    <>
+      <div className="sk-bar">
+        {lead}
+        {job.images.length > 1 && (
+          <Dropdown
+            label="Master photo"
+            prefix="Photo"
+            value={String(ii)}
+            options={photos}
+            onChange={v => {
+              setImage(Number(v));
+              setShown(null);
+            }}
+          />
+        )}
+        <div className="sk-bar-end">
+          <button type="button" className="mini" disabled={!photo.count} onClick={() => copy(photo.text, `${plural(photo.count, 'prompt')} for ${photoName}`)}>
             <Icon name="clipboard" size={14} /> Copy {photo.count} for {photoName}
           </button>
           {job.images.length > 1 && (
-            <button type="button" className="mini" disabled={!left.count} onClick={() => copy(left.text, `all ${plural(left.count, 'prompt')} still to make`)}>
+            <button type="button" className="mini ghost" disabled={!left.count} onClick={() => copy(left.text, `all ${plural(left.count, 'prompt')} still to make`)}>
               Copy all {left.count} left
             </button>
           )}
         </div>
       </div>
-
-      {job.images.length > 1 && (
-        <div className="sk-pr-photos" role="group" aria-label="Master photo">
-          {job.images.map((im, i) => {
-            const n = job.fabrics.filter((_, fi) => !job.done[`${fi}:${i}`]).length;
-            return (
-              <button key={i} type="button" className={`sk-pr-photo ${i === ii ? 'on' : ''}`} aria-pressed={i === ii} onClick={() => (setImage(i), setShown(null))}>
-                {job.imageFiles?.[i] ? (
-                  <LocalThumb path={job.imageFiles[i]} className="sk-pr-thumb" alt="" />
-                ) : (
-                  <span className="sk-pr-thumb ph" aria-hidden="true">
-                    <Icon name="image" size={16} />
-                  </span>
-                )}
-                <span className="sk-pr-photo-txt">
-                  <b>{im}</b>
-                  <small>{n ? `${n} to make` : 'All made'}</small>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <p className="sk-hint">Attach the master photo, paste its prompt, then save the result under the file name shown, in the job's output folder. The app ticks it off.</p>
 
       {todo.length === 0 && !withMade ? (
         <p className="sk-pr-done">
-          <Icon name="checkCircle" size={18} weight="fill" /> Every fabric is made for {photoName}.
+          <Icon name="checkCircle" size={16} weight="fill" /> Every fabric is made for {photoName}.
         </p>
       ) : (
         <ul className="sk-pr-list">
@@ -698,6 +781,16 @@ function Prompts({ job }: { job: SkeidarJob }) {
             return (
               <li key={fi} className={made ? 'made' : ''}>
                 <div className="sk-pr-row">
+                  <button
+                    type="button"
+                    className="icon-btn mini ghost"
+                    aria-expanded={open}
+                    aria-label={`${open ? 'Hide' : 'Show'} the prompt for ${f}`}
+                    title={open ? 'Hide the prompt' : 'Show the prompt'}
+                    onClick={() => setShown(open ? null : fi)}
+                  >
+                    <Icon name={open ? 'caretDown' : 'caretRight'} size={14} />
+                  </button>
                   <span className="sk-swatch" style={{ background: colours[fi] }} aria-hidden="true" />
                   <div className="sk-pr-name">
                     <b>
@@ -710,10 +803,7 @@ function Prompts({ job }: { job: SkeidarJob }) {
                   </div>
                   {made && <span className="tag ok">Made</span>}
                   <div className="sk-pr-btns">
-                    <button type="button" className="mini ghost" aria-expanded={open} onClick={() => setShown(open ? null : fi)}>
-                      {open ? 'Hide' : 'Show'}
-                    </button>
-                    <button type="button" className="mini" title={`Copy “${file}”`} onClick={() => copy(file, 'the file name')}>
+                    <button type="button" className="mini ghost" title={`Copy “${file}”`} onClick={() => copy(file, 'the file name')}>
                       File name
                     </button>
                     <button type="button" className="mini" onClick={() => copy(promptFor(job, fi, ii), `the prompt for ${f}`)}>
@@ -728,20 +818,22 @@ function Prompts({ job }: { job: SkeidarJob }) {
         </ul>
       )}
 
-      <div className="row gap wrap">
-        {listed.length > PROMPT_ROWS && (
-          <button type="button" className="ghost mini" onClick={() => setAll(!all)}>
-            {all ? 'Show fewer' : `Show all ${listed.length}`}
-          </button>
-        )}
-        {rows.length > todo.length && (
-          <button type="button" className="ghost mini" aria-pressed={withMade} onClick={() => setWithMade(!withMade)}>
-            {withMade ? 'Hide made ones' : `Also show ${rows.length - todo.length} made`}
-          </button>
-        )}
-      </div>
+      {(listed.length > PROMPT_ROWS || rows.length > todo.length) && (
+        <div className="row gap wrap">
+          {listed.length > PROMPT_ROWS && (
+            <button type="button" className="ghost mini" onClick={() => setAll(!all)}>
+              {all ? 'Show fewer' : `Show all ${listed.length}`}
+            </button>
+          )}
+          {rows.length > todo.length && (
+            <button type="button" className="ghost mini" aria-pressed={withMade} onClick={() => setWithMade(!withMade)}>
+              {withMade ? 'Hide made ones' : `Also show ${rows.length - todo.length} made`}
+            </button>
+          )}
+        </div>
+      )}
       {dialog}
-    </section>
+    </>
   );
 }
 

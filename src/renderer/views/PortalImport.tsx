@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppState, PortalField, PortalMapping, PortalTable } from '../../shared/types';
 import type { PortalRow } from '../../shared/ops';
-import { COMPLEXITY_LABELS, mapComplexity, mapPortalStatus } from '../../shared/status';
+import { COMPLEXITY_LABELS, mapComplexity, mapPortalStatus, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
 import { Field, Icon, Modal, StatusPill, fmtDate, useApp } from '../ui';
 import { sppMessage } from '../../shared/outputs';
@@ -103,7 +103,7 @@ function toDate(s: string): string | undefined {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-/** Portal status words and the status each becomes, shown under the preview. */
+/** Portal status words and the status each becomes, listed under the preview. */
 const WORDS: [string, PortalRow['status']][] = [
   ['approved', 'done'],
   ['rejected / redo', 'revision'],
@@ -124,6 +124,7 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
   // A full pull is the whole dashboard, so jobs missing from it (approved) can be found in the output folder.
   const [whole, setWhole] = useState(mode === 'pull');
   const [fields, setFields] = useState<Partial<Record<PortalField, number>>>({});
+  const [remap, setRemap] = useState(false);
   const has = (f: PortalField) => (fields[f] ?? -1) >= 0;
 
   const pull = async () => {
@@ -196,6 +197,8 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
   };
 
   const saved = table && state.settings.portalMappings.some(m => m.signature === signature(table));
+  // A saved mapping that finds rows stays folded away until asked for.
+  const foldable = saved && rows.length > 0;
   const title = mode === 'pull' ? 'Pull models from the MetaZtech portal' : mode === 'file' ? `Import ${file?.source ?? 'a table'} into MetaZtech` : 'Import a pasted table';
 
   return (
@@ -227,19 +230,19 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
       <div className="pi">
         {mode === 'pull' && (
           <p className="pi-intro">
-            Reads the page open in the portal window. Log in there once (the session is kept), open the list of your assigned models (and the rejected / submitted lists if they are separate pages), and pull each one.
+            Reads the page open in the CMS window (log in there once; the session is kept). Open the list of your assigned models there, and the rejected or submitted lists if they are separate pages, and pull each one.
             {pageInfo && <span className="pi-page">Page: {pageInfo}</span>}
           </p>
         )}
         {mode === 'paste' && (
-          <Field label="Paste the table (select it in the portal or a sheet, Ctrl+C, then Ctrl+V here). First row must be the headers.">
+          <Field label="Paste the table, headers first (select it in the portal or a sheet, Ctrl+C, then Ctrl+V here)">
             <textarea rows={6} value={paste} onChange={e => setPaste(e.target.value)} placeholder={'Job ID\tModel\tComplexity\tStatus\nMZ-101\tOffice chair\tComplex\tRejected'} />
           </Field>
         )}
         {mode === 'file' && file && (
           <div className="pi-file">
             <span className="pi-file-ic" aria-hidden="true">
-              <Icon name="table" size={22} weight="fill" />
+              <Icon name="table" size={18} weight="fill" />
             </span>
             <div className="grow">
               <b className="ellipsis">{file.source}</b>
@@ -267,25 +270,32 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
             <div className="pi-sec">
               <h3>Which column is which?</h3>
               {saved && <span className="tag ok">Saved mapping</span>}
+              {foldable && (
+                <button type="button" className="link-btn pi-toggle" aria-expanded={remap} onClick={() => setRemap(!remap)}>
+                  {remap ? 'Hide' : 'Change'}
+                </button>
+              )}
             </div>
-            <div className="pi-map">
-              {FIELDS.map(f => (
-                <Field key={f.key} label={f.label}>
-                  <select
-                    className={has(f.key) ? 'set' : ''}
-                    value={has(f.key) ? fields[f.key] : ''}
-                    onChange={e => setFields({ ...fields, [f.key]: e.target.value === '' ? -1 : Number(e.target.value) })}
-                  >
-                    <option value="">—</option>
-                    {table.headers.map((h, i) => (
-                      <option key={i} value={i}>
-                        {h || `Column ${i + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              ))}
-            </div>
+            {(!foldable || remap) && (
+              <div className="pi-map">
+                {FIELDS.map(f => (
+                  <Field key={f.key} label={f.label}>
+                    <select
+                      className={has(f.key) ? 'set' : ''}
+                      value={has(f.key) ? fields[f.key] : ''}
+                      onChange={e => setFields({ ...fields, [f.key]: e.target.value === '' ? -1 : Number(e.target.value) })}
+                    >
+                      <option value="">—</option>
+                      {table.headers.map((h, i) => (
+                        <option key={i} value={i}>
+                          {h || `Column ${i + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                ))}
+              </div>
+            )}
             <div className="pi-sec">
               <h3>Preview</h3>
               <span className="muted small">{rows.length > 10 ? `First 10 of ${rows.length} rows` : `${rows.length} row${rows.length === 1 ? '' : 's'}`}</span>
@@ -297,9 +307,9 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
                     <tr>
                       <th>ID</th>
                       <th>Name</th>
-                      <th>Portal status</th>
+                      <th className="pi-c-portal">Portal status</th>
                       <th>Becomes</th>
-                      <th>Complexity</th>
+                      <th className="pi-c-cx">Complexity</th>
                       <th className="num">Rejections</th>
                       {has('due') && <th>Due</th>}
                       {has('approved') && <th>Approved on</th>}
@@ -310,11 +320,11 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
                       <tr key={i}>
                         <td className="pi-code">{r.code}</td>
                         <td className="pi-name">{r.name}</td>
-                        <td className="muted">{r.statusText}</td>
+                        <td className="muted pi-c-portal">{r.statusText}</td>
                         <td>
                           <StatusPill status={r.status} company="metaztech" />
                         </td>
-                        <td>{r.complexity ? COMPLEXITY_LABELS[r.complexity] : <span className="muted">not set</span>}</td>
+                        <td className="pi-c-cx">{r.complexity ? COMPLEXITY_LABELS[r.complexity] : <span className="muted">not set</span>}</td>
                         <td className="num">{r.revisions ?? ''}</td>
                         {has('due') && <td className="nowrap">{fmtDate(r.due)}</td>}
                         {has('approved') && <td className="nowrap">{fmtDate(r.approvedOn)}</td>}
@@ -326,18 +336,9 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
             ) : (
               <p className="pi-intro">No rows yet: pick the column that holds the model name or the job ID.</p>
             )}
-            <div className="pi-words" aria-label="How portal status words are read">
-              <span className="muted small">Status words are matched automatically:</span>
-              {WORDS.map(([w, st]) => (
-                <span key={w} className="pi-word">
-                  {w}
-                  <Icon name="arrowRight" size={12} />
-                  <StatusPill status={st} company="metaztech" />
-                </span>
-              ))}
-            </div>
             <p className="pi-note">
-              Existing models are matched by job ID (by name only when there is no ID), so pulling again only updates them.
+              Existing models are matched by job ID (by name when there is no ID), so pulling again only updates them. Status words are read as{' '}
+              {WORDS.map(([w, st]) => `${w} → ${statusLabel(st, 'metaztech')}`).join(' · ')}.
             </p>
             {!has('approved') && rows.some(r => r.status === 'done') && (
               <p className="pi-note warn-text">No "Approved on" column picked: approved models new to the app count toward this month's earnings.</p>

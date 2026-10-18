@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState } from '../shared/types';
 import { statusLabel } from '../shared/status';
-import { ClientTile, Icon, type IconName, type Route } from './ui';
+import { CLIENT_ICON, Icon, type IconName, type Route } from './ui';
 import type { ClientKey } from './ui';
 
 interface Hit {
@@ -92,8 +92,10 @@ export function Omni({ state, screens, onGo }: { state: AppState; screens: Scree
           placeholder="Search models, clients, subscriptions…"
           aria-label="Search models, clients and subscriptions"
           role="combobox"
-          aria-expanded={open && !!q}
+          aria-autocomplete="list"
+          aria-expanded={open && !!q.trim()}
           aria-controls="omni-results"
+          aria-activedescendant={open && hits[at] ? `omni-hit-${at}` : undefined}
           onChange={e => {
             setQ(e.target.value);
             setOpen(true);
@@ -110,7 +112,11 @@ export function Omni({ state, screens, onGo }: { state: AppState; screens: Scree
             } else if (e.key === 'ArrowUp') {
               e.preventDefault();
               setAt(i => Math.max(i - 1, 0));
-            } else if (e.key === 'Enter' && hits[at]) pick(hits[at]);
+            } else if (e.key === 'Enter' && hits[at]) {
+              // Without this the same Enter also presses whatever the new screen focuses first, e.g. a drawer's status pill.
+              e.preventDefault();
+              pick(hits[at]);
+            }
           }}
         />
         <span className="kbd">Ctrl K</span>
@@ -124,14 +130,19 @@ export function Omni({ state, screens, onGo }: { state: AppState; screens: Scree
             return (
               <div key={`${h.group}-${i}`}>
                 {head && <div className="grp">{h.group}</div>}
-                <button type="button" role="option" aria-selected={i === at} className={i === at ? 'on' : ''} onMouseEnter={() => setAt(i)} onClick={() => pick(h)}>
-                  {h.client ? (
-                    <ClientTile client={h.client} size="sm" icon={h.icon} />
-                  ) : (
-                    <span className="ic-tile sm" style={{ background: 'var(--fill)' }}>
-                      <Icon name={h.icon ?? 'arrowRight'} size={17} />
-                    </span>
-                  )}
+                <button
+                  type="button"
+                  id={`omni-hit-${i}`}
+                  role="option"
+                  tabIndex={-1}
+                  aria-selected={i === at}
+                  className={i === at ? 'on' : ''}
+                  onMouseEnter={() => setAt(i)}
+                  onClick={() => pick(h)}
+                >
+                  <span className={`omni-ic ${h.client ? `c-${h.client}` : ''}`} aria-hidden="true">
+                    <Icon name={h.icon ?? (h.client ? (CLIENT_ICON[h.client] ?? 'cube') : 'arrowRight')} />
+                  </span>
                   <span className="t">
                     <b>{h.title}</b>
                     {h.sub && <small>{h.sub}</small>}

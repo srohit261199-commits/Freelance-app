@@ -4,25 +4,27 @@ import { isOpen, lastWorked, statusesFor, statusLabel } from '../../shared/statu
 import { modelLabel } from '../../shared/planner';
 import { nextDeadlines, paceText, weekProgress } from '../../shared/pace';
 import { hub } from '../hub';
-import { ClientTile, Empty, Icon, Modal, StatusPicker, fmtDate, useApp } from '../ui';
+import { Dropdown, Empty, Icon, MenuButton, Modal, PageHead, StatusPicker, fmtDate, useApp, type Choice, type IconName } from '../ui';
 import { modelPriority, PRIORITY_LABEL, PRIORITY_ORDER, type Priority } from '../priority';
-import { AddModel, ModelDrawer } from './Models';
+import { AddModel, ModelDrawer, nextStep } from './Models';
 import { when } from './MetaZtechParts';
-import { DashMenu, type MenuItem } from './DashMenu';
 import { AssetsPanel } from './AssetsPanel';
 import { JobDetails, JobEditor, clientIcon, jobPayText } from './JobDetails';
 import './Client.css';
 
 type Tab = ModelStatus | 'all';
-/** The row's one-click next step; anything else opens the model. */
-const ACTION: Partial<Record<ModelStatus, { to: ModelStatus; label: string }>> = {
-  revision: { to: 'in_progress', label: 'Fix now' },
-  todo: { to: 'in_progress', label: 'Start' },
-  in_progress: { to: 'review', label: 'Submit' },
-  review: { to: 'done', label: 'Done' },
-};
 const RANK: Partial<Record<ModelStatus, number>> = { revision: 0, in_progress: 1, todo: 2, review: 3 };
 const touched = (m: Model) => lastWorked(m) ?? m.updatedAt;
+
+/** An item in the header's ⋯ menu. */
+function Act({ icon, label, run }: { icon: IconName; label: string; run(): void }) {
+  return (
+    <button type="button" role="menuitem" onClick={run}>
+      <Icon name={icon} />
+      <span className="grow">{label}</span>
+    </button>
+  );
+}
 
 /** Screen for a client added by hand that works with a list of models. */
 export function Client({ state, company, openId, now }: { state: AppState; company: CompanyId; openId?: string; now: Date }) {
@@ -79,6 +81,12 @@ export function Client({ state, company, openId, now }: { state: AppState; compa
   const current = openModel ? all.find(m => m.id === openModel) : undefined;
   const groups = [...new Set(all.map(m => m.group).filter((g): g is string => !!g))];
   const open = all.filter(m => isOpen(m.status)).length;
+  const tabs: Choice<Tab>[] = (['all', ...statuses] as const).map(s => ({
+    value: s,
+    label: s === 'all' ? 'All' : statusLabel(s, company),
+    tone: s === 'all' ? undefined : `st-${s}`,
+    count: counts[s] ?? 0,
+  }));
 
   const set = async (ids: string[], to: ModelStatus) => {
     await hub.setStatus(ids, to);
@@ -95,12 +103,6 @@ export function Client({ state, company, openId, now }: { state: AppState; compa
     if (p === 'urgent' && today.length) return `${today[0].label} is today`;
     return pace?.per === 'week' ? `Behind this week's target (${pace.done} of ${pace.target})` : `Today's target: ${pace?.done ?? 0} of ${pace?.target ?? 0}`;
   };
-  const menu: MenuItem[] = [
-    { label: 'Edit job details', icon: 'pencil', onSelect: () => setEditing(true) },
-    ...(cfg.notes.trim() ? [{ label: 'Brief & pay terms', icon: 'info' as const, onSelect: () => setBrief(true) }] : []),
-    ...cfg.links.map(l => ({ label: l.label, icon: 'link' as const, onSelect: () => void hub.openUrl(l.url) })),
-    { label: 'Export to Excel', icon: 'excel', onSelect: () => void exportClient() },
-  ];
 
   return (
     <div className={`page cl-page c-${company}`}>
@@ -113,57 +115,80 @@ export function Client({ state, company, openId, now }: { state: AppState; compa
           </button>
         </div>
       )}
-      <header className="cl-head">
-        <span className="client-tile c-fill" aria-hidden="true">
-          <Icon name={clientIcon(cfg)} size={30} weight="fill" />
-        </span>
-        <div className="cl-title">
-          <h1>{cfg.name}</h1>
-          <div className="cl-chips">
-            {cfg.role && <span className="cl-chip">{cfg.role}</span>}
-            <span className="cl-chip c-soft">{jobPayText(cfg)}</span>
-            {pace && <span className={`cl-chip ${pace.behind && pace.per === 'week' ? 'warn' : ''}`}>{paceText(pace)}</span>}
+      <PageHead
+        title={cfg.name}
+        icon={clientIcon(cfg)}
+        meta={
+          <>
+            {cfg.role && <span>{cfg.role}</span>}
+            <span>{jobPayText(cfg)}</span>
+            {/* A week the job hasn't reached yet has nothing to count */}
+            {pace && pace.target > 0 && <span className={pace.behind && pace.per === 'week' ? 'warn-text' : ''}>{paceText(pace)}</span>}
             {today.map(d => (
-              <span key={d.id} className="cl-chip bad">
+              <span key={d.id} className={d.passed ? '' : 'bad-text'}>
                 {d.label} today{d.time ? ` ${d.time}` : ''}
               </span>
             ))}
-          </div>
-        </div>
-        <div className="cl-actions">
-          <DashMenu iconOnly icon="dots" label="Job details, links and export" items={menu} className="cl-ibtn" />
-          <button type="button" className="lg primary" onClick={() => setAdding(true)}>
-            <Icon name="plus" size={18} /> Add model
-          </button>
-        </div>
-      </header>
-
-      <div className="cl-bar">
-        <div className="tabs cl-tabs" role="group" aria-label="Status">
-          {(['all', ...statuses] as const).map(s => (
-            <button key={s} type="button" className={`tab ${s === 'revision' && counts[s] ? 'bad' : ''} ${tab === s ? 'on' : ''}`} aria-pressed={tab === s} onClick={() => setTab(s)}>
-              {s === 'all' ? 'All' : statusLabel(s, company)}
-              <span className="n">{counts[s] ?? 0}</span>
-            </button>
-          ))}
-        </div>
-        <label className="cl-search">
-          <Icon name="search" size={16} />
-          <span className="sr-only">Search models</span>
-          <input type="search" placeholder="Name, ID or project" value={query} onChange={e => setQuery(e.target.value)} />
-        </label>
-      </div>
+          </>
+        }
+      >
+        <MenuButton label="More actions" icon="dots">
+          {close => (
+            <>
+              <Act
+                icon="pencil"
+                label="Edit job details"
+                run={() => {
+                  close();
+                  setEditing(true);
+                }}
+              />
+              {cfg.notes.trim() && (
+                <Act
+                  icon="info"
+                  label="Brief & pay terms"
+                  run={() => {
+                    close();
+                    setBrief(true);
+                  }}
+                />
+              )}
+              {cfg.links.length > 0 && <hr />}
+              {cfg.links.map(l => (
+                <Act
+                  key={l.url}
+                  icon="link"
+                  label={l.label}
+                  run={() => {
+                    close();
+                    void hub.openUrl(l.url);
+                  }}
+                />
+              ))}
+              <hr />
+              <Act
+                icon="excel"
+                label="Export to Excel"
+                run={() => {
+                  close();
+                  void exportClient();
+                }}
+              />
+            </>
+          )}
+        </MenuButton>
+        <button type="button" className="primary" onClick={() => setAdding(true)}>
+          <Icon name="plus" /> Add model
+        </button>
+      </PageHead>
 
       <div className="cl-grid">
         <section className="panel cl-list" aria-label="Models">
           {all.length === 0 ? (
             <Empty title={`No ${cfg.name} models yet`}>
-              <p>
-                Click <strong>Add model</strong> for each piece of work {cfg.name} gives you: its name, the ID they use for it, and where it stands. Start it, submit it for review and mark it done from
-                this list; finished models count toward the weekly target and pay.
-              </p>
+              <p>Add each piece of work they send. Finished models count toward the weekly target and pay.</p>
               <div className="row gap wrap cl-empty-acts">
-                <button type="button" className="mini primary" onClick={() => setAdding(true)}>
+                <button type="button" className="mini" onClick={() => setAdding(true)}>
                   <Icon name="plus" size={14} /> Add the first model
                 </button>
                 <button type="button" className="mini" onClick={() => setEditing(true)}>
@@ -171,90 +196,95 @@ export function Client({ state, company, openId, now }: { state: AppState; compa
                 </button>
               </div>
             </Empty>
-          ) : shown.length === 0 ? (
-            <Empty title="Nothing matches">
-              {q ? 'Change the search, or pick another tab.' : `No models are ${statusLabel(tab as ModelStatus, company).toLowerCase()} right now.`}
-            </Empty>
           ) : (
-            <div className="cl-table" role="table" aria-label={`${cfg.name} models`} aria-rowcount={shown.length + 1}>
-              <div className="cl-row cl-th" role="row">
-                <span role="columnheader">Model</span>
-                <span role="columnheader">Status</span>
-                <span role="columnheader">Updated</span>
-                <span role="columnheader">
-                  <span className="sr-only">Next step</span>
-                </span>
+            <>
+              <div className="cl-tools">
+                <Dropdown label="Status" prefix="Status" value={tab} options={tabs} onChange={v => setTab(v)} />
+                <label className="cl-search">
+                  <Icon name="search" />
+                  <span className="sr-only">Search models</span>
+                  <input type="search" placeholder="Name, ID or project" value={query} onChange={e => setQuery(e.target.value)} />
+                </label>
               </div>
-              <div role="rowgroup">
-                {shown.map(m => {
-                  const act = ACTION[m.status];
-                  const p = prio.get(m.id) ?? 'low';
-                  // In-progress work is high anyway; flag what the due date, the target or a deadline raised.
-                  const flag = m.status !== 'revision' && (p === 'urgent' || (p === 'high' && (m.status !== 'in_progress' || m.dueDate))) ? p : undefined;
-                  const worked = lastWorked(m);
-                  return (
-                    <div key={m.id} id={`cl-row-${m.id}`} role="row" className={`cl-row ${m.status === 'revision' ? 'bad' : ''} ${m.id === openModel ? 'open' : ''}`} onClick={() => setOpenModel(m.id)}>
-                      <span className="cl-c-model" role="cell">
-                        <ClientTile client={company} size="sm" icon={clientIcon(cfg)} />
-                        <span className="cl-name">
-                          <button
-                            type="button"
-                            className="link-btn"
-                            title={[m.name, m.group].filter(Boolean).join(' · ')}
-                            onClick={e => {
-                              e.stopPropagation();
-                              setOpenModel(m.id);
-                            }}
-                          >
-                            {m.starred && <Icon name="star" size={13} weight="fill" />}
-                            <span className="ellipsis">{m.name}</span>
-                          </button>
-                          <small>
-                            {m.code && <span>{m.code}</span>}
-                            {m.group && <span>{m.group}</span>}
-                            <span className="cl-upd-inline">{when(worked ?? m.updatedAt, now)}</span>
-                            {flag && (
-                              <span className={`flag ${flag}`} title={why(m, flag)}>
-                                <Icon name="flag" weight="fill" size={12} />
-                                {PRIORITY_LABEL[flag]}
-                              </span>
+              {shown.length === 0 ? (
+                <Empty title="Nothing matches">
+                  {q ? 'Change the search, or pick another status.' : `No models are ${statusLabel(tab as ModelStatus, company).toLowerCase()} right now.`}
+                </Empty>
+              ) : (
+                <div className="cl-table" role="table" aria-label={`${cfg.name} models`} aria-rowcount={shown.length + 1}>
+                  <div className="cl-row cl-th" role="row">
+                    <span role="columnheader">Model</span>
+                    <span role="columnheader">Status</span>
+                    <span className="cl-c-upd" role="columnheader">
+                      Updated
+                    </span>
+                    <span role="columnheader">
+                      <span className="sr-only">Next step</span>
+                    </span>
+                  </div>
+                  <div role="rowgroup">
+                    {shown.map(m => {
+                      const act = nextStep(m);
+                      const p = prio.get(m.id) ?? 'low';
+                      // In-progress work is high anyway; flag what the due date, the target or a deadline raised.
+                      const flag = m.status !== 'revision' && (p === 'urgent' || (p === 'high' && (m.status !== 'in_progress' || m.dueDate))) ? p : undefined;
+                      const worked = lastWorked(m);
+                      return (
+                        <div key={m.id} id={`cl-row-${m.id}`} role="row" className={`cl-row ${m.status === 'revision' ? 'bad' : ''} ${m.id === openModel ? 'open' : ''}`} onClick={() => setOpenModel(m.id)}>
+                          <span className="cl-c-model" role="cell">
+                            <button
+                              type="button"
+                              className="link-btn cl-name"
+                              title={[m.name, m.group].filter(Boolean).join(' · ')}
+                              onClick={e => {
+                                e.stopPropagation();
+                                setOpenModel(m.id);
+                              }}
+                            >
+                              {m.starred && <Icon name="star" size={13} weight="fill" />}
+                              <span className="ellipsis">{m.name}</span>
+                            </button>
+                            <small className="cl-sub">
+                              {m.code && <span>{m.code}</span>}
+                              {m.group && <span>{m.group}</span>}
+                              <span className="cl-upd-inline">{when(worked ?? m.updatedAt, now)}</span>
+                              {flag && (
+                                <span className={`flag ${flag}`} title={why(m, flag)}>
+                                  <Icon name="flag" weight="fill" size={11} />
+                                  {PRIORITY_LABEL[flag]}
+                                </span>
+                              )}
+                            </small>
+                          </span>
+                          <span className="cl-c-st" role="cell">
+                            <StatusPicker status={m.status} company={company} onPick={s => set([m.id], s)} />
+                          </span>
+                          <span className="cl-c-upd" role="cell" title={worked ? `Status changed ${fmtDate(worked, true)}` : `Added ${fmtDate(m.createdAt, true)}`}>
+                            {when(worked ?? m.updatedAt, now)}
+                          </span>
+                          <span className="cl-c-act" role="cell" onClick={e => e.stopPropagation()}>
+                            {act && (
+                              <button type="button" className="mini" onClick={() => set([m.id], act.to)} aria-label={`${act.label}: ${m.name}`}>
+                                {act.label}
+                              </button>
                             )}
-                          </small>
-                        </span>
-                      </span>
-                      <span className="cl-c-st" role="cell">
-                        <StatusPicker status={m.status} company={company} onPick={s => set([m.id], s)} />
-                      </span>
-                      <span className="cl-c-upd" role="cell" title={worked ? `Status changed ${fmtDate(worked, true)}` : `Added ${fmtDate(m.createdAt, true)}`}>
-                        {when(worked ?? m.updatedAt, now)}
-                      </span>
-                      <span className="cl-c-act" role="cell" onClick={e => e.stopPropagation()}>
-                        {act ? (
-                          <button type="button" className={`cl-act ${m.status === 'revision' ? 'ink' : ''}`} onClick={() => set([m.id], act.to)} aria-label={`${act.label}: ${m.name}`}>
-                            {act.label}
-                          </button>
-                        ) : (
-                          <button type="button" className="cl-act" onClick={() => setOpenModel(m.id)} aria-label={`View ${m.name}`}>
-                            View
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {all.length > 0 && (
-            <p className="cl-foot muted small">
-              {open} open · {counts.review ?? 0} {statusLabel('review', company).toLowerCase()} · {all.length} in all
-            </p>
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <p className="cl-foot muted small">
+                {open} open · {counts.review ?? 0} {statusLabel('review', company).toLowerCase()} · {all.length} in all
+              </p>
+            </>
           )}
         </section>
 
-        <aside className="cl-side" aria-label="Job details and files">
-          <JobDetails state={state} company={company} now={now} />
-          <AssetsPanel state={state} company={company} />
+        <aside className="panel cl-side" aria-label="Job details and files">
+          <JobDetails state={state} company={company} now={now} bare />
+          <AssetsPanel state={state} company={company} bare />
         </aside>
       </div>
 

@@ -1,0 +1,84 @@
+/* The model drawer (ModelDrawer) on MetaZtech and on clients added by hand. Scoped under .md-drawer. */
+
+/* the status dropdown and the next step, then the portal link and the star */
+.md-drawer .md-acts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.md-drawer .md-star[aria-pressed='true'] {
+  color: var(--st-prog);
+}
+.md-drawer .drawer-body > h3 {
+  margin-top: 4px;
+}
+/* the small delete button's icon lines up with the content above it */
+.md-drawer .md-delete {
+  align-self: flex-start;
+  margin-left: -10px;
+}
+.md-drawer .contents {
+  display: contents;
+}
+.md-drawer .facts {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.md-drawer .facts dt {
+  color: var(--muted);
+}
+.md-drawer .facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.md-drawer .pre {
+  white-space: pre-wrap;
+}
+.md-drawer .gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.md-drawer .gallery button {
+  height: auto;
+  padding: 0;
+  aspect-ratio: 1;
+  border-radius: var(--r);
+  overflow: hidden;
+  background: var(--hover);
+}
+.md-drawer .gallery img,
+.md-drawer .gallery .ph {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.md-drawer .history {
+  display: flex;
+  flex-direction: column;
+}
+.md-drawer .history li {
+  padding: 6px 0;
+  border-top: 1px solid var(--line-2);
+  font-size: 13px;
+}
+.md-drawer .history li:first-child {
+  border-top: 0;
+}
+
+@media (max-width: 760px) {
+  .md-drawer .facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0 12px;
+  }
+  .md-drawer .facts dd {
+    margin-bottom: 6px;
+  }
+  .md-drawer .gallery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

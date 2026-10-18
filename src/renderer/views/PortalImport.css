@@ -2,7 +2,7 @@
 .pi {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
 }
 .pi .pi-intro {
@@ -12,32 +12,27 @@
 }
 .pi .pi-page {
   display: block;
-  margin-top: 6px;
-  color: var(--text-2);
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--faint);
   overflow-wrap: anywhere;
-}
-.pi .field > span:first-child {
-  line-height: 1.4;
 }
 .pi textarea {
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 
 /* the file being imported */
 .pi .pi-file {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 12px 16px 12px 12px;
-  border-radius: 20px;
-  background: var(--hover);
+  gap: 12px;
   min-width: 0;
 }
 .pi .pi-file-ic {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r);
   background: var(--mz-tint);
   color: var(--mz-deep);
   display: grid;
@@ -46,11 +41,10 @@
 }
 .pi .pi-file b {
   display: block;
-  font-size: 15px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .pi .pi-file small {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 
@@ -58,43 +52,43 @@
 .pi .pi-sec {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   margin-top: 4px;
 }
-.pi .pi-sec h3 {
-  font-size: 16px;
-  font-weight: 800;
+.pi .pi-toggle {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--link);
 }
 
 /* mapping selects */
 .pi .pi-map {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 12px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px 12px;
 }
 .pi .pi-map select {
   width: 100%;
-  height: 40px;
-  font-weight: 600;
+  font-size: 13px;
   color: var(--muted);
 }
 .pi .pi-map select.set {
   color: var(--text);
+  font-weight: 550;
 }
 
 /* preview */
 .pi .pi-preview {
-  max-height: 320px;
-  border-radius: 18px;
+  max-height: 300px;
+  border-radius: var(--r);
   box-shadow: 0 0 0 1px var(--line);
-  padding: 0 6px 6px;
 }
 .pi .pi-preview th {
-  padding-top: 12px;
+  padding-top: 8px;
 }
 .pi .pi-preview td {
-  padding: 10px;
   font-size: 13px;
 }
 .pi .pi-preview .pi-code {
@@ -103,30 +97,11 @@
   white-space: nowrap;
 }
 .pi .pi-preview .pi-name {
-  font-weight: 600;
+  font-weight: 550;
   min-width: 180px;
 }
 .pi .nowrap {
   white-space: nowrap;
-}
-
-/* status words */
-.pi .pi-words {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-}
-.pi .pi-word {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-2);
-}
-.pi .pi-word .icon {
-  color: var(--faint);
 }
 .pi .pi-note {
   font-size: 12px;
@@ -140,10 +115,15 @@
 @media (max-width: 760px) {
   .pi .pi-map {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
   }
   .pi .pi-preview {
-    max-height: 280px;
+    max-height: 260px;
+  }
+}
+/* on a phone the preview scrolls sideways; the name keeps enough room to read */
+@media (max-width: 500px) {
+  .pi .pi-preview .pi-name {
+    min-width: 140px;
   }
 }
 

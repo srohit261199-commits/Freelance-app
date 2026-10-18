@@ -5,17 +5,17 @@ import { modelLabel } from '../../shared/planner';
 import { isComplete, statusEvents, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
 import { PRIORITY_LABEL, PRIORITY_ORDER, jobPriority, modelPriority, type Priority } from '../priority';
-import { Icon, useApp } from '../ui';
+import { Dropdown, Icon, useApp, type Choice } from '../ui';
 import { DashMenu, type MenuItem } from './DashMenu';
 import { isBuiltIn } from './JobDetails';
 
 type Col = 'todo' | 'in_progress' | 'review' | 'revision' | 'done';
-const COLS: { id: Col; name: string; tone: string }[] = [
-  { id: 'todo', name: 'To do', tone: 'todo' },
-  { id: 'in_progress', name: 'In progress', tone: 'prog' },
-  { id: 'review', name: 'In review', tone: 'rev' },
-  { id: 'revision', name: 'Rejected', tone: 'bad' },
-  { id: 'done', name: 'Done', tone: 'ok' },
+const COLS: { id: Col; name: string }[] = [
+  { id: 'todo', name: 'To do' },
+  { id: 'in_progress', name: 'In progress' },
+  { id: 'review', name: 'In review' },
+  { id: 'revision', name: 'Rejected' },
+  { id: 'done', name: 'Done' },
 ];
 const BUILT_INS: CompanyId[] = ['waveink', 'metaztech', 'skeidar'];
 const RECENT = 14 * 86400000;
@@ -143,6 +143,15 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
           : PRIORITY_ORDER.indexOf(a.prio) - PRIORITY_ORDER.indexOf(b.prio) || a.order.localeCompare(b.order) || a.title.localeCompare(b.title),
       );
   const name = (id: CompanyId) => state.companies.find(c => c.id === id)?.name ?? id;
+  const filterOptions = ['all', ...clients].map(
+    (f): Choice => ({
+      value: f,
+      label: f === 'all' ? 'All clients' : name(f),
+      short: f === 'all' ? 'All' : undefined,
+      client: f === 'all' ? undefined : f,
+      count: cards.filter(c => f === 'all' || c.client === f).length,
+    }),
+  );
 
   const open = (c: Card) => (c.model ? go({ view: 'company', company: c.model.company, modelId: c.model.id }) : go({ view: 'skeidar', company: c.job!.company, jobId: c.job!.id }));
 
@@ -182,15 +191,10 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
   return (
     <>
       <div className="dash-board-bar">
-        <div className="chips on-bg" role="group" aria-label="Show client">
-          {['all', ...clients].map(f => (
-            <button key={f} type="button" className={`chip ${f !== 'all' ? `c-${f}` : ''} ${shownFilter === f ? 'on' : ''}`} aria-pressed={shownFilter === f} onClick={() => setFilter(f)}>
-              {f !== 'all' && <span className="dot" />}
-              {f === 'all' ? 'All' : name(f)}
-            </button>
-          ))}
-        </div>
-        <span className="dash-hint">Drag cards between columns · MetaZtech statuses sync from the CMS</span>
+        <Dropdown label="Client" prefix="Client" value={shownFilter} options={filterOptions} onChange={setFilter} />
+        <span className="dash-hint" title="MetaZtech statuses sync from the CMS">
+          Drag cards between columns
+        </span>
       </div>
       <div className="dash-cols-wrap">
         <div className="dash-cols">
@@ -212,11 +216,10 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
                 onDrop={drop(col.id)}
               >
                 <header className="dash-colhead">
-                  <span className={`dash-colpill ${col.tone}`}>
-                    {col.name}
-                    <span className="n">{list.length}</span>
-                  </span>
-                  {col.id === 'todo' && <DashMenu iconOnly icon="plus" label="Add a task" items={addItems} className="ghost dash-col-add" />}
+                  <span className={`dot st-${col.id}`} aria-hidden="true" />
+                  <h3>{col.name}</h3>
+                  <span className="n">{list.length}</span>
+                  {col.id === 'todo' && <DashMenu iconOnly icon="plus" label="Add a task" items={addItems} className="ghost mini dash-col-add" />}
                 </header>
                 <div className="dash-cards">
                   {list.map(c => (
@@ -240,26 +243,25 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
                         <span className="ellipsis">
                           {name(c.client)} · {c.code}
                         </span>
-                        <DashMenu iconOnly icon="dots" label={`Move or open ${c.title}`} items={items(c)} className="ghost dash-card-more" />
+                        <DashMenu iconOnly icon="dots" label={`Move or open ${c.title}`} items={items(c)} className="ghost mini dash-card-more" />
                       </div>
-                      <button type="button" className="dash-card-title" onClick={() => open(c)}>
-                        {c.title}
+                      <button type="button" className="dash-card-title" title={c.title} onClick={() => open(c)}>
+                        <span className="clamp">{c.title}</span>
                       </button>
-                      <span className={`flag ${c.prio}`}>
-                        <Icon name="flag" weight="fill" size={12} />
-                        {PRIORITY_LABEL[c.prio]}
-                      </span>
+                      {c.meta && (
+                        <span className="dash-card-meta ellipsis" title={c.meta}>
+                          {c.meta}
+                        </span>
+                      )}
                       <div className="dash-card-foot">
+                        <span className={`flag ${c.prio}`}>
+                          <Icon name="flag" weight="fill" size={12} />
+                          {PRIORITY_LABEL[c.prio]}
+                        </span>
                         <span className={c.late ? 'bad-text' : ''}>
-                          <Icon name="calendar" size={14} />
+                          <Icon name="calendar" size={13} />
                           {c.date}
                         </span>
-                        {c.meta && (
-                          <span title={c.meta}>
-                            <Icon name="info" size={14} />
-                            <span className="ellipsis">{c.meta}</span>
-                          </span>
-                        )}
                       </div>
                     </article>
                   ))}

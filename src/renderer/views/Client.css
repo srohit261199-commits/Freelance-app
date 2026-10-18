@@ -1,111 +1,50 @@
-/* A client added by hand (models workflow): header with pay chips, status tabs, model list and a right column
-   with job details and files. Everything is scoped under .cl-page; the client's colour comes from c-<id> on the root. */
+/* A client added by hand (models workflow): the model list under one toolbar, and one side panel with job details and
+   files. Everything is scoped under .cl-page; the client's colour comes from c-<id>. */
 
-/* ---------- header ---------- */
-.cl-page .cl-head {
-  display: flex;
-  align-items: center;
+/* ---------- layout: the list, and the side panel beside it ---------- */
+.cl-page .cl-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
   gap: 16px;
-  flex-wrap: wrap;
+  align-items: start;
 }
-.cl-page .cl-title {
+.cl-page .cl-list {
+  container: cllist / inline-size;
+  gap: 10px;
+}
+.cl-page .cl-tools {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  min-width: 0;
-  margin-right: auto;
-}
-.cl-page .cl-title h1 {
-  line-height: 1.05;
-  overflow-wrap: anywhere;
-}
-.cl-page .cl-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.cl-page .cl-chip {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: var(--panel);
-  font-size: 12px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  white-space: nowrap;
-}
-.cl-page .cl-chip.c-soft {
-  background: var(--c-tint);
-  color: var(--c-deep);
-  font-weight: 700;
-}
-.cl-page .cl-chip.warn {
-  background: var(--st-prog-bg);
-  color: var(--st-prog);
-}
-.cl-page .cl-chip.bad {
-  background: var(--st-bad-bg);
-  color: var(--st-bad);
-}
-.cl-page .cl-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: none;
-  margin-left: auto;
-}
-.cl-page .cl-actions > button.lg {
-  padding: 0 20px;
-}
-.cl-page .cl-ibtn {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  flex: none;
-}
-
-/* ---------- tabs and search ---------- */
-.cl-page .cl-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px 20px;
-  flex-wrap: wrap;
-}
-.cl-page .tab {
-  height: 46px;
-  padding: 0 10px 0 18px;
-  gap: 12px;
-  font-size: 14px;
-}
-.cl-page .tab .n {
-  min-width: 28px;
-  height: 28px;
-  font-size: 12px;
 }
 .cl-page .cl-search {
-  margin-left: auto;
-  width: 260px;
-  height: 40px;
-  border-radius: 999px;
-  background: var(--panel);
-  box-shadow: 0 0 0 1px var(--line);
+  flex: 1 1 160px;
+  min-width: 140px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: var(--fill);
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px;
-  color: var(--muted);
+  color: var(--faint);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .cl-page .cl-search:focus-within {
-  box-shadow:
-    0 0 0 1px var(--line),
-    0 0 0 4px var(--c-tint);
+  border-color: var(--primary);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--primary-tint);
+  color: var(--muted);
 }
 .cl-page .cl-search input {
   flex: 1;
   width: 0;
   min-width: 0;
-  height: 38px;
+  height: 32px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -115,70 +54,47 @@
   background: transparent;
   box-shadow: none;
 }
-
-/* ---------- main grid ---------- */
-.cl-page .cl-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 400px;
-  gap: 20px;
-  align-items: start;
-}
-.cl-page .cl-list {
-  padding: 12px 18px 16px;
-  gap: 10px;
-}
-.cl-page .cl-list > .empty {
-  margin: 18px 0;
-}
 .cl-page .empty p {
-  max-width: 560px;
-  line-height: 1.5;
+  max-width: 480px;
 }
 .cl-page .cl-empty-acts {
   justify-content: center;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 .cl-page .cl-empty-acts .mini {
   gap: 6px;
 }
-.cl-page .cl-side {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  min-width: 0;
-}
 .cl-page .cl-foot {
-  padding: 4px 10px 0;
+  font-size: 12px;
 }
 .cl-page .cl-brief {
   line-height: 1.6;
   color: var(--text-2);
   white-space: pre-wrap;
 }
-
-/* ---------- model table (grid rows) ---------- */
-.cl-page .cl-table {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  --cl-cols: minmax(0, 1fr) 150px 120px 100px;
+.cl-page .cl-side {
+  gap: 12px;
 }
-.cl-page .cl-table > [role='rowgroup'] {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+
+/* ---------- model table: grid rows split by thin lines ---------- */
+.cl-page .cl-table {
+  margin: 0 -8px;
+  --cl-cols: minmax(0, 1fr) 132px 100px 76px;
 }
 .cl-page .cl-row {
+  position: relative;
   display: grid;
   grid-template-columns: var(--cl-cols);
-  gap: 14px;
   align-items: center;
-  padding: 12px 10px;
-  border-radius: 16px;
-  font-size: 14px;
-  min-height: 60px;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 8px;
+  border-top: 1px solid var(--line-2);
   cursor: pointer;
   transition: background 0.15s ease;
+}
+.cl-page [role='rowgroup'] > .cl-row:first-child {
+  border-top: 0;
 }
 .cl-page .cl-row:not(.cl-th):hover {
   background: var(--hover);
@@ -188,139 +104,92 @@
   background: var(--danger-row);
 }
 .cl-page .cl-row.open {
-  box-shadow: inset 0 0 0 1.5px var(--line);
+  background: var(--fill);
+}
+.cl-page .cl-row.open::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--primary);
 }
 .cl-page .cl-th {
   min-height: 0;
-  padding: 10px 10px 8px;
+  padding: 0 8px 6px;
+  border-top: 0;
+  box-shadow: inset 0 -1px var(--line-2);
   cursor: default;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
   color: var(--faint);
+  white-space: nowrap;
 }
 .cl-page .cl-row > span {
   min-width: 0;
 }
 .cl-page .cl-c-model {
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.cl-page .cl-name {
-  display: flex;
   flex-direction: column;
-  min-width: 0;
+  gap: 1px;
 }
-.cl-page .cl-name .link-btn {
-  font-weight: 600;
+.cl-page button.cl-name {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  font-weight: 550;
   white-space: nowrap;
 }
-.cl-page .cl-name .link-btn .icon {
+.cl-page .cl-name .icon {
   color: var(--st-prog);
   flex: none;
 }
-.cl-page .cl-name small {
+.cl-page .cl-sub {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 8px;
+  gap: 0 6px;
   font-size: 12px;
   color: var(--muted);
 }
-.cl-page .cl-name small > * {
+.cl-page .cl-sub > * {
   white-space: nowrap;
+}
+.cl-page .cl-sub > * + *::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--faint);
 }
 .cl-page .cl-upd-inline {
   display: none;
 }
-.cl-page .cl-c-st .pill-btn {
-  padding: 0 10px 0 12px;
-}
 .cl-page .cl-c-upd {
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cl-page .cl-act {
-  width: 100%;
-  height: 32px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 700;
-  background: var(--fill);
-  box-shadow: none;
+.cl-page .cl-th .cl-c-upd {
+  font-size: inherit;
+  color: inherit;
 }
-.cl-page .cl-act:hover {
-  background: var(--line);
-}
-.cl-page .cl-act.ink {
-  background: var(--ink);
-  color: var(--on-ink);
-}
-.cl-page .cl-act.ink:hover {
-  background: var(--ink-hover);
-}
-
-/* ---------- the model drawer (shared ModelDrawer) ---------- */
-.cl-page .drawer-body h4 {
-  margin-top: 4px;
-}
-.cl-page .drawer-body > button.danger {
-  align-self: flex-start;
-}
-.cl-page .drawer .contents {
-  display: contents;
-}
-.cl-page .drawer .facts {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr);
-  gap: 8px 14px;
-  margin: 0;
-  font-size: 13px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: var(--hover);
-}
-.cl-page .drawer .facts dt {
-  color: var(--muted);
-}
-.cl-page .drawer .facts dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-.cl-page .drawer .history {
+.cl-page .cl-c-act {
   display: flex;
-  flex-direction: column;
-}
-.cl-page .drawer .history li {
-  padding: 8px 0;
-  border-top: 1px solid var(--line-2);
-  font-size: 13px;
-}
-.cl-page .drawer .history li:first-child {
-  border-top: 0;
+  align-items: center;
+  justify-content: flex-end;
 }
 
-/* ---------- narrower windows ---------- */
-@media (max-width: 1600px) {
-  .cl-page .cl-grid {
-    grid-template-columns: minmax(0, 1fr) 340px;
-  }
-}
-@media (min-width: 1100px) and (max-width: 1350px) {
-  .cl-page .cl-grid {
-    grid-template-columns: minmax(0, 1fr) 320px;
-  }
+/* a narrower list drops the update column; the time goes after the model's ID */
+@container cllist (max-width: 600px) {
   .cl-page .cl-table {
-    --cl-cols: minmax(0, 1fr) 140px 92px;
+    --cl-cols: minmax(0, 1fr) 132px 76px;
   }
-  .cl-page .cl-th > :nth-child(3),
   .cl-page .cl-c-upd {
     display: none;
   }
@@ -328,6 +197,37 @@
     display: inline;
   }
 }
+/* narrower still, each row becomes two lines: the name, its facts and the next step; then the status */
+@container cllist (max-width: 440px) {
+  .cl-page .cl-th {
+    display: none;
+  }
+  .cl-page .cl-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'model act'
+      'st act';
+    gap: 6px 10px;
+    padding: 8px;
+  }
+  .cl-page .cl-c-model {
+    grid-area: model;
+  }
+  .cl-page .cl-c-st {
+    grid-area: st;
+  }
+  .cl-page .cl-c-act {
+    grid-area: act;
+  }
+}
+
+/* ---------- narrower windows ---------- */
+@media (min-width: 1100px) and (max-width: 1350px) {
+  .cl-page .cl-grid {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+}
+/* the side panel goes under the list, job details and files side by side */
 @media (max-width: 1099px) {
   .cl-page .cl-grid {
     grid-template-columns: minmax(0, 1fr);
@@ -336,99 +236,24 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
+    gap: 24px;
+  }
+  .cl-page .cl-side > .ap-bare {
+    padding: 0 0 0 24px;
+    border-top: 0;
+    border-left: 1px solid var(--line-2);
   }
 }
 
 /* ---------- phone ---------- */
 @media (max-width: 760px) {
-  .cl-page .client-tile {
-    width: 52px;
-    height: 52px;
-    border-radius: 18px;
-  }
-  .cl-page .cl-head {
-    gap: 12px 14px;
-    align-items: flex-start;
-  }
-  .cl-page .cl-title {
-    flex: 1 1 200px;
-    margin-right: 0;
-  }
-  .cl-page .cl-actions {
-    width: 100%;
-    gap: 8px;
-  }
-  .cl-page .cl-actions > button.lg {
-    flex: 1 1 auto;
-    height: 40px;
-  }
-  .cl-page .cl-ibtn {
-    width: 40px;
-    height: 40px;
-    order: 9;
-  }
-  .cl-page .cl-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .cl-page .cl-tabs {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    gap: 6px;
-    margin: 0 -16px;
-    padding: 0 16px 2px;
-    scrollbar-width: none;
-  }
-  .cl-page .cl-tabs::-webkit-scrollbar {
-    display: none;
-  }
-  .cl-page .tab {
-    flex: none;
-  }
-  .cl-page .cl-search {
-    width: auto;
-    margin-left: 0;
-  }
-  .cl-page .cl-list {
-    padding: 8px;
-  }
-  .cl-page .cl-th {
-    display: none;
-  }
-  .cl-page .cl-row {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      'model model act'
-      'st st upd';
-    gap: 8px 10px;
-    padding: 12px;
-  }
-  .cl-page .cl-c-model {
-    grid-area: model;
-  }
-  .cl-page .cl-c-st {
-    grid-area: st;
-  }
-  .cl-page .cl-c-upd {
-    grid-area: upd;
-    display: block;
-    font-size: 12px;
-    justify-self: end;
-  }
-  .cl-page .cl-upd-inline {
-    display: none;
-  }
-  .cl-page .cl-c-act {
-    grid-area: act;
-  }
-  .cl-page .cl-act {
-    width: auto;
-    min-width: 72px;
-  }
   .cl-page .cl-side {
     display: flex;
+    gap: 12px;
   }
-  .cl-page .drawer .facts {
-    grid-template-columns: minmax(0, 1fr);
+  .cl-page .cl-side > .ap-bare {
+    padding: 12px 0 0;
+    border-top: 1px solid var(--line-2);
+    border-left: 0;
   }
 }

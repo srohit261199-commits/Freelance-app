@@ -1,19 +1,22 @@
-import { useMemo, useState } from 'react';
-import type { AppState, CompanyId, Currency, Payment } from '../../shared/types';
+import { useId, useMemo, useState } from 'react';
+import type { AppState, CompanyId, Currency, PayRule, Payment } from '../../shared/types';
 import { addMonths, allEarnings, convert, formatMoney, localDate, monthLabel, monthsBetween, ordinal, tierFee, type CompanyEarnings } from '../../shared/money';
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
 import { hub } from '../hub';
-import { ConfirmButton, Field, Icon, Modal, fmtDate, useApp, type IconName } from '../ui';
-import { clientIcon } from './JobDetails';
+import { ConfirmButton, Dropdown, Field, Icon, Modal, PageHead, Stat, fmtDate, useApp, type Choice, type IconName } from '../ui';
+import { clientIcon, isBuiltIn } from './JobDetails';
 import './Payments.css';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-/** Bottom to top in each month's bar. */
+/** Bottom to top in each month's bar; clients added by hand go on top. */
 const STACK: CompanyId[] = ['skeidar', 'metaztech', 'waveink'];
-const LEGEND: CompanyId[] = ['waveink', 'metaztech', 'skeidar'];
-const CUR_LABEL: Record<Currency, string> = { INR: '₹ INR', AED: 'AED', USD: 'US$' };
-const CUR_SHORT: Record<Currency, string> = { INR: '₹', AED: 'AED', USD: 'US$' };
-const WORK: Record<CompanyId, string> = { waveink: 'retainer', metaztech: 'approvals', skeidar: 'work' };
+const CURRENCIES: Choice<Currency>[] = [
+  { value: 'INR', label: 'Indian rupee (₹)', short: '₹ INR' },
+  { value: 'AED', label: 'UAE dirham (AED)', short: 'AED' },
+  { value: 'USD', label: 'US dollar (US$)', short: 'US$' },
+];
+/** What a payment was for, after the month: "October retainer". */
+const WORK: Record<PayRule['kind'], string> = { retainer: 'retainer', tiered: 'approvals', 'per-item': 'work' };
 
 /** Pay rule in full (tooltip) and short (the By client row). */
 function payTerms(state: AppState, id: CompanyId, next?: string): [string, string] {
@@ -79,7 +82,7 @@ interface Tx {
 }
 
 export function Earnings({ state, now }: { state: AppState; now: Date }) {
-  const { toast } = useApp();
+  const { go, toast } = useApp();
   const earnings = useMemo(() => allEarnings(state, now), [state, now]);
   const [editing, setEditing] = useState<Partial<Payment> | null>(null);
   const base = state.settings.baseCurrency;
@@ -93,6 +96,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   const nowMonth = today.slice(0, 7);
   const thisYear = now.getFullYear();
   const cfg = (id: CompanyId) => state.companies.find(c => c.id === id)!;
+  // Archived clients still earned what they earned.
+  const stack = [...STACK, ...state.companies.filter(c => !isBuiltIn(c)).map(c => c.id)];
   const mzCfg = state.companies.find(c => c.id === 'metaztech');
   const mzDone = state.models.filter(m => m.company === 'metaztech' && isComplete(m.status));
 
@@ -114,7 +119,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   const accruing = earnings.reduce((s, e) => s + (cfg(e.company).pay.kind === 'retainer' ? toBase(e.thisMonth, e.currency) : 0), 0);
 
   const bars = monthsBetween(firstMonth, nowMonth).map(mk => {
-    const segs = STACK.flatMap(cid => {
+    const segs = stack.flatMap(cid => {
       const e = earnings.find(x => x.company === cid);
       const line = e?.months.find(l => l.month === mk);
       if (!e || !line || line.net <= 0) return [];
@@ -125,6 +130,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
     return { month: mk, segs, owed, total: segs.reduce((s, x) => s + x.paid + x.owed, 0) };
   });
   const maxBar = Math.max(1, ...bars.map(b => b.total));
+  // Top of the bars first, and only the clients the chart shows.
+  const legend = [...stack].reverse().filter(cid => bars.some(b => b.segs.some(x => x.cid === cid)));
   const label = (mk: string) => MON[+mk.slice(5, 7) - 1] + (+mk.slice(0, 4) === thisYear ? '' : ` ${mk.slice(2, 4)}`);
 
   const byMonth = new Map<string, number>();
@@ -140,23 +147,35 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
       const late = l.state !== 'accruing' && !!l.due && l.due < lateCut;
       const window = c.pay.kind === 'tiered' && l.due ? `${c.pay.payoutFrom}–${shortDate(l.due, now)}` : l.due ? shortDate(l.due, now) : '';
       const name = monthName(l.month, +l.month.slice(0, 4) !== thisYear);
+      const variations = (c.workflow ?? (c.id === 'skeidar' ? 'variations' : 'models')) === 'variations';
       txs.push({
         key: `${e.company}:${l.month}`,
         when: window ? `Due ${window}` : 'No fixed day',
         company: e.company,
-        what: e.company === 'waveink' ? `${name} retainer` : e.company === 'metaztech' ? `${name} approvals (${l.units})` : `${name} · ${plural(l.units, 'image')}`,
+        what:
+          c.pay.kind === 'retainer'
+            ? `${name} retainer`
+            : c.pay.kind === 'tiered'
+              ? `${name} approvals (${l.units})`
+              : `${name} · ${plural(l.units, c.pay.unit)}`,
         sub: l.paid > 0 ? `${money(l.paid, e.currency)} of ${money(l.net, e.currency)} recorded` : l.state === 'accruing' ? 'this month, paid next month' : undefined,
         amount: left,
         currency: e.currency,
         status: late ? 'late' : l.state === 'part' ? 'part' : 'pending',
-        source: e.company === 'waveink' ? { icon: 'repeat', text: 'Retainer rule' } : e.company === 'metaztech' ? { icon: 'hourglass', text: 'Waiting for payment advice' } : { icon: 'brush', text: 'Job tracker' },
+        source:
+          c.pay.kind === 'retainer'
+            ? { icon: 'repeat', text: 'Retainer rule' }
+            : c.pay.kind === 'tiered'
+              ? { icon: 'hourglass', text: 'Waiting for payment advice' }
+              : { icon: clientIcon(c), text: variations ? 'Job tracker' : 'Finished models' },
         record: { date: localDate(new Date()), company: e.company, currency: e.currency, period: l.month, amount: Math.round(left * 100) / 100 },
       });
     }
   }
-  txs.sort((a, b) => (a.record!.period ?? '').localeCompare(b.record!.period ?? '') || STACK.indexOf(b.company) - STACK.indexOf(a.company));
+  txs.sort((a, b) => (a.record!.period ?? '').localeCompare(b.record!.period ?? '') || stack.indexOf(b.company) - stack.indexOf(a.company));
   for (const p of [...state.payments].sort((a, b) => b.date.localeCompare(a.date))) {
-    const what = [p.period && `${monthName(p.period, +p.period.slice(0, 4) !== thisYear)} ${WORK[p.company] ?? ''}`.trim(), p.reference && `ref ${p.reference}`].filter(Boolean).join(' · ');
+    const kind = state.companies.find(c => c.id === p.company)?.pay.kind;
+    const what = [p.period && `${monthName(p.period, +p.period.slice(0, 4) !== thisYear)} ${kind ? WORK[kind] : ''}`.trim(), p.reference && `ref ${p.reference}`].filter(Boolean).join(' · ');
     txs.push({
       key: p.id,
       when: shortDate(p.date, now),
@@ -177,77 +196,62 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   }
 
   const range = `${monthName(firstMonth, firstMonth.slice(0, 4) !== nowMonth.slice(0, 4))} – ${monthName(nowMonth, true)}`;
-  const rateNote = base === 'INR' ? ` at AED ${rates.AED} and US$ ${rates.USD}` : ` · AED 1 = ₹${rates.AED}, US$ 1 = ₹${rates.USD}`;
+  const exportAll = async () => {
+    const r = await hub.exportExcel('all');
+    if (r.path) toast(`Saved ${r.path}`);
+    else if (r.error) toast(r.error, 'error');
+  };
 
   return (
     <div className="page pay">
-      <header className="page-head">
-        <div>
-          <h1>Payments</h1>
-          <p>
-            {range} · shown in {CUR_SHORT[base]}
-            {rateNote}
-          </p>
-        </div>
-        <div className="actions">
-          <div className="seg" role="group" aria-label="Show totals in">
-            {(['INR', 'AED', 'USD'] as Currency[]).map(c => (
-              <button key={c} type="button" className={c === base ? 'on' : ''} aria-pressed={c === base} onClick={() => c !== base && hub.patchSettings({ baseCurrency: c })}>
-                {CUR_LABEL[c]}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="lg"
-            onClick={async () => {
-              const r = await hub.exportExcel('all');
-              if (r.path) toast(`Saved ${r.path}`);
-              else if (r.error) toast(r.error, 'error');
-            }}
-          >
-            <Icon name="download" size={18} /> Export
-          </button>
-          <button type="button" className="primary lg" onClick={() => setEditing({ date: localDate(new Date()), company: 'waveink', currency: 'AED' })}>
-            <Icon name="plus" size={18} /> Record payment
-          </button>
-        </div>
-      </header>
+      <PageHead
+        title="Payments"
+        meta={
+          <>
+            <span>{range}</span>
+            <span>AED 1 = ₹{rates.AED}</span>
+            <span>US$ 1 = ₹{rates.USD}</span>
+          </>
+        }
+      >
+        <Dropdown label="Show totals in" prefix="Totals in" value={base} options={CURRENCIES} onChange={c => hub.patchSettings({ baseCurrency: c })} align="end" />
+        <button type="button" className="icon-btn" aria-label="Export to Excel" title="Export to Excel" onClick={exportAll}>
+          <Icon name="excel" />
+        </button>
+        <button type="button" className="primary" onClick={() => setEditing({ date: localDate(new Date()), company: 'waveink', currency: 'AED' })}>
+          <Icon name="plus" /> Record payment
+        </button>
+      </PageHead>
 
-      <section className="kpis pay-tiles" aria-label="Totals">
-        <Tile tone="ok" icon="arrowDownLeft" label="Received" value={formatMoney(receivedFY, base)} sub={`since 1 April · ${plural(fyPayments.length, 'payment')} recorded`} />
-        <Tile tone="info" icon="hourglass" label="Earned, not paid yet" value={formatMoney(sum('outstanding'), base)} sub={accruing > 0.5 ? `+ ${formatMoney(accruing, base)} accruing this month` : 'finished months and approved work'} />
-        <Tile
-          tone={late > 0.5 ? 'bad' : 'neutral'}
-          icon="warning"
+      <section className="kpis money-stats" aria-label="Totals">
+        <Stat label="Received" value={formatMoney(receivedFY, base)} sub={`since 1 April · ${plural(fyPayments.length, 'payment')} recorded`} />
+        <Stat label="Earned, not paid yet" value={formatMoney(sum('outstanding'), base)} sub={accruing > 0.5 ? `+ ${formatMoney(accruing, base)} accruing this month` : 'finished months and approved work'} />
+        <Stat
           label="Late"
+          tone={late > 0.5 ? 'bad-text' : undefined}
           value={formatMoney(late, base)}
           sub={late > 0.5 ? `${plural(lateMonths, 'month')} past ${lateMonths === 1 ? 'its' : 'their'} pay day` : 'nothing past its pay day'}
         />
-        <Tile
-          tone="warn"
-          icon="trophy"
-          label="Best month"
-          value={best ? `${label(best[0])} · ${formatMoney(best[1], base)}` : '—'}
-          sub={`${formatMoney(sum('earned'), base)} earned to date, after TDS`}
-        />
+        <Stat label={best ? `Best month · ${label(best[0])}` : 'Best month'} value={best ? formatMoney(best[1], base) : '—'} sub={`${formatMoney(sum('earned'), base)} earned to date, after TDS`} />
       </section>
 
-      <div className="pay-mid">
-        <section className="panel pay-chart-panel" aria-labelledby="pay-chart-h">
+      <div className="panel pay-overview">
+        <section aria-labelledby="pay-chart-h">
           <div className="pay-chart-head">
             <h2 id="pay-chart-h">Earned per month</h2>
             <ul className="pay-legend">
-              {LEGEND.map(id => (
+              {legend.map(id => (
                 <li key={id}>
                   <i className={`c-${id}`} />
                   {cfg(id)?.name}
                 </li>
               ))}
-              <li>
-                <i className="owed" />
-                Not paid yet
-              </li>
+              {bars.some(b => b.owed > 0.5) && (
+                <li>
+                  <i className="owed" />
+                  Not paid yet
+                </li>
+              )}
             </ul>
           </div>
           <div className="pay-chart-scroll">
@@ -264,7 +268,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                     {b.total > 0.5 ? (
                       <div
                         className="pay-stack"
-                        style={{ height: `calc((100% - 26px) * ${(b.total / maxBar).toFixed(4)})` }}
+                        style={{ height: `calc((100% - 20px) * ${(b.total / maxBar).toFixed(4)})` }}
                         title={`${label(b.month)}: ${formatMoney(b.total, base)} earned${b.owed > 0.5 ? `, ${formatMoney(b.owed, base)} not paid yet` : ''}${b.month === nowMonth ? ' (this month, paid next month)' : ''}`}
                       >
                         {b.segs.flatMap(s => [
@@ -283,7 +287,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
           </div>
         </section>
 
-        <section className="panel pay-clients" aria-labelledby="pay-clients-h">
+        <section className="pay-clients" aria-labelledby="pay-clients-h">
           <h2 id="pay-clients-h">By client</h2>
           <ul>
             {companies.map(({ e, months, late: lateAmt }) => {
@@ -304,13 +308,15 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
               return (
                 <li key={e.company} className={`pay-client c-${e.company}`}>
                   <div className="pay-client-row">
-                    <span className="pay-client-tile c-fill" aria-hidden="true">
-                      <Icon name={clientIcon(c)} size={20} weight="fill" />
-                    </span>
+                    <span className="cdot" aria-hidden="true" />
                     <div className="pay-client-text">
                       <b>{c.name}</b>
                       <span title={terms}>{short}</span>
-                      {parts.length > 0 && <span>{parts.join(' · ')}</span>}
+                      {parts.length > 0 && (
+                        <span title={e.approxMonth > 0 ? `${plural(e.approxMonth, 'model')} imported already approved ${e.approxMonth > 1 ? 'are' : 'is'} counted in the month ${e.approxMonth > 1 ? 'they were' : 'it was'} imported` : undefined}>
+                          {parts.join(' · ')}
+                        </span>
+                      )}
                     </div>
                     <div className="pay-client-fig">
                       <b>{fig}</b>
@@ -318,18 +324,24 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                     </div>
                   </div>
                   {e.overdue && (
-                    <div className="banner bad small">
-                      {monthLabel(e.overdue.month)} was due {fmtDate(e.overdue.due)}
-                      {e.overdue.paid > 0
-                        ? ` and is only partly recorded: ${formatMoney(e.overdue.paid, e.currency)} of ${formatMoney(e.overdue.net, e.currency)}. Record the rest below once it arrives.`
-                        : ' and is not recorded. Record it below once it arrives.'}
-                    </div>
+                    <p className="pay-note bad-text">
+                      <Icon name="warning" size={14} />
+                      <span>
+                        {monthLabel(e.overdue.month)} was due {fmtDate(e.overdue.due)}
+                        {e.overdue.paid > 0
+                          ? ` and is only partly recorded: ${formatMoney(e.overdue.paid, e.currency)} of ${formatMoney(e.overdue.net, e.currency)}. Record the rest below once it arrives.`
+                          : ' and is not recorded. Record it below once it arrives.'}
+                      </span>
+                    </p>
                   )}
-                  {e.unpriced > 0 && <div className="banner small">{e.unpriced} approved model{e.unpriced > 1 ? 's have' : ' has'} no complexity set; counted at the lowest tier.</div>}
-                  {e.approxMonth > 0 && (
-                    <p className="pay-note">
-                      {e.approxMonth} model{e.approxMonth > 1 ? 's' : ''} imported already approved {e.approxMonth > 1 ? 'are' : 'is'} counted in the month{' '}
-                      {e.approxMonth > 1 ? 'they were' : 'it was'} imported.
+                  {e.unpriced > 0 && (
+                    <p className="pay-note muted" title="Counted at the lowest tier until it is set">
+                      <span>
+                        {e.unpriced} approved model{e.unpriced > 1 ? 's have' : ' has'} no complexity ·{' '}
+                        <button type="button" className="link-btn pay-link" onClick={() => go({ view: 'company', company: e.company })}>
+                          Set {e.unpriced > 1 ? 'them' : 'it'}
+                        </button>
+                      </span>
                     </p>
                   )}
                   {e.company === 'metaztech' && mzDone.length > 0 && mzCfg?.pay.kind === 'tiered' && (
@@ -361,7 +373,8 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
         </section>
       </div>
 
-      <section className="panel pay-tx" aria-label="Payments and money due">
+      <section className="panel pay-tx" aria-labelledby="pay-tx-h">
+        <h2 id="pay-tx-h">Payments and money due</h2>
         {txs.length === 0 ? (
           <p className="muted small">No payments yet.</p>
         ) : (
@@ -372,10 +385,11 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                   <th className="pay-c-date">Date</th>
                   <th className="pay-c-client">Client</th>
                   <th>For</th>
-                  <th className="pay-c-amt">Amount</th>
-                  <th className="pay-c-base">In {CUR_SHORT[base]}</th>
+                  <th className="pay-c-amt num">Amount</th>
                   <th className="pay-c-status">Status</th>
-                  <th className="pay-c-src">Source</th>
+                  <th className="pay-c-src">
+                    <span className="pay-src-t">Source</span>
+                  </th>
                   <th className="pay-c-act">
                     <span className="sr-only">Actions</span>
                   </th>
@@ -390,7 +404,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                       <td className="pay-when">{t.when}</td>
                       <td className="pay-who-td">
                         <span className="pay-who">
-                          <span className={`cdot big c-${t.company}`} />
+                          <span className={`cdot c-${t.company}`} />
                           {name}
                         </span>
                       </td>
@@ -404,15 +418,17 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
                           </small>
                         )}
                       </td>
-                      <td className="pay-amt tabular">{money(t.amount, t.currency)}</td>
-                      <td className="pay-base tabular">{formatMoney(toBase(t.amount, t.currency), base)}</td>
+                      <td className="pay-amt num">
+                        <b>{money(t.amount, t.currency)}</b>
+                        {t.currency !== base && <small>{formatMoney(toBase(t.amount, t.currency), base)}</small>}
+                      </td>
                       <td className="pay-status">
                         <span className={`pill ${pill}`}>{text}</span>
                       </td>
                       <td className="pay-src-td">
-                        <span className="pay-src">
-                          <Icon name={t.source.icon} size={16} />
-                          {t.source.text}
+                        <span className="pay-src" title={t.source.text}>
+                          <Icon name={t.source.icon} size={14} />
+                          <span className="pay-src-t">{t.source.text}</span>
                         </span>
                       </td>
                       <td className="row-actions pay-act">
@@ -439,24 +455,10 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   );
 }
 
-function Tile({ tone, icon, label, value, sub }: { tone: 'ok' | 'info' | 'bad' | 'warn' | 'neutral'; icon: IconName; label: string; value: string; sub: string }) {
-  return (
-    <div className={`pay-tile ${tone}`}>
-      <div className="pay-tile-top">
-        {label}
-        <span className="pay-tile-ic" aria-hidden="true">
-          <Icon name={icon} size={17} weight="fill" />
-        </span>
-      </div>
-      <div className="pay-tile-num">{value}</div>
-      <div className="pay-tile-sub">{sub}</div>
-    </div>
-  );
-}
-
 function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: Partial<Payment>; onClose(): void }) {
   const { toast } = useApp();
   const [p, setP] = useState<Partial<Payment>>(payment);
+  const amountId = useId();
   const set = (patch: Partial<Payment>) => setP({ ...p, ...patch });
   const save = async () => {
     const amount = Number(p.amount);
@@ -470,7 +472,6 @@ function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: 
     await hub.upsert('payments', { ...p, amount, currency, settledAmount, source: p.source ?? 'manual' });
     onClose();
   };
-  const defaults: Record<CompanyId, Currency> = { waveink: 'AED', metaztech: 'INR', skeidar: 'AED' };
   return (
     <Modal
       title={payment.id ? 'Edit payment' : 'Record payment'}
@@ -499,7 +500,7 @@ function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: 
     >
       <div className="grid2">
         <Field label="Company">
-          <select value={p.company} onChange={e => set({ company: e.target.value as CompanyId, currency: defaults[e.target.value as CompanyId] })}>
+          <select value={p.company} onChange={e => set({ company: e.target.value as CompanyId, currency: state.companies.find(c => c.id === e.target.value)?.currency })}>
             {state.companies.map(c => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -510,26 +511,27 @@ function PaymentEditor({ state, payment, onClose }: { state: AppState; payment: 
         <Field label="Date received">
           <input type="date" value={p.date ?? ''} onChange={e => set({ date: e.target.value })} />
         </Field>
-        <Field label="Amount received">
-          <input type="number" min="0" step="0.01" value={p.amount ?? ''} onChange={e => set({ amount: e.target.value as unknown as number })} />
-        </Field>
-        <Field label="Currency">
-          <select value={p.currency} onChange={e => set({ currency: e.target.value as Currency })}>
-            <option>INR</option>
-            <option>AED</option>
-            <option>USD</option>
-          </select>
-        </Field>
+        <div className="field">
+          <span id={amountId}>Amount received</span>
+          <div className="pay-money">
+            <input type="number" min="0" step="0.01" aria-labelledby={amountId} value={p.amount ?? ''} onChange={e => set({ amount: e.target.value as unknown as number })} />
+            <select aria-label="Currency" value={p.currency} onChange={e => set({ currency: e.target.value as Currency })}>
+              <option>INR</option>
+              <option>AED</option>
+              <option>USD</option>
+            </select>
+          </div>
+        </div>
         <Field label="For month (optional)">
           <input type="month" value={p.period ?? ''} onChange={e => set({ period: e.target.value || undefined })} />
         </Field>
         <Field label="Reference">
           <input value={p.reference ?? ''} onChange={e => set({ reference: e.target.value })} />
         </Field>
+        <Field label="Note">
+          <input value={p.note ?? ''} onChange={e => set({ note: e.target.value })} />
+        </Field>
       </div>
-      <Field label="Note">
-        <input value={p.note ?? ''} onChange={e => set({ note: e.target.value })} />
-      </Field>
     </Modal>
   );
 }

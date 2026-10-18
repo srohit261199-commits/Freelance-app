@@ -1,10 +1,10 @@
-import { useId, useState } from 'react';
+import { useState } from 'react';
 import type { AppState, Currency, FoundPlan, SoftwareAccount, Subscription, VendorId } from '../../shared/types';
 import { formatMoney } from '../../shared/money';
 import { uid } from '../../shared/ops';
 import { matchVendorSub, planToSubscription, VENDORS, vendorById } from '../../shared/vendors';
 import { hub } from '../hub';
-import { ConfirmButton, Field, Icon, Modal, relTime, useApp } from '../ui';
+import { ConfirmButton, Field, Icon, MenuButton, Modal, relTime, useApp } from '../ui';
 import './Accounts.css';
 
 const STATUS: Record<Subscription['status'], string> = { active: 'Active', trial: 'Free trial', cancelling: 'Auto-renew off', cancelled: 'Ended' };
@@ -51,52 +51,69 @@ export function AccountsPanel({ state, now }: { state: AppState; now: Date }) {
 
   return (
     <section className="panel ac" aria-labelledby="ac-h">
-      <div className="ac-head">
-        <div className="grow">
-          <h2 id="ac-h">Software accounts</h2>
-          <p className="small muted">
-            Sign in once in the app’s own window, then Read plans pulls renewal dates and prices from the account page.
-          </p>
-        </div>
+      <div className="panel-head">
+        <h2 id="ac-h">Software accounts</h2>
         {state.accounts.length > 0 && (
-          <button type="button" className="mini" onClick={() => setEditing({})}>
+          <button type="button" className="mini end" onClick={() => setEditing({})}>
             <Icon name="plus" size={14} /> Add account
           </button>
         )}
       </div>
+      <p className="small muted">
+        {state.accounts.length
+          ? 'Read plans copies renewal dates and prices from each account page; it opens a sign-in window the first time.'
+          : 'Add an account to copy renewal dates and prices from its plans page.'}
+      </p>
 
       {state.accounts.length ? (
         <ul className="ac-list">
           {state.accounts.map(a => {
             const plans = linked(a);
+            const names = plans.length ? plans.map(s => s.name).join(', ') : 'No plans read yet';
             return (
-              <li key={a.id} className="ac-card">
-                <div className="ac-top">
-                  <span className={`ac-tile v-${a.vendor}`} aria-hidden="true">
-                    {initials(vendorName(a))}
+              <li key={a.id}>
+                <span className="ac-tile" aria-hidden="true">
+                  {initials(vendorName(a))}
+                </span>
+                <div className="ac-txt">
+                  <b className="ellipsis">{a.label}</b>
+                  <small className="ellipsis muted">{a.email || hostOf(a.plansUrl)}</small>
+                </div>
+                <div className="ac-txt ac-plans">
+                  <span className="ellipsis" title={names}>
+                    {names}
                   </span>
-                  <div className="ac-txt">
-                    <b className="ellipsis">{a.label}</b>
-                    <small className="ellipsis">{a.email || hostOf(a.plansUrl)}</small>
-                  </div>
-                  <button type="button" className="icon-btn ghost" aria-label={`Edit ${a.label}`} title="Edit" onClick={() => setEditing(a)}>
-                    <Icon name="pencil" size={16} />
-                  </button>
+                  <small className={a.lastError ? 'warn-text' : 'muted'}>{a.lastError || (a.lastRead ? `Read ${relTime(a.lastRead, now)}` : 'Not read yet')}</small>
                 </div>
-                <p className="ac-plans">
-                  {plans.length ? plans.map(s => s.name).join(', ') : 'No plans read yet'}
-                </p>
-                <p className={`ac-state small ${a.lastError ? 'warn-text' : 'muted'}`}>
-                  {a.lastError ? a.lastError : a.lastRead ? `Read ${relTime(a.lastRead, now)}` : 'Click Open to sign in, then Read plans.'}
-                </p>
-                <div className="ac-btns">
-                  <button type="button" className="mini" onClick={() => hub.accountOpen(a.id)}>
-                    <Icon name="external" size={14} /> Open
-                  </button>
-                  <button type="button" className="mini primary" disabled={busy === a.id} onClick={() => read(a)}>
-                    <Icon name="sync" size={14} /> {busy === a.id ? 'Reading…' : 'Read plans'}
-                  </button>
-                </div>
+                <button type="button" className="mini" disabled={busy === a.id} onClick={() => read(a)}>
+                  <Icon name="sync" size={14} /> {busy === a.id ? 'Reading…' : 'Read plans'}
+                </button>
+                <MenuButton label={`More for ${a.label}`} icon="dots" className="ghost mini">
+                  {close => (
+                    <>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          close();
+                          hub.accountOpen(a.id);
+                        }}
+                      >
+                        <Icon name="external" /> Open sign-in window
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          close();
+                          setEditing(a);
+                        }}
+                      >
+                        <Icon name="pencil" /> Edit account
+                      </button>
+                    </>
+                  )}
+                </MenuButton>
               </li>
             );
           })}
@@ -104,24 +121,12 @@ export function AccountsPanel({ state, now }: { state: AppState; now: Date }) {
       ) : (
         <div className="ac-start" role="group" aria-label="Add a software account">
           {VENDORS.map(v => (
-            <button key={v.id} type="button" className="ac-quick" onClick={() => setEditing({ vendor: v.id, label: v.name, plansUrl: v.plansUrl })}>
-              <span className={`ac-tile v-${v.id}`} aria-hidden="true">
-                {initials(v.name)}
-              </span>
-              <span>
-                <b>{v.name}</b>
-                <small>{v.examples}</small>
-              </span>
+            <button key={v.id} type="button" className="mini" title={v.examples} onClick={() => setEditing({ vendor: v.id, label: v.name, plansUrl: v.plansUrl })}>
+              <Icon name="plus" size={14} /> {v.name}
             </button>
           ))}
-          <button type="button" className="ac-quick" onClick={() => setEditing({ vendor: 'other', label: '', plansUrl: '' })}>
-            <span className="ac-tile v-other" aria-hidden="true">
-              <Icon name="plus" size={18} />
-            </span>
-            <span>
-              <b>Other software</b>
-              <small>Any site with a plans page</small>
-            </span>
+          <button type="button" className="mini" title="Any site with a plans page" onClick={() => setEditing({ vendor: 'other', label: '', plansUrl: '' })}>
+            <Icon name="plus" size={14} /> Other software
           </button>
         </div>
       )}
@@ -134,7 +139,6 @@ export function AccountsPanel({ state, now }: { state: AppState; now: Date }) {
 function AccountEditor({ account, onClose }: { account: Partial<SoftwareAccount>; onClose(): void }) {
   const { toast } = useApp();
   const [a, setA] = useState<Partial<SoftwareAccount>>({ vendor: 'autodesk', label: 'Autodesk', plansUrl: vendorById('autodesk')!.plansUrl, ...account });
-  const pickId = useId();
   const preset = vendorById(a.vendor);
   const pick = (vendor: VendorId) => {
     const v = vendorById(vendor);
@@ -158,7 +162,7 @@ function AccountEditor({ account, onClose }: { account: Partial<SoftwareAccount>
       plansUrl: a.plansUrl!.trim(),
       createdAt: a.createdAt ?? new Date().toISOString(),
     });
-    toast(a.id ? `${a.label} saved` : `${a.label} added. Click Open to sign in.`);
+    toast(a.id ? `${a.label} saved` : `${a.label} added. Click Read plans to sign in and read your plans.`);
     onClose();
   };
   return (
@@ -179,7 +183,7 @@ function AccountEditor({ account, onClose }: { account: Partial<SoftwareAccount>
           )}
           <span className="grow" />
           {missing && <span className="muted small">{missing}</span>}
-          <button type="button" className="soft" onClick={onClose}>
+          <button type="button" onClick={onClose}>
             Cancel
           </button>
           <button type="button" className="primary" disabled={!!missing} onClick={save}>
@@ -188,22 +192,19 @@ function AccountEditor({ account, onClose }: { account: Partial<SoftwareAccount>
         </>
       }
     >
-      {!a.id && (
-        <div className="field">
-          <span id={pickId}>Vendor</span>
-          <div className="ac-pick" role="group" aria-labelledby={pickId}>
-            {[...VENDORS.map(v => [v.id, v.name] as const), ['other', 'Other'] as const].map(([id, name]) => {
-              const on = id === 'other' ? !preset : a.vendor === id;
-              return (
-                <button key={id} type="button" className={on ? 'on' : ''} aria-pressed={on} onClick={() => pick(id)}>
-                  {name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
       <div className="grid2">
+        {!a.id && (
+          <Field label="Vendor">
+            <select value={preset ? a.vendor : 'other'} onChange={e => pick(e.target.value as VendorId)}>
+              {VENDORS.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+              <option value="other">Other</option>
+            </select>
+          </Field>
+        )}
         <Field label="Name">
           <input autoFocus value={a.label ?? ''} onChange={e => setA({ ...a, label: e.target.value })} placeholder="e.g. Foundry" />
         </Field>
@@ -214,7 +215,7 @@ function AccountEditor({ account, onClose }: { account: Partial<SoftwareAccount>
       <Field label="Plans page" hint={preset ? `${preset.name}’s page that lists your plans and renewal dates. Change it if yours is elsewhere.` : 'The page on the vendor’s site that lists your plans and renewal dates.'}>
         <input type="url" value={a.plansUrl ?? ''} onChange={e => setA({ ...a, plansUrl: e.target.value })} placeholder="https://…" />
       </Field>
-      <p className="small muted">The app never sees your password: you sign in on the vendor’s own page, in a window that keeps its sign-in separate from everything else.</p>
+      <p className="small muted">You sign in on the vendor’s own page, in a window kept apart from everything else; the app never sees your password.</p>
     </Modal>
   );
 }
@@ -270,7 +271,7 @@ function PlansReview({ state, account, plans, url, onClose }: { state: AppState;
           <span className="grow muted small ellipsis" title={url}>
             Read from {url}
           </span>
-          <button type="button" className="soft" onClick={onClose}>
+          <button type="button" onClick={onClose}>
             Cancel
           </button>
           <button type="button" className="primary" disabled={!picked.length} onClick={save}>
@@ -292,6 +293,9 @@ function PlansReview({ state, account, plans, url, onClose }: { state: AppState;
                   {r.plan.plan && <span className="muted">{r.plan.plan}</span>}
                 </label>
                 <span className={`tag ${r.existing ? 'info' : 'ok'}`}>{r.existing ? `Updates ${r.existing.name}` : 'New'}</span>
+                <button type="button" className="link-btn" aria-expanded={!!r.open} onClick={() => flip(i, { open: !r.open })}>
+                  {r.open ? 'Hide what was read' : 'Show what was read'}
+                </button>
               </div>
               {r.on && (
                 <div className="ac-r-fields">
@@ -347,9 +351,6 @@ function PlansReview({ state, account, plans, url, onClose }: { state: AppState;
                   Price changes from {formatMoney(r.existing.amount, r.existing.currency)} to {formatMoney(Number(r.sub.amount), r.sub.currency ?? r.existing.currency)}.
                 </p>
               )}
-              <button type="button" className="link-btn small" aria-expanded={!!r.open} onClick={() => flip(i, { open: !r.open })}>
-                {r.open ? 'Hide what was read' : 'Show what was read'}
-              </button>
               {r.open && <pre className="ac-raw">{r.plan.raw || '(nothing below the product name)'}</pre>}
             </li>
           );

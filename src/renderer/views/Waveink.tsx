@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import type { AppState, Model, ModelStatus } from '../../shared/types';
 import { COMPANY_STATUSES, isComplete, isOpen, lastWorked, statusLabel } from '../../shared/status';
 import { formatMoney } from '../../shared/money';
 import { modelLabel, waveinkQueue } from '../../shared/planner';
 import { hub } from '../hub';
-import { ClientTile, Drawer, Empty, Icon, Modal, relTime, useApp } from '../ui';
+import { Drawer, Dropdown, Empty, Icon, MenuButton, Modal, PageHead, relTime, useApp, type Choice } from '../ui';
 import { modelPriority, PRIORITY_LABEL } from '../priority';
-import { AddWaveinkModel, Pop, WaveinkDetail, WiStatus } from './WaveinkDetail';
+import { AddWaveinkModel, WaveinkDetail, WiStatus } from './WaveinkDetail';
 import { JobDrawer } from './JobDetails';
 import { nextDeadlines, paceText, weekProgress } from '../../shared/pace';
 import { clientFolder, withFolder } from '../../shared/assets';
@@ -28,6 +28,46 @@ const firstRow = (m: Model) => Math.min(...(m.rows ?? [1e6]));
 const groupRank = (g: string) => (g === 'Tech' ? 0 : g === 'Apparel' ? 1 : g === 'Other' ? 3 : 2);
 const DAYS = 'Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday';
 
+/** A toolbar button with a small panel of controls under it; closes on Escape or an outside click and gives focus back. */
+function Pop({ label, text, badge, children }: { label: string; text: string; badge: number; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    panel.current?.querySelector<HTMLElement>('button, input')?.focus();
+    const down = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    // Capture phase, so a drawer around the panel doesn't also close on the same Escape; a menu open in the panel closes first.
+    const esc = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape' || panel.current?.querySelector('.menu')) return;
+      e.stopPropagation();
+      setOpen(false);
+      btn.current?.focus();
+    };
+    document.addEventListener('mousedown', down);
+    document.addEventListener('keydown', esc, true);
+    return () => {
+      document.removeEventListener('mousedown', down);
+      document.removeEventListener('keydown', esc, true);
+    };
+  }, [open]);
+  return (
+    <div className="wi-pop" ref={ref}>
+      <button ref={btn} type="button" title={label} aria-label={label} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Icon name="funnel" />
+        <span className="wi-pop-text">{text}</span>
+        {badge > 0 && <span className="count">{badge}</span>}
+      </button>
+      {open && (
+        <div ref={panel} className="wi-pop-panel" role="dialog" aria-label={label}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function useWide() {
   const [wide, setWide] = useState(() => matchMedia(WIDE).matches);
   useEffect(() => {
@@ -40,7 +80,7 @@ function useWide() {
 }
 
 export function Waveink({ state, openId, now }: { state: AppState; openId?: string; now: Date }) {
-  const { go, toast } = useApp();
+  const { toast } = useApp();
   const wide = useWide();
   const cfg = state.companies.find(c => c.id === 'waveink')!;
   const root = clientFolder(state, 'waveink');
@@ -127,6 +167,14 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
   const picked = shown.filter(m => selected.has(m.id)).map(m => m.id);
   const allPicked = shown.length > 0 && picked.length === shown.length;
   const filtered = status !== 'all' || sub !== 'all' || starred;
+  const changed = [status !== 'all', sub !== 'all', starred, sort !== 'queue'].filter(Boolean).length;
+  const statusChoices: Choice<StatusFilter>[] = (['all', 'open', ...COMPANY_STATUSES.waveink] as const).map(s => ({
+    value: s,
+    label: s === 'all' ? 'All' : s === 'open' ? 'Open' : statusLabel(s, 'waveink'),
+    tone: s === 'all' || s === 'open' ? undefined : `st-${s}`,
+    count: counts[s] ?? 0,
+  }));
+  const groupCount = (g: string) => all.filter(m => groupOf(m) === g && hit(m)).length;
   const chosen = sel ? all.find(m => m.id === sel) : undefined;
   const current = chosen ?? (wide ? shown[0] : undefined);
   useEffect(() => {
@@ -177,198 +225,149 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
 
   return (
     <div className="page wi-page c-waveink">
-      <header className="wi-head">
-        <span className="client-tile c-fill" aria-hidden="true">
-          <Icon name="cube" size={30} weight="fill" />
-        </span>
-        <div className="wi-title">
-          <h1>{cfg.name}</h1>
-          <div className="wi-chips">
-            <span className="wi-chip">{cfg.role}</span>
-            {cfg.pay.kind === 'retainer' && <span className="wi-chip c-soft strong">{formatMoney(cfg.pay.amount, cfg.currency)} retainer</span>}
+      <PageHead
+        title={cfg.name}
+        icon="cube"
+        meta={
+          <>
+            {cfg.role && <span>{cfg.role}</span>}
+            {cfg.pay.kind === 'retainer' && <span>{formatMoney(cfg.pay.amount, cfg.currency)} retainer</span>}
             {report && (
-              <span className="wi-chip">
+              <span>
                 Report to {report[1]} every {report[2]}
               </span>
             )}
-            {pace && <span className={`wi-chip ${pace.behind && pace.per === 'week' ? 'warn' : ''}`}>{paceText(pace)}</span>}
+            {pace && pace.target > 0 && <span className={pace.behind && pace.per === 'week' ? 'warn-text' : ''}>{paceText(pace)}</span>}
             {dueToday.map(d => (
-              <span key={d.id} className={`wi-chip ${d.passed ? '' : 'bad'}`}>
+              <span key={d.id} className={d.passed ? '' : 'bad-text'}>
                 {d.label} today{d.time ? ` ${d.time}` : ''}
               </span>
             ))}
-            <button type="button" className="wi-chip wi-chip-btn" onClick={() => setJob(true)}>
-              <Icon name="calendar" size={13} /> Job details
-            </button>
-          </div>
-        </div>
-        <div className="wi-prog">
+            <span>
+              <button type="button" className="link-btn" onClick={() => setJob(true)}>
+                Job details
+              </button>
+            </span>
+          </>
+        }
+      >
+        <div className="wi-prog" title={`${done} of ${total} ${tech.length ? 'Tech ' : ''}models done`}>
           <div className="wi-prog-top">
             <span>
-              {done} of {total} {tech.length ? 'Tech ' : ''}models done
+              <b className="tabular">
+                {done} / {total}
+              </b>{' '}
+              {tech.length ? 'Tech ' : ''}done
             </span>
-            <span className="muted tabular">{pct}%</span>
+            <span className="tabular">{pct}%</span>
           </div>
-          <div className="wi-bar" role="progressbar" aria-label={`${tech.length ? 'Tech ' : ''}models done`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
+          <div className="progress" role="progressbar" aria-label={`${tech.length ? 'Tech ' : ''}models done`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={done}>
             <div style={{ width: `${pct}%` }} />
           </div>
         </div>
-        <div className="wi-actions">
-          <Pop label="Links, brief and add model" icon={<Icon name="dots" size={22} />} className="wi-ibtn lg-ic">
-            {close => (
-              <>
+        <MenuButton label="More actions" icon="dots">
+          {close => (
+            <>
+              {cfg.links.map(l => (
                 <button
+                  key={l.url}
                   type="button"
                   role="menuitem"
                   onClick={() => {
                     close();
-                    setAdding(true);
+                    hub.openUrl(l.url);
                   }}
                 >
-                  <Icon name="plus" size={15} />
-                  <span className="grow">Add model</span>
+                  <Icon name="link" />
+                  <span className="grow">{l.label}</span>
+                  <Icon name="external" size={13} />
                 </button>
-                <hr />
-                {cfg.links.map(l => (
-                  <button
-                    key={l.url}
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      close();
-                      hub.openUrl(l.url);
-                    }}
-                  >
-                    <Icon name="link" size={15} />
-                    <span className="grow">{l.label}</span>
-                    <Icon name="external" size={13} />
-                  </button>
-                ))}
+              ))}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  close();
+                  setBrief(true);
+                }}
+              >
+                <Icon name="info" />
+                <span className="grow">Brief & pay terms</span>
+              </button>
+              <hr />
+              {root && (
                 <button
                   type="button"
                   role="menuitem"
+                  title={root}
                   onClick={() => {
                     close();
-                    setBrief(true);
+                    hub.openPath(root);
                   }}
                 >
-                  <Icon name="info" size={15} />
-                  <span className="grow">Brief & pay terms</span>
+                  <Icon name="folderOpen" />
+                  <span className="grow">Open output folder</span>
                 </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    close();
-                    setJob(true);
-                  }}
-                >
-                  <Icon name="calendar" size={15} />
-                  <span className="grow">Job details & files</span>
-                </button>
-                <hr />
-                {root && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    title={root}
-                    onClick={() => {
-                      close();
-                      hub.openPath(root);
-                    }}
-                  >
-                    <Icon name="folderOpen" size={15} />
-                    <span className="grow">Open output folder</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  role="menuitem"
-                  title="Download images saves each model's catalog images in its own folder here"
-                  onClick={async () => {
-                    close();
-                    const p = await hub.pickFolder(root || undefined);
-                    if (p) await hub.upsert('companies', { ...withFolder(cfg, p) });
-                  }}
-                >
-                  <Icon name="folder" size={15} />
-                  <span className="grow">{root ? 'Change output folder' : 'Choose output folder'}</span>
-                </button>
-              </>
-            )}
-          </Pop>
-          <button type="button" className="lg primary" onClick={exportNow}>
-            <Icon name="excel" size={18} /> Export Excel
-          </button>
-        </div>
-      </header>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                title="Download images saves each model's catalog images in its own folder here"
+                onClick={async () => {
+                  close();
+                  const p = await hub.pickFolder(root || undefined);
+                  if (p) await hub.upsert('companies', { ...withFolder(cfg, p) });
+                }}
+              >
+                <Icon name="folder" />
+                <span className="grow">{root ? 'Change output folder' : 'Choose output folder'}</span>
+              </button>
+            </>
+          )}
+        </MenuButton>
+        <button type="button" className="primary" onClick={exportNow}>
+          <Icon name="excel" /> Export to Excel
+        </button>
+      </PageHead>
 
       <div className="wi-grid">
         <section className="panel wi-list" aria-label="Models">
           <div className="wi-tools">
-            <div className="wi-tabs" role="group" aria-label="Group">
-              {groups.map(g => (
-                <button key={g} type="button" className={`wi-tab ${g === group ? 'on' : ''}`} aria-pressed={g === group} onClick={() => pickGroup(g)}>
-                  {g} · {all.filter(m => groupOf(m) === g && hit(m)).length}
-                </button>
-              ))}
-            </div>
+            {groups.length <= 3 ? (
+              <div className="seg wi-groups" role="group" aria-label="Group">
+                {groups.map(g => (
+                  <button key={g} type="button" className={g === group ? 'on' : ''} aria-pressed={g === group} onClick={() => pickGroup(g)}>
+                    {g} <span className="n">{groupCount(g)}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <Dropdown label="Group" value={group} options={groups.map(g => ({ value: g, label: g, count: groupCount(g) }))} onChange={pickGroup} className="wi-groups" />
+            )}
             <label className="wi-search">
-              <Icon name="search" size={16} />
+              <Icon name="search" />
               <span className="sr-only">Search models</span>
-              <input type="search" placeholder="Name or Jasani code" value={query} onChange={e => setQuery(e.target.value)} />
+              <input type="search" placeholder="Name or code" value={query} onChange={e => setQuery(e.target.value)} />
             </label>
-            <Pop label="Filter and sort" kind="dialog" icon={<Icon name="funnel" size={17} />} dot={filtered || sort !== 'queue'}>
-              {() => (
-                <>
-                  <div className="wi-fsec">
-                    <span className="wi-flabel">Status</span>
-                    <div className="chips">
-                      {(['all', 'open', ...COMPANY_STATUSES.waveink] as const).map(s => (
-                        <button key={s} type="button" className={`chip ${status === s ? 'on' : ''}`} aria-pressed={status === s} onClick={() => setStatusFilter(s)}>
-                          {s === 'all' ? 'All' : s === 'open' ? 'Open' : statusLabel(s, 'waveink')}
-                          <span className="n">{counts[s] ?? 0}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="wi-fgrid">
-                    {subs.length > 0 && (
-                      <label className="field">
-                        <span>Subcategory</span>
-                        <select value={sub} onChange={e => setSub(e.target.value)}>
-                          <option value="all">All subcategories</option>
-                          {subs.map(s => (
-                            <option key={s}>{s}</option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    <label className="field">
-                      <span>Sort</span>
-                      <select value={sort} onChange={e => setSort(e.target.value as Sort)}>
-                        {SORTS.map(([k, v]) => (
-                          <option key={k} value={k}>
-                            {v}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  <div className="row gap between">
-                    <button type="button" className={`chip ${starred ? 'on' : ''}`} aria-pressed={starred} onClick={() => setStarred(!starred)}>
-                      <Icon name="star" size={13} weight={starred ? 'fill' : 'regular'} /> Only starred
-                    </button>
-                    <button type="button" className="ghost mini" onClick={clearFilters} disabled={!filtered}>
-                      Clear filters
-                    </button>
-                  </div>
-                </>
+            <Pop label="Filter and sort" text="Filter" badge={changed}>
+              <Dropdown label="Status" prefix="Status" value={status} options={statusChoices} onChange={v => setStatusFilter(v)} />
+              {subs.length > 0 && (
+                <Dropdown label="Subcategory" prefix="Subcategory" value={sub} options={[{ value: 'all', label: 'All' }, ...subs.map(s => ({ value: s, label: s }))]} onChange={setSub} />
               )}
+              <Dropdown label="Sort" prefix="Sort" value={sort} options={SORTS.map(([value, label]) => ({ value, label }))} onChange={v => setSort(v)} />
+              <div className="row gap between">
+                <label className="row gap wi-check">
+                  <input type="checkbox" checked={starred} onChange={e => setStarred(e.target.checked)} />
+                  Only starred
+                </label>
+                <button type="button" className="ghost mini" onClick={clearFilters} disabled={!filtered}>
+                  Clear filters
+                </button>
+              </div>
             </Pop>
             <button
               type="button"
-              className={`wi-tool ${selecting ? 'on' : ''}`}
+              className={`wi-select ${selecting ? 'on' : ''}`}
               aria-pressed={selecting}
               onClick={() => {
                 setSelecting(!selecting);
@@ -383,8 +382,8 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                 'Select'
               )}
             </button>
-            <button type="button" className="wi-ibtn" aria-label="Add model" title="Add model" onClick={() => setAdding(true)}>
-              <Icon name="plus" size={18} />
+            <button type="button" className="icon-btn" aria-label="Add model" title="Add model" onClick={() => setAdding(true)}>
+              <Icon name="plus" />
             </button>
           </div>
 
@@ -413,30 +412,32 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
             <div className="wi-bulk">
               <label className="row gap">
                 <input type="checkbox" checked={allPicked} onChange={e => setSelected(e.target.checked ? new Set(shown.map(m => m.id)) : new Set())} aria-label="Select all shown" />
-                <strong>{picked.length} selected</strong>
+                {picked.length} selected
               </label>
-              <Pop label="Set status of the selected models" text={<>Set status <Icon name="caretDown" size={12} weight="bold" /></>} className="mini" disabled={!picked.length}>
-                {close =>
-                  COMPANY_STATUSES.waveink.map(s => (
-                    <button
-                      key={s}
-                      type="button"
-                      role="menuitem"
-                      onClick={async () => {
-                        close();
-                        await set(picked, s);
-                        setSelected(new Set());
-                      }}
-                    >
-                      <span className={`dot st-${s}`} />
-                      {statusLabel(s, 'waveink')}
-                    </button>
-                  ))
-                }
-              </Pop>
-              <button type="button" className="mini" disabled={!picked.length || !!downloading} onClick={() => download(all.filter(m => picked.includes(m.id)))}>
-                <Icon name="download" size={14} /> {downloading ?? 'Download images'}
-              </button>
+              <fieldset className="wi-bulk-acts" disabled={!picked.length} aria-label="Change the selected models">
+                <MenuButton label="Set status of the selected models" text="Set status" className="select-btn mini" align="start">
+                  {close =>
+                    COMPANY_STATUSES.waveink.map(s => (
+                      <button
+                        key={s}
+                        type="button"
+                        role="menuitem"
+                        onClick={async () => {
+                          close();
+                          await set(picked, s);
+                          setSelected(new Set());
+                        }}
+                      >
+                        <span className={`dot st-${s}`} />
+                        {statusLabel(s, 'waveink')}
+                      </button>
+                    ))
+                  }
+                </MenuButton>
+                <button type="button" className="mini" disabled={!!downloading} onClick={() => download(all.filter(m => picked.includes(m.id)))}>
+                  <Icon name="download" size={14} /> {downloading ?? 'Download images'}
+                </button>
+              </fieldset>
             </div>
           )}
 
@@ -479,14 +480,13 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                         setSel(m.id);
                       }}
                     >
-                      <ClientTile client="waveink" />
                       <span className="wi-name">
                         <b>
-                          {m.starred && <Icon name="star" size={13} weight="fill" />}
+                          {m.starred && <Icon name="star" size={12} weight="fill" />}
                           {m.name}
                         </b>
                         <small>
-                          <span>{m.code}</span>
+                          {m.code && <span>{m.code}</span>}
                           {subText && <span className="wi-sub-inline">{subText}</span>}
                           {!!m.percent && !isComplete(m.status) && <span>{m.percent}%</span>}
                           {worked && <span>{relTime(worked, now)}</span>}
