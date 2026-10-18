@@ -3,20 +3,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { HubApi, NewModel, SettingsPatch } from '../shared/api';
 import type { AppState, Collection, Model } from '../shared/types';
-import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, uid } from '../shared/ops';
+import { applyStatus, importPortalRows, patchModel, uid } from '../shared/ops';
+import { applySppFolders, recordPull, type SppResult } from '../shared/outputs';
+import { clientFolder } from '../shared/assets';
+import * as outputs from './outputs';
 import { dataDir, flush, getState, loadState, onChange, replaceState, update } from './store';
-import * as google from './google';
-import { runSync } from './sync';
 import { openPortal, pullPortal } from './portal';
 import { folderImageCount, scanFolder } from './files';
 import { exportExcel, exportName } from './exporter';
 import * as assets from './assets';
 import * as accounts from './accounts';
 import { localDate } from '../shared/money';
-import { newMail, tick } from './notify';
+import { tick } from './notify';
 
 let win: BrowserWindow | null = null;
-let syncTimer: NodeJS.Timeout | null = null;
 
 // Lets tests and a second profile run against a separate data folder.
 if (process.env.FREELANCE_HUB_DATA) app.setPath('userData', process.env.FREELANCE_HUB_DATA);
@@ -73,24 +73,6 @@ function createWindow(): void {
   win.on('closed', () => (win = null));
 }
 
-function scheduleSync(): void {
-  if (syncTimer) clearInterval(syncTimer);
-  const s = getState().settings;
-  if (!s.google.connected) return;
-  syncTimer = setInterval(() => void syncAndNotify(), Math.max(5, s.syncMinutes) * 60000);
-}
-
-async function syncAndNotify() {
-  const before = new Set(getState().emails.map(e => e.id));
-  const firstRun = before.size === 0;
-  const result = await runSync();
-  if (result.ok && !firstRun) {
-    const name = (id: string) => getState().companies.find(c => c.id === id)?.name ?? '';
-    newMail(before, getState().emails, name, focus);
-  }
-  return result;
-}
-
 function newModel(input: NewModel, now: string): Model {
   return {
     status: 'todo',
@@ -137,65 +119,9 @@ const handlers: HubApi = {
   },
   async patchSettings(patch: SettingsPatch) {
     update(s => {
-      s.settings = {
-        ...s.settings,
-        ...patch,
-        google: { ...s.settings.google, ...patch.google },
-        rates: { ...s.settings.rates, ...patch.rates },
-      };
+      s.settings = { ...s.settings, ...patch, rates: { ...s.settings.rates, ...patch.rates } };
     });
     if (patch.launchAtStartup !== undefined) setLaunchAtLogin(patch.launchAtStartup);
-    if (patch.syncMinutes !== undefined) scheduleSync();
-  },
-  async acceptSuggestion(id, override) {
-    update(s => acceptSuggestion(s, id, override));
-  },
-  async dismissSuggestion(id) {
-    update(s => dismissSuggestion(s, id));
-  },
-  async googleConnect(clientId, clientSecret) {
-    try {
-      const { email } = await google.connect({ clientId: clientId.trim(), clientSecret: clientSecret.trim() });
-      update(s => {
-        s.settings.google = { ...s.settings.google, clientId: clientId.trim(), clientSecret: clientSecret.trim(), connected: true, email };
-        delete s.settings.google.lastError;
-      });
-      scheduleSync();
-      void syncAndNotify();
-      focus();
-      return { ok: true, email };
-    } catch (err) {
-      focus();
-      return { ok: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  },
-  async googleDisconnect() {
-    google.disconnect();
-    update(s => {
-      s.settings.google.connected = false;
-      delete s.settings.google.email;
-    });
-    scheduleSync();
-  },
-  async loadGoogleCredentials() {
-    const pick = await dialog.showOpenDialog(win!, {
-      title: 'Choose the OAuth client JSON you downloaded from Google Cloud',
-      filters: [{ name: 'JSON', extensions: ['json'] }],
-      properties: ['openFile'],
-    });
-    if (pick.canceled || !pick.filePaths[0]) return null;
-    try {
-      const json = JSON.parse(fs.readFileSync(pick.filePaths[0], 'utf8'));
-      const c = json.installed ?? json.web ?? json;
-      if (!c.client_id || !c.client_secret) return { error: 'That file has no client_id / client_secret. Download the JSON of a "Desktop app" OAuth client.' };
-      return { clientId: c.client_id, clientSecret: c.client_secret };
-    } catch {
-      return { error: 'Could not read that file as JSON.' };
-    }
-  },
-  async sync() {
-    google.configure(getState().settings.google);
-    return syncAndNotify();
   },
   async portalOpen() {
     openPortal(getState().settings.metaztechPortalUrl);
@@ -207,10 +133,36 @@ const handlers: HubApi = {
       return { error: err instanceof Error ? err.message : String(err) };
     }
   },
-  async portalImport(rows) {
+  async portalImport(rows, opts) {
+    const now = new Date().toISOString();
     let counts = { added: 0, updated: 0, unchanged: 0 };
-    update(s => (counts = importPortalRows(s, rows, new Date().toISOString())));
-    return counts;
+    let full = false;
+    update(s => {
+      counts = importPortalRows(s, rows, now);
+      if (opts?.fullList) full = recordPull(s, rows, now);
+    });
+    return full && clientFolder(getState(), 'metaztech') ? { ...counts, spp: await checkSpp() } : counts;
+  },
+  async downloadReferences(id) {
+    const s = getState();
+    const m = s.models.find(x => x.id === id);
+    if (!m) return { error: 'That model is no longer in the app.' };
+    const root = clientFolder(s, m.company);
+    if (!root) return { error: 'Choose the output folder first.' };
+    if (!m.sourceUrls?.length) return { error: `${m.code ?? m.name} has no image links in the catalog.` };
+    try {
+      const r = await outputs.downloadReferences(m, root);
+      update(st => {
+        const x = st.models.find(y => y.id === id);
+        if (x) x.outputFolder = r.folder;
+      });
+      return r;
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  async checkSppFolders() {
+    return checkSpp();
   },
   async pickFolder(defaultPath) {
     const pick = await dialog.showOpenDialog(win!, { defaultPath, properties: ['openDirectory'] });
@@ -321,6 +273,20 @@ const handlers: HubApi = {
   },
 };
 
+/** Reads MetaZtech's output folder and marks jobs approved that left the dashboard with their .spp delivered. */
+async function checkSpp(): Promise<SppResult | { error: string }> {
+  const root = clientFolder(getState(), 'metaztech');
+  if (!root) return { error: 'Link the MetaZtech output folder first.' };
+  try {
+    const folders = await outputs.scanSppFolders(root);
+    let result: SppResult = { approved: [], created: [], onDashboard: 0 };
+    update(s => (result = applySppFolders(s, folders, new Date().toISOString())));
+    return result;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 for (const [name, fn] of Object.entries(handlers)) {
   ipcMain.handle(`hub:${name}`, (_e, ...args) => (fn as (...a: unknown[]) => unknown)(...args));
 }
@@ -329,20 +295,18 @@ app.whenReady().then(() => {
   const state = loadState();
   // Re-point a login item an older portable build registered at its temporary copy.
   if (process.platform === 'win32' && state.settings.launchAtStartup) setLaunchAtLogin(true);
-  google.configure(state.settings.google);
-  if (state.settings.google.connected && !google.hasTokens()) {
-    update(s => {
-      s.settings.google.connected = false;
-    });
-  }
+  // Older versions kept a Google sign-in here for reading Gmail, Calendar and Drive.
+  fs.rmSync(path.join(dataDir(), 'google-token.bin'), { force: true });
   onChange(s => win?.webContents.send('hub:state', s));
   createWindow();
-  scheduleSync();
-  if (getState().settings.google.connected) setTimeout(() => void syncAndNotify(), 4000);
   setInterval(() => tick(getState(), focus), 60000);
   setTimeout(() => tick(getState(), focus), 8000);
   // Job folders: re-sync a few seconds after files change in a watched client folder.
   setTimeout(() => assets.startWatchers(getState, update, onChange), 3000);
+  // Jobs approved while the app was closed: checked once at start when there is a pull to compare with.
+  setTimeout(() => {
+    if (getState().settings.portalLastPull && clientFolder(getState(), 'metaztech')) void checkSpp();
+  }, 5000);
 });
 
 app.on('window-all-closed', () => {

@@ -1,4 +1,4 @@
-/* Settings & import: import panel (dropzone, catalogs, column mapping) beside the Google, money, folders, app and data cards; the client list and client editors below. Scoped under .set-page. */
+/* Settings & import: import panel (dropzone, catalogs, column mapping) beside the money, folders, app and data cards; the client list and client editors below. Scoped under .set-page. */
 
 /* ---------- header ---------- */
 .set-page .set-head {
@@ -342,51 +342,6 @@
   padding: 22px;
   gap: 14px;
 }
-.set-page .set-acct {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-.set-page .set-acct-ic {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--fill);
-  color: var(--muted);
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.set-page .set-acct-ic.on {
-  background: var(--money-tint);
-  color: var(--money-deep);
-}
-.set-page .set-acct-txt {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.set-page .set-acct-txt b {
-  font-size: 14px;
-  font-weight: 700;
-}
-.set-page .set-acct-txt small {
-  font-size: 12px;
-  color: var(--muted);
-}
-.set-page .set-small {
-  height: 34px;
-  padding: 0 14px;
-  font-size: 12px;
-  background: var(--fill);
-  box-shadow: none;
-  flex: none;
-}
-.set-page .set-small:hover {
-  background: var(--line);
-}
 .set-page .set-btns {
   display: flex;
   flex-wrap: wrap;
@@ -434,53 +389,6 @@
 .set-page .set-seg button.on {
   background: var(--ink);
   color: var(--on-ink);
-}
-.set-page .set-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-}
-.set-page .set-links .link-btn {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--link);
-  gap: 4px;
-  align-items: center;
-}
-.set-page .set-guide {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  counter-reset: step;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  color: var(--text-2);
-}
-.set-page .set-guide li {
-  counter-increment: step;
-  position: relative;
-  padding-left: 32px;
-}
-.set-page .set-guide li::before {
-  content: counter(step);
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--fill);
-  color: var(--text);
-  font-size: 11px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-}
-.set-page .set-guide b {
-  color: var(--text);
 }
 
 /* money */
@@ -738,17 +646,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
   gap: 12px;
-}
-.set-page .set-match {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-  gap: 12px;
-}
-.set-page .set-client h4 {
-  margin-top: 4px;
-}
-.set-page .set-client .field small {
-  font-size: 12px;
 }
 
 /* the client list follows its panel's width: below a table's room each client becomes a small card, cells labelled */

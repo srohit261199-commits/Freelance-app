@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { initialState } from '../src/main/seed/initial';
 import { allocate, companyEarnings, localDate, paymentValue, rollRenewal, type MonthLine } from '../src/shared/money';
-import { attentionMail, dailyLog, mailLine, modelLabel, needsAction, nextActions } from '../src/shared/planner';
-import { acceptSuggestion, applyStatus, importPortalRows, patchModel, repairState, type PortalRow } from '../src/shared/ops';
-import { catalogStatusText, lastWorked, mapComplexity, mapPortalStatus, normaliseCode, setStatus, statusEvents, trackerStatusText } from '../src/shared/status';
-import { classify, meetingFromInviteSubject, parseIcs, parseSubscription, parseWaveinkSalary, teamsSenders, toEmailItem, type RawMail } from '../src/shared/mail';
-import { applySync, ingestMail } from '../src/shared/ingest';
-import type { AppState, SyncResult } from '../src/shared/types';
+import { dailyLog, modelLabel, nextActions } from '../src/shared/planner';
+import { applyStatus, importPortalRows, patchModel, repairState, type PortalRow } from '../src/shared/ops';
+import { catalogStatusText, lastWorked, mapComplexity, mapPortalStatus, setStatus, statusEvents, trackerStatusText } from '../src/shared/status';
+import type { AppState } from '../src/shared/types';
 
 const NOW = '2026-10-09T10:00:00.000Z';
 const fresh = (): AppState => initialState(NOW);
@@ -63,7 +61,6 @@ describe('status', () => {
   it('writes the catalog wording back', () => {
     const s = fresh();
     expect(catalogStatusText(s.models.find(m => m.revised)!)).toBe('done (R)');
-    expect(normaliseCode('itwc_1203.glb')).toBe('ITWC 1203');
   });
 
   it('reads negated and pending wording before the words it contains', () => {
@@ -233,97 +230,14 @@ describe('portal import', () => {
   });
 });
 
-const mail = (over: Partial<RawMail>): RawMail => ({ id: 'm1', threadId: 't1', from: '', subject: '', snippet: '', date: NOW, labelIds: ['UNREAD'], ...over });
-
-describe('mail', () => {
-  const companies = fresh().companies;
-  it('sorts mail and Teams notifications into companies', () => {
-    expect(classify(mail({ from: 'Sibi Iype <sibi@waveink.ae>' }), companies)).toBe('waveink');
-    expect(classify(mail({ from: 'Sharon (PM) <sharon_pm@metaztech.ai>' }), companies)).toBe('metaztech');
-    expect(classify(mail({ from: 'Microsoft Teams <no-reply@teams.mail.microsoft>', subject: 'Ritu Agrawal sent a message' }), companies)).toBe('metaztech');
-    expect(classify(mail({ from: 'x@shine.com', subject: 'Recruiter viewed your profile' }), companies)).toBe('other');
-    expect(teamsSenders('Ritu Agrawal and Dheeraj Ganesh Gowda sent 2 messages to your chat')).toEqual(['Ritu Agrawal', 'Dheeraj Ganesh Gowda']);
-  });
-
-  it('reads the Waveink salary mail', () => {
-    const p = parseWaveinkSalary(
-      mail({ id: 'x', subject: 'Salary Transfer Reference – Rohit - September 2026', snippet: 'Transfer reference: 33TF068381319 Kindly confirm' }),
-      3000,
-    );
-    expect(p).toMatchObject({ amount: 3000, currency: 'AED', period: '2026-09', reference: '33TF068381319' });
-  });
-
-  it('records a Waveink salary once, not again for the reply to it', () => {
-    const sibi = 'Sibi Iype <sibi@waveink.ae>';
-    const subject = 'Salary Transfer Reference – Rohit - September 2026';
-    const raws = [
-      mail({ id: 'sal', from: sibi, subject, snippet: 'Transfer reference: 33TF068381319 Kindly confirm receipt of the payment.', date: '2026-10-01T06:38:27Z' }),
-      mail({ id: 're', from: sibi, subject: `Re: ${subject}`, snippet: 'Dear Rohit, Thank you for the confirmation.', date: '2026-10-01T09:14:54Z' }),
-    ];
-    expect(parseWaveinkSalary(raws[1], 3000)).toBeNull();
-    expect(toEmailItem(raws[1], companies).kind).toBe('mail');
-    const sync = (s: AppState) => {
-      const result: SyncResult = { ok: true, newEmails: 0, meetings: 0, driveMatches: 0, newSuggestions: 0, newPayments: 0 };
-      applySync(s, ingestMail(s, raws, new Set(), new Set(raws.map(r => r.id)), NOW), [], null, Date.parse(NOW), result);
-      return result;
-    };
-
-    const empty = fresh();
-    empty.payments = [];
-    empty.handledEmails = [];
-    expect(sync(empty).newPayments).toBe(1);
-    expect(empty.payments).toEqual([expect.objectContaining({ period: '2026-09', reference: '33TF068381319', emailId: 'sal' })]);
-    expect(sync(empty).newPayments).toBe(0);
-
-    const seeded = fresh();
-    expect(sync(seeded).newPayments).toBe(0);
-    expect(companyEarnings(seeded, 'waveink', new Date(NOW)).received).toBe(3000);
-  });
-
-  it('reads Google Play, Stripe and cancellation receipts', () => {
-    const play = parseSubscription(
-      mail({
-        from: 'Google Play <googleplay-noreply@google.com>',
-        subject: 'Your Google Play Order Receipt from 6 Oct 2026',
-        date: '2026-10-06T10:41:56Z',
-        body: 'Your subscription from Anthropic, PBC on Google Play has renewed.\nItem Price\n\nClaude Pro Subscription (Claude by Anthropic) ₹1,999.00/month\n\nPayment method:\n\nUPI: GPay\n',
-      }),
-    );
-    expect(play).toMatchObject({ name: 'Claude Pro Subscription', amount: 1999, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-11-06', paymentMethod: 'UPI: GPay' });
-    const tripo = parseSubscription(mail({ from: 'Link <notifications@link.com>', subject: 'Your Tripo AI receipt', body: 'Tripo AI\n₹1,986.60\nManage subscription' }));
-    expect(tripo).toMatchObject({ name: 'Tripo AI', amount: 1986.6, currency: 'INR' });
-    const chaos = parseSubscription(mail({ from: 'no-reply@chaos.com', subject: 'Your invoice #INV12441647 is ready', body: 'Invoice Due Date: 09/28/2026Account Balance: 540.00 USD\n' }));
-    expect(chaos).toMatchObject({ amount: 540, currency: 'USD' });
-    const cancel = parseSubscription(
-      mail({ from: 'googleplay-noreply@google.com', subject: 'Your ChatGPT subscription will be cancelled', body: 'Your ChatGPT subscription from OpenAI OpCo, LLC on Google Play will be cancelled on 9 Nov 2026.' }),
-    );
-    expect(cancel).toMatchObject({ status: 'cancelling', endsOn: '2026-11-09' });
-  });
-
-  it('reads invites from ICS and from Google invite subjects', () => {
-    const ics = parseIcs('BEGIN:VEVENT\r\nSUMMARY:Production Pipeline Training\r\nDTSTART;TZID=India Standard Time:20260922T150000\r\nDTEND;TZID=India Standard Time:20260922T160000\r\nDESCRIPTION:Join: https://teams.microsoft.com/meet/296237542693771?p=abc\r\nEND:VEVENT');
-    expect(ics?.title).toBe('Production Pipeline Training');
-    expect(new Date(ics!.start).toISOString()).toBe('2026-09-22T09:30:00.000Z');
-    expect(ics?.joinUrl).toContain('teams.microsoft.com/meet/');
-    const m = meetingFromInviteSubject(
-      mail({ subject: 'Invitation: Kickoff call @ Tue Sep 1, 2026 7:30pm - 8:30pm (GMT+5:30) (s.rohit.261199@gmail.com)', body: 'https://meet.google.com/emh-yjnj-xmi' }),
-      'waveink',
-    );
-    expect(m?.start).toBe('2026-09-01T14:00:00.000Z');
-    expect(m?.joinUrl).toBe('https://meet.google.com/emh-yjnj-xmi');
-  });
-});
-
 describe('planner', () => {
-  it('puts rejections, meetings and Friday reporting first', () => {
+  it('puts rejections and Friday reporting first', () => {
     const s = fresh();
     importPortalRows(s, [{ code: 'R1', name: 'Bed frame', status: 'revision', raw: {} }], NOW);
-    s.meetings.push({ id: 'm', company: 'waveink', title: 'Review call', start: '2026-10-09T13:00:00Z', source: 'calendar' });
     const friday = new Date('2026-10-09T09:00:00Z');
     const acts = nextActions(s, friday);
     const titles = acts.filter(a => a.priority === 1).map(a => a.title);
     expect(titles.some(t => t.startsWith('Fix rejection: Bed frame'))).toBe(true);
-    expect(titles.some(t => t.includes('Review call'))).toBe(true);
     expect(titles.some(t => /daily update log/i.test(t))).toBe(true);
     expect(acts.some(a => a.title.startsWith('Next Waveink model'))).toBe(true);
   });
@@ -337,37 +251,6 @@ describe('planner', () => {
     expect(log).toHaveLength(1);
     expect(log[0]).toMatchObject({ started: 2, inReview: 1, completed: 0 });
     expect(log[0].notes).toContain('GLB uploaded');
-  });
-
-  it('only flags recent client mail that asks for something', () => {
-    const s = fresh();
-    s.emails = [
-      { id: 'a', threadId: 'a', company: 'metaztech', from: 'x', fromName: 'Ritu', subject: 'please work on rejections', snippet: '', date: '2026-10-08T15:00:00Z', unread: true, url: '', kind: 'teams', attention: ['rejections'] },
-      { id: 'b', threadId: 'b', company: 'other', from: 'x', fromName: 'Shine', subject: 'urgent', snippet: '', date: '2026-10-08T15:00:00Z', unread: true, url: '', kind: 'mail', attention: ['urgent'] },
-      { id: 'c', threadId: 'c', company: 'waveink', from: 'x', fromName: 'Sibi', subject: 'please confirm', snippet: '', date: '2026-09-01T15:00:00Z', unread: false, url: '', kind: 'mail', attention: ['please'] },
-    ];
-    expect(attentionMail(s.emails, new Date(NOW)).map(e => e.id)).toEqual(['a']);
-  });
-
-  it('flags unread client requests of any age, and shows what a Teams message says', () => {
-    const s = fresh();
-    const now = new Date(NOW);
-    const teams = 'Microsoft Teams <no-reply@teams.mail.microsoft>';
-    const old = toEmailItem(mail({ id: 'o', from: teams, subject: 'Ritu Agrawal sent 2 messages to your chat', snippet: 'EOD all complexity will upgrade', date: '2026-10-05T02:58:48Z' }), s.companies);
-    expect(needsAction(old, now)).toBe(true);
-    expect(needsAction({ ...old, unread: false }, now)).toBe(false);
-    expect(needsAction({ ...old, unread: false, date: '2026-10-08T10:00:00Z' }, now)).toBe(true);
-    expect(needsAction({ ...old, company: 'other' }, now)).toBe(false);
-    expect(needsAction({ ...old, attention: [] }, now)).toBe(false);
-    expect(attentionMail([old], now)).toEqual([old]);
-
-    const ritu = toEmailItem(mail({ id: 'r', from: teams, subject: 'Ritu Agrawal sent a message', snippet: 'please work on rejection' }), s.companies);
-    expect(ritu).toMatchObject({ kind: 'teams', fromName: 'Ritu Agrawal' });
-    expect(mailLine(ritu)).toBe('please work on rejection');
-    expect(mailLine({ ...ritu, snippet: '[Image] Hi, Ritu' })).toBe('Ritu Agrawal sent a message');
-    expect(mailLine({ ...ritu, kind: 'mail' })).toBe('Ritu Agrawal sent a message');
-    s.emails = [ritu];
-    expect(nextActions(s, now).map(a => a.title)).toContain('Ritu Agrawal: please work on rejection');
   });
 
   it('counts each model once per day by its net change: Done then undone is not completed', () => {
@@ -442,56 +325,12 @@ describe('excel export', () => {
   });
 });
 
-describe('subscription matching', () => {
-  it('matches renewal receipts to the right existing plan', async () => {
-    const { findSubscription } = await import('../src/shared/ingest');
-    const subs = fresh().subscriptions;
-    const pick = (name: string, vendor: string) => findSubscription(subs, { name, vendor })?.name;
-    expect(pick('Google AI Pro (5 TB) (Google One)', 'Google Ireland')).toBe('Google AI Pro (5 TB)');
-    expect(pick('Claude Pro Subscription', 'Anthropic')).toBe('Claude Pro');
-    expect(pick('LinkedIn: Job Search & Network', 'LinkedIn')).toBe('LinkedIn Premium');
-    expect(pick('Tripo AI', 'Tripo AI')).toBe('Tripo AI Starter (annual)');
-    expect(pick('Substance 3D Painter', 'Adobe')).toBeUndefined();
-  });
-});
-
-describe('calendar', () => {
-  it('files the Waveink Weekly Demo under Waveink even though it comes from personal Gmail addresses', async () => {
-    const { calendarMeetings } = await import('../src/shared/ingest');
-    const [m] = calendarMeetings(
-      [
-        {
-          id: 'wd',
-          summary: 'Weekly Demo',
-          start: { dateTime: '2026-10-14T19:30:00+05:30' },
-          end: { dateTime: '2026-10-14T20:30:00+05:30' },
-          organizer: { email: 'danial.aftab.01@gmail.com' },
-          attendees: [{ email: 'sibiabin92@gmail.com' }, { email: 's.rohit.261199@gmail.com' }],
-          conferenceData: { entryPoints: [{ entryPointType: 'video', uri: 'https://meet.google.com/emh-yjnj-xmi' }] },
-        },
-      ],
-      fresh(),
-    );
-    expect(m).toMatchObject({ company: 'waveink', start: '2026-10-14T14:00:00.000Z', joinUrl: 'https://meet.google.com/emh-yjnj-xmi' });
-  });
-});
-
 describe('saved data', () => {
   it('drops a salary reply that an older sync recorded as a second payment', () => {
     const s = fresh();
     const real = s.payments[0];
     s.payments.push({ ...real, id: 'pay-re', source: 'email', reference: undefined, emailId: 're', note: `Re: ${real.note ?? 'Salary Transfer Reference'}` });
     expect(repairState(s).payments.map(p => p.id)).toEqual([real.id]);
-  });
-
-  it('fixes an accepted payout in another currency at the rate on the day it was accepted', () => {
-    const s = fresh();
-    s.suggestions.push({ id: 'sg', kind: 'payment', emailId: 'm1', emailUrl: '', title: '', detail: '', createdAt: NOW, payment: { company: 'metaztech', date: '2026-10-05', currency: 'AED' } });
-    acceptSuggestion(s, 'sg', { payment: { amount: 100 } });
-    const p = s.payments.at(-1)!;
-    expect(p.settledAmount).toBe(2400);
-    s.settings.rates.AED = 30;
-    expect(paymentValue(p, 'INR', s.settings.rates)).toBe(2400);
   });
 
   it('dates "Last Updated" by real work, not by starring or the import', () => {

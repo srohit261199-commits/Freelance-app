@@ -4,7 +4,7 @@ import type { CompanyConfig } from '../shared/types';
 import { nextActions } from '../shared/planner';
 import { isComplete } from '../shared/status';
 import { hub, useAppState, useNow } from './hub';
-import { AppCtx, Icon, relTime, type Route } from './ui';
+import { AppCtx, Icon, type Route } from './ui';
 import { Omni, type Screen } from './Omni';
 import { allEarnings, localDate } from '../shared/money';
 import { Today, readDone } from './views/Today';
@@ -13,7 +13,6 @@ import { MetaZtech } from './views/MetaZtech';
 import { Client } from './views/Client';
 import { AddClient } from './views/JobDetails';
 import { Skeidar } from './views/Skeidar';
-import { Inbox } from './views/Inbox';
 import { Earnings } from './views/Earnings';
 import { Subscriptions } from './views/Subscriptions';
 import { Portfolio } from './views/Portfolio';
@@ -34,7 +33,6 @@ export function App() {
   const now = useNow();
   const [route, setRoute] = useState<Route>({ view: 'today' });
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [syncing, setSyncing] = useState(false);
   const side = useRef<HTMLElement>(null);
   const main = useRef<HTMLElement>(null);
 
@@ -101,7 +99,6 @@ export function App() {
       waveink: `${by('waveink').filter(m => m.group === 'Tech' && isComplete(m.status)).length}/${by('waveink').filter(m => m.group === 'Tech' && m.status !== 'skipped').length}`,
       metaztech: by('metaztech').filter(m => m.status === 'revision').length,
       skeidar: state.skeidarJobs.filter(j => j.status === 'open').length,
-      inbox: state.suggestions.length,
       late: allEarnings(state, now).filter(e => e.overdue).length,
       subs: state.subscriptions.filter(s => s.status === 'active' || s.status === 'trial').length,
       portfolio: state.portfolioTasks.filter(t => !t.done).length,
@@ -109,19 +106,6 @@ export function App() {
   }, [state, now, doneTick]);
 
   if (!state || !counts) return <div className="boot">Loading…</div>;
-
-  const sync = async () => {
-    if (!state.settings.google.connected) {
-      setRoute({ view: 'settings' });
-      toast('Connect Google first (Settings → Google account).', 'error');
-      return;
-    }
-    setSyncing(true);
-    const r = await hub.sync();
-    setSyncing(false);
-    if (r.ok) toast(`Synced: ${r.newEmails} new mails, ${r.meetings} upcoming meetings, ${r.driveMatches} GLBs on Drive${r.newSuggestions ? `, ${r.newSuggestions} to review` : ''}.`);
-    else toast(r.error ?? 'Sync failed', 'error');
-  };
 
   const screens: (Screen & { section: string; badge?: string | number })[] = [
     { section: 'Menu', route: { view: 'today' }, label: 'Dashboard', icon: 'dashboard', badge: counts.today || undefined },
@@ -143,7 +127,6 @@ export function App() {
       })),
     { section: 'Money', route: { view: 'earnings' }, label: 'Payments', icon: 'wallet', badge: counts.late || undefined },
     { section: 'Money', route: { view: 'subscriptions' }, label: 'Subscriptions', icon: 'repeat', badge: counts.subs || undefined },
-    { section: 'Tools', route: { view: 'inbox' }, label: 'Mail scan', icon: 'mail', badge: counts.inbox || undefined },
     { section: 'Tools', route: { view: 'settings' }, label: 'Settings & import', icon: 'gear' },
     { section: 'Tools', route: { view: 'portfolio' }, label: 'Portfolio', icon: 'globe', badge: counts.portfolio || undefined },
   ];
@@ -151,21 +134,7 @@ export function App() {
     r.view === route.view &&
     (r.view === 'company' ? route.view === 'company' && r.company === route.company : r.view === 'skeidar' ? route.view === 'skeidar' && (r.company ?? 'skeidar') === (route.company ?? 'skeidar') : true);
   const title = screens.find(s => active(s.route))?.label ?? '';
-  const g = state.settings.google;
   const sections = [...new Set(screens.map(s => s.section))];
-
-  const found = state.suggestions.length;
-  const kinds = (['payment', 'subscription'] as const)
-    .map(k => [k, state.suggestions.filter(s => s.kind === k).length] as const)
-    .filter(([, n]) => n > 0)
-    .map(([k, n]) => (k === 'payment' ? (n === 1 ? 'a payment' : `${n} payments`) : n === 1 ? 'a subscription' : `${n} subscriptions`));
-  const card = found
-    ? { title: `${found} new ${found === 1 ? 'thing' : 'things'} found in Gmail`, body: `Check ${kinds.join(' and ')} before ${found === 1 ? 'it goes' : 'they go'} into your records.`, cta: 'Review now', act: () => setRoute({ view: 'inbox' }) }
-    : !g.connected
-      ? { title: 'Connect Gmail', body: 'Find payouts, receipts, client mail and meetings without copying anything by hand.', cta: 'Set up', act: () => setRoute({ view: 'settings' }) }
-      : { title: 'All caught up', body: g.lastSync ? `Last checked ${relTime(g.lastSync, now)}. Nothing new to review.` : 'Nothing new to review.', cta: syncing ? 'Syncing…' : 'Check now', act: sync };
-  const led = syncing ? 'busy' : !g.connected ? 'off' : g.lastError ? 'err' : '';
-  const syncText = syncing ? 'Syncing…' : !g.connected ? 'Google not connected' : g.lastError ? 'Sync failed · retry' : g.lastSync ? `Synced ${relTime(g.lastSync, now)}` : 'Not synced yet';
 
   return (
     <AppCtx.Provider value={{ go, toast }}>
@@ -179,12 +148,6 @@ export function App() {
             {title && <span className="where">— {title}</span>}
           </div>
           <Omni state={state} screens={screens} onGo={go} />
-          <div className="sync-status">
-            <button type="button" onClick={sync} disabled={syncing} title={g.lastError ?? 'Sync Gmail, Calendar and Drive now'}>
-              <span className={`led ${led}`} />
-              <span className="txt">{syncText}</span>
-            </button>
-          </div>
         </header>
         <div className="body">
           <nav className="side" ref={side} aria-label="Screens">
@@ -216,27 +179,16 @@ export function App() {
                 )}
               </div>
             ))}
-            <div className="side-card">
-              <span className="tile-ic">
-                <Icon name="mailOpen" size={20} weight="fill" />
-              </span>
-              <b>{card.title}</b>
-              <p>{card.body}</p>
-              <button type="button" className="primary" onClick={card.act} disabled={syncing && card.cta === 'Syncing…'}>
-                {card.cta}
-              </button>
-            </div>
           </nav>
           <main className="content" ref={main}>
             <ScreenBoundary screen={JSON.stringify(route)}>
-              {route.view === 'today' && <Today state={state} now={now} onSync={sync} />}
+              {route.view === 'today' && <Today state={state} now={now} />}
               {route.view === 'company' && route.company === 'waveink' && <Waveink state={state} openId={route.modelId} now={now} />}
               {route.view === 'company' && route.company === 'metaztech' && <MetaZtech state={state} openId={route.modelId} now={now} />}
               {route.view === 'company' && route.company !== 'waveink' && route.company !== 'metaztech' && (
                 <Client key={route.company} state={state} company={route.company} openId={route.modelId} now={now} />
               )}
               {route.view === 'skeidar' && <Skeidar key={route.company ?? 'skeidar'} state={state} now={now} openId={route.jobId} company={route.company ?? 'skeidar'} />}
-              {route.view === 'inbox' && <Inbox state={state} now={now} onSync={sync} syncing={syncing} emailId={route.emailId} />}
               {route.view === 'earnings' && <Earnings state={state} now={now} />}
               {route.view === 'subscriptions' && <Subscriptions state={state} now={now} />}
               {route.view === 'portfolio' && <Portfolio state={state} now={now} />}

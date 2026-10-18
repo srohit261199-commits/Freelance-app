@@ -20,7 +20,6 @@ function acme(over: Partial<CompanyConfig> = {}): CompanyConfig {
     color: '#c7b8ff',
     currency: 'USD',
     pay: { kind: 'per-item', rate: 40, unit: 'model' },
-    match: { domains: [], names: [], keywords: [] },
     links: [],
     notes: '',
     workflow: 'models',
@@ -177,9 +176,6 @@ describe('planner with job details', () => {
     expect(fri.find(a => a.id === 'next-1')).toMatchObject({ priority: 2, title: 'Start: Chair 1' });
     const thu = nextActions(s, at('2026-10-08T09:00:00'));
     expect(thu.find(a => a.id === 'dl-acme-call-2026-10-09')).toMatchObject({ priority: 2, title: 'Weekly review call · tomorrow 16:00' });
-    // A calendar meeting at the same time already has its own row.
-    s.meetings.push({ id: 'm1', company: 'acme', title: 'Acme review call', start: at('2026-10-09T16:00:00').toISOString(), source: 'calendar' });
-    expect(nextActions(s, at('2026-10-09T09:00:00')).some(a => a.id.startsWith('dl-acme-'))).toBe(false);
   });
 
   it('lists added clients’ revisions first and a start date coming up, and ignores archived clients', () => {
@@ -203,10 +199,7 @@ describe('planner with job details', () => {
     const fri = nextActions(s, at('2026-10-09T10:00:00'));
     expect(fri.find(a => a.title.startsWith('Send the Waveink'))?.detail).toBe('Export Excel on the Waveink page builds the Daily Update Log sheet from your status changes.');
     expect(fri.find(a => a.title.startsWith('MetaZtech daily target'))?.detail).toBe('Ritu asked for 1–2 files per day if you skip weekends.');
-    // The Wednesday demo shows as a deadline until the calendar brings in the meeting.
     expect(titles(s, at('2026-10-14T10:00:00'))).toContain('1 Weekly Demo on Google Meet · today 19:30');
-    s.meetings.push({ id: 'demo', company: 'waveink', title: 'Weekly Demo', start: at('2026-10-14T19:30:00').toISOString(), source: 'calendar' });
-    expect(titles(s, at('2026-10-14T10:00:00')).some(t => t.includes('Weekly Demo on Google Meet'))).toBe(false);
     // No Waveink reminder mid-week, and no MetaZtech target once two files went in.
     expect(titles(s, at('2026-10-06T10:00:00')).some(t => /update log/i.test(t))).toBe(false);
   });
@@ -238,23 +231,13 @@ describe('priority from job details', () => {
 });
 
 describe('dashboard agenda', () => {
-  const list = (s: AppState, now: Date) => agenda(s, now, 7).map(w => (w.kind === 'meeting' ? `meeting ${w.meeting.title}` : `deadline ${w.deadline.company}:${w.deadline.id}:${w.deadline.date}`));
+  const list = (s: AppState, now: Date) => agenda(s, now, 7).map(d => `${d.company}:${d.id}:${d.date}`);
 
-  it('lists meetings and every client’s deadlines together, soonest first', () => {
+  it('lists every client’s deadlines together, soonest first, and drops what is over', () => {
     const s = withAcme();
-    s.meetings.push({ id: 'k', company: 'other', title: 'Dentist', start: at('2026-10-12T11:00:00').toISOString(), end: at('2026-10-12T11:30:00').toISOString(), source: 'calendar' });
-    expect(list(s, at('2026-10-10T11:00:00'))).toEqual(['meeting Dentist', 'deadline waveink:wi-demo:2026-10-14', 'deadline acme:call:2026-10-16', 'deadline waveink:wi-report:2026-10-16']);
-  });
-
-  it('shows a deadline once when the calendar brought it in as a meeting, and drops what is over', () => {
-    const s = withAcme();
-    s.meetings.push(
-      { id: 'demo', company: 'waveink', title: 'Weekly Demo', start: at('2026-10-14T19:30:00').toISOString(), end: at('2026-10-14T20:30:00').toISOString(), source: 'calendar' },
-      { id: 'old', company: 'waveink', title: 'Kick-off', start: at('2026-10-09T10:00:00').toISOString(), end: at('2026-10-09T11:00:00').toISOString(), source: 'calendar' },
-    );
-    expect(list(s, at('2026-10-10T11:00:00'))).toEqual(['meeting Weekly Demo', 'deadline acme:call:2026-10-16', 'deadline waveink:wi-report:2026-10-16']);
-    // Friday after 18:00: the log's time has gone, Acme's 16:00 call too. Next week's demo has no meeting yet, so it shows as a deadline.
-    expect(list(s, at('2026-10-16T18:30:00'))).toEqual(['deadline waveink:wi-demo:2026-10-21', 'deadline acme:call:2026-10-23', 'deadline waveink:wi-report:2026-10-23']);
+    expect(list(s, at('2026-10-10T11:00:00'))).toEqual(['waveink:wi-demo:2026-10-14', 'acme:call:2026-10-16', 'waveink:wi-report:2026-10-16']);
+    // Friday after 18:00: the log's time has gone, Acme's 16:00 call too.
+    expect(list(s, at('2026-10-16T18:30:00'))).toEqual(['waveink:wi-demo:2026-10-21', 'acme:call:2026-10-23', 'waveink:wi-report:2026-10-23']);
   });
 
   it('leaves out archived clients', () => {

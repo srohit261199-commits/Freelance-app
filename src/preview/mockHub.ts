@@ -1,17 +1,18 @@
 /**
  * Browser stand-in for the Electron main process. The app screens are the real ones; this file fakes
- * only what needs Windows or Google: sign-in loads a dated snapshot, the portal and folders return
- * labelled samples, and Excel export builds a real workbook offered through the page's save prompt.
+ * only what needs Windows: the portal and folders return labelled samples, and Excel export builds a
+ * real workbook offered through the page's save prompt.
  */
 import type { Hub, NewModel } from '../shared/api';
-import type { AppState, Collection, Model, SyncResult } from '../shared/types';
+import type { AppState, Collection, Model } from '../shared/types';
 import { initialState } from '../main/seed/initial';
-import { acceptSuggestion, applyStatus, dismissSuggestion, importPortalRows, patchModel, repairState, uid, upgradeState } from '../shared/ops';
-import { applySync, calendarMeetings, driveGlbs, ingestMail } from '../shared/ingest';
+import { applyStatus, importPortalRows, patchModel, repairState, uid, upgradeState } from '../shared/ops';
 import { localDate } from '../shared/money';
+import { recordPull } from '../shared/outputs';
+import { clientFolder } from '../shared/assets';
 import * as mockAssets from './mockAssets';
 import * as mockAccounts from './mockAccounts';
-import { RECEIPT_IDS, SAMPLE_FOLDER, SAMPLE_PORTAL, SNAPSHOT_DRIVE, SNAPSHOT_EVENTS, SNAPSHOT_MAIL } from './snapshot';
+import { SAMPLE_FOLDER, SAMPLE_PORTAL } from './samples';
 
 declare global {
   interface Window {
@@ -20,7 +21,6 @@ declare global {
 }
 
 const KEY = 'freelance-hub-preview-v1';
-const DAY = 86400000;
 
 type NoticeListener = (text: string, link?: string) => void;
 const noticeListeners = new Set<NoticeListener>();
@@ -83,21 +83,6 @@ export function resetPreview() {
 
 const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-function runSnapshotSync(): SyncResult {
-  const result: SyncResult = { ok: true, newEmails: 0, meetings: 0, driveMatches: 0, newSuggestions: 0, newPayments: 0 };
-  const now = Date.now();
-  const clientIds = new Set(SNAPSHOT_MAIL.map(m => m.id).filter(id => !RECEIPT_IDS.has(id)));
-  const got = ingestMail(state, SNAPSHOT_MAIL, RECEIPT_IDS, clientIds, new Date(now).toISOString());
-  // The live sync asks Calendar for 7 days back and 30 ahead.
-  const events = SNAPSHOT_EVENTS.filter(e => {
-    const t = new Date(e.start.dateTime!).getTime();
-    return t > now - 7 * DAY && t < now + 30 * DAY;
-  });
-  const meetings = calendarMeetings(events, state);
-  commit(s => applySync(s, got, meetings, driveGlbs(SNAPSHOT_DRIVE), now, result));
-  return result;
-}
-
 function openLink(url: string) {
   let opened: Window | null = null;
   try {
@@ -147,43 +132,9 @@ const hub: Hub = {
   },
   async patchSettings(patch) {
     commit(s => {
-      s.settings = { ...s.settings, ...patch, google: { ...s.settings.google, ...patch.google }, rates: { ...s.settings.rates, ...patch.rates } };
+      s.settings = { ...s.settings, ...patch, rates: { ...s.settings.rates, ...patch.rates } };
     });
     if (patch.launchAtStartup !== undefined) notice('In the app this sets Freelance Hub to start with Windows.');
-  },
-  async acceptSuggestion(id, override) {
-    commit(s => acceptSuggestion(s, id, override));
-  },
-  async dismissSuggestion(id) {
-    commit(s => dismissSuggestion(s, id));
-  },
-  async googleConnect(clientId, clientSecret) {
-    if (!/\.apps\.googleusercontent\.com$/.test(clientId.trim())) {
-      return { ok: false, error: 'That client ID should end in .apps.googleusercontent.com. Copy it from Google Cloud → Clients, or load the downloaded JSON.' };
-    }
-    if (!clientSecret.trim()) return { ok: false, error: 'Add the client secret too.' };
-    notice('In the app your browser opens Google sign-in now. The preview skips that and loads a snapshot of your Gmail, Calendar and Drive from 9 Oct.');
-    await wait(1200);
-    commit(s => {
-      s.settings.google = { ...s.settings.google, clientId: clientId.trim(), clientSecret: clientSecret.trim(), connected: true, email: 's.rohit.261199@gmail.com' };
-    });
-    runSnapshotSync();
-    return { ok: true, email: 's.rohit.261199@gmail.com' };
-  },
-  async googleDisconnect() {
-    commit(s => {
-      s.settings.google.connected = false;
-      delete s.settings.google.email;
-    });
-  },
-  async loadGoogleCredentials() {
-    notice('In the app this opens the client JSON you downloaded from Google Cloud. The preview fills in sample values.');
-    return { clientId: 'preview-sample-client.apps.googleusercontent.com', clientSecret: 'GOCSPX-preview-sample' };
-  },
-  async sync() {
-    if (!state.settings.google.connected) return { ok: false, error: 'Google is not connected yet. Open Settings → Google account.', newEmails: 0, meetings: 0, driveMatches: 0, newSuggestions: 0, newPayments: 0 };
-    await wait(700);
-    return runSnapshotSync();
   },
   async portalOpen() {
     notice('In the app this opens cms.metaztech.ai in its own window, where you log in once. Use "Pull from portal" to see how importing works with a sample table.');
@@ -193,10 +144,29 @@ const hub: Hub = {
     notice('This is a made-up sample table. In the app, Pull from portal reads the page you have open in the MetaZtech window.');
     return SAMPLE_PORTAL;
   },
-  async portalImport(rows) {
+  async portalImport(rows, opts) {
+    const now = new Date().toISOString();
     let counts = { added: 0, updated: 0, unchanged: 0 };
-    commit(s => (counts = importPortalRows(s, rows, new Date().toISOString())));
-    return counts;
+    let full = false;
+    commit(s => {
+      counts = importPortalRows(s, rows, now);
+      if (opts?.fullList) full = recordPull(s, rows, now);
+    });
+    return full && clientFolder(state, 'metaztech') ? { ...counts, spp: await hub.checkSppFolders() } : counts;
+  },
+  async downloadReferences(id) {
+    try {
+      return await mockAssets.downloadReferences(ctx, id);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  },
+  async checkSppFolders() {
+    try {
+      return await mockAssets.checkSppFolders(ctx);
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
   },
   async pickFolder(defaultPath) {
     notice('In the app this opens a Windows folder picker.');

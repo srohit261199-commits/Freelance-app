@@ -2,7 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import type { AppState, CompanyConfig, CompanyId, Model, ModelStatus, SkeidarJob } from '../../shared/types';
 import { clientTarget, nextActions, type NextAction } from '../../shared/planner';
 import { allEarnings, convert, daysUntil, formatMoney, jobOutputs, localDate, modelFee, monthlyCost, monthsBetween, rollRenewal, type CompanyEarnings } from '../../shared/money';
-import { agenda, deadlinesBetween, meetingFor, paceText, weekProgress, type DeadlineHit, type Pace } from '../../shared/pace';
+import { agenda, deadlinesBetween, paceText, weekProgress, type DeadlineHit, type Pace } from '../../shared/pace';
 import { isComplete, statusLabel } from '../../shared/status';
 import { hub } from '../hub';
 import { ClientTile, Icon, useApp, type ClientKey, type IconName } from '../ui';
@@ -20,13 +20,12 @@ const DONE_KEY = 'fh-dash-done';
 const BUILT_INS: CompanyId[] = ['waveink', 'metaztech', 'skeidar'];
 const STACK: CompanyId[] = ['skeidar', 'metaztech', 'waveink'];
 const LETTER_TONES: ClientKey[] = ['metaztech', 'waveink', 'skeidar', 'money'];
-/** "This week" lists this many meetings and deadlines at most. */
+/** "This week" lists this many deadlines at most. */
 const WEEK_ROWS = 5;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayMonth = (date: string) => `${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]}`;
-const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 function whenText(date: string, now: Date): string {
   const d = daysUntil(date, now);
   return d < 0 ? 'Overdue' : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : dayMonth(date);
@@ -42,7 +41,7 @@ function readLayout(): Layout {
     return 'widgets';
   }
 }
-/** Rows ticked off for today that have nothing to record (a meeting, a mail, a reminder). */
+/** Rows ticked off for today that have nothing to record (a deadline, a renewal, a reminder). */
 export function readDone(today: string): string[] {
   try {
     const v = JSON.parse(localStorage.getItem(DONE_KEY) ?? 'null') as { date: string; ids: string[] } | null;
@@ -114,7 +113,7 @@ interface Tile {
   open(): void;
 }
 
-export function Today({ state, now, onSync }: { state: AppState; now: Date; onSync(): void }) {
+export function Today({ state, now }: { state: AppState; now: Date }) {
   const { go, toast } = useApp();
   const [layout, setLayoutState] = useState<Layout>(readLayout);
   const [filter, setFilter] = useState<Filter>('all');
@@ -137,7 +136,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
   const inBase = (v: number, e: CompanyEarnings) => convert(v, e.currency, base, rates);
   const month = today.slice(0, 7);
   const models = useMemo(() => new Map(state.models.map(m => [m.id, m])), [state.models]);
-  const clientName = (c: ClientKey) => (c === 'money' ? 'Money' : c === 'portfolio' ? 'Portfolio' : c === 'other' ? '' : (find(c)?.name ?? c));
+  const clientName = (c: ClientKey) => (c === 'money' ? 'Money' : c === 'portfolio' ? 'Portfolio' : (find(c)?.name ?? c));
 
   const setLayout = (l: Layout) => {
     setLayoutState(l);
@@ -168,7 +167,6 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
     (s, e) => s + e.months.filter(l => l.due && l.month < month && plusDays(l.due, 3) < today).reduce((t, l) => t + Math.max(0, inBase(l.net - (e.paidByMonth[l.month] ?? 0), e)), 0),
     0,
   );
-  const onDrive = state.models.filter(m => m.company === 'waveink' && m.driveFileUrl && (m.status === 'todo' || m.status === 'in_progress'));
   const mzDue = (() => {
     const e = earnings.find(x => x.company === 'metaztech');
     return e ? e.months.filter(l => l.month < month).reduce((s, l) => s + l.net - (e.paidByMonth[l.month] ?? 0), 0) : 0;
@@ -178,20 +176,13 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
   const describe = (a: NextAction): Row => {
     const m = a.modelId ? models.get(a.modelId) : undefined;
     const id = a.id;
-    const client: ClientKey = a.company ?? 'other';
+    const client: ClientKey = a.company;
     let icon: IconName | undefined;
     let value = '';
     let date: string | undefined;
     let kind: Row['kind'] = m ? 'model' : 'local';
-    let list: Model[] = m ? [m] : [];
     let check = m ? `Mark ${statusLabel(checkTo(m), m.company)}` : 'Done for today';
-    if (id.startsWith('meet-')) {
-      const t = state.meetings.find(x => id === `meet-${x.id}`);
-      icon = 'calendar';
-      if (t) date = localDate(t.start);
-    } else if (id.startsWith('mail-')) {
-      icon = state.emails.find(x => id === `mail-${x.id}`)?.kind === 'teams' ? 'teams' : 'mail';
-    } else if (id.startsWith('overdue-')) {
+    if (id.startsWith('overdue-')) {
       const e = earnings.find(x => id.startsWith(`overdue-${x.company}-`));
       if (e?.overdue) value = formatMoney(e.overdue.net - e.overdue.paid, e.currency);
       kind = 'open';
@@ -220,10 +211,6 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
       }
       kind = 'open';
       check = 'Open the job to tick images';
-    } else if (id === 'wi-drive') {
-      kind = 'model';
-      list = onDrive;
-      check = `Mark ${statusLabel('review', 'waveink')}`;
     } else if (id.startsWith('pf-')) {
       kind = 'portfolio';
       check = 'Mark done';
@@ -243,7 +230,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
       due: { text, tone: a.priority === 1 ? 'bad' : a.priority === 2 ? 'warn' : 'neutral' },
       value,
       kind,
-      models: list,
+      models: m ? [m] : [],
       check,
     };
   };
@@ -277,7 +264,7 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
       return remember(a, () => hub.upsert('portfolioTasks', { ...t, done: false, doneAt: undefined }));
     }
     if (!r.models.length) return;
-    const to = a.id === 'wi-drive' ? 'review' : checkTo(r.models[0]);
+    const to = checkTo(r.models[0]);
     const snaps = r.models.map(m => ({ id: m.id, status: m.status, history: m.history, revisions: m.revisions, startedAt: m.startedAt }));
     await hub.setStatus(
       r.models.map(m => m.id),
@@ -308,21 +295,15 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
       const m = a.modelId ? models.get(a.modelId) : undefined;
       // MetaZtech rejects; clients added by hand ask for revisions.
       const word = a.company === 'metaztech' ? 'rejection' : 'revision';
-      return n > 1 ? `${n} ${clientName(a.company ?? 'other')} ${word}s to fix` : `Fix ${word}: ${m?.code ?? m?.name ?? ''}`;
+      return n > 1 ? `${n} ${clientName(a.company)} ${word}s to fix` : `Fix ${word}: ${m?.code ?? m?.name ?? ''}`;
     }
     if (a.id.startsWith('overdue-')) return `${state.companies.find(c => a.id.startsWith(`overdue-${c.id}-`))?.name ?? 'A'} payment is late`;
-    if (a.id.startsWith('meet-')) return a.title.split(': ')[0];
     if (a.id.startsWith('dl-waveink-wi-report-')) return 'Waveink update log due today';
-    if (a.id.startsWith('mail-')) return `Reply to ${a.title.split(': ')[0]}`;
     return a.title.length > 44 ? `${a.title.slice(0, 42)}…` : a.title;
   };
 
-  // ----- this week: meetings and each client's recurring deadlines (one that came in as a meeting shows once) -----
-  const coming = agenda(state, now, 7);
-  const anyMeeting = coming.some(w => w.kind === 'meeting');
-  const week = coming.slice(0, WEEK_ROWS);
-  const firstJoin = week.flatMap(w => (w.kind === 'meeting' && w.meeting.joinUrl ? [w.meeting.id] : []))[0];
-  const platform = (url?: string) => (!url ? '' : /teams\./i.test(url) ? 'Teams' : /meet\.google/i.test(url) ? 'Google Meet' : /zoom\./i.test(url) ? 'Zoom' : 'Online');
+  // ----- this week: each client's recurring deadlines -----
+  const week = agenda(state, now, 7).slice(0, WEEK_ROWS);
 
   // ----- earnings -----
   const fyYear = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
@@ -379,7 +360,6 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
     if (r.path) toast(`Saved ${r.path}`);
     else if (r.error) toast(r.error, 'error');
   };
-  const connected = state.settings.google.connected;
 
   // A client added by hand gets a tile like the built-in one it works like: models done, or images made on open jobs.
   const clientTile = (c: CompanyConfig): Tile => {
@@ -504,23 +484,10 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
             icon="dots"
             label="More actions"
             className="dash-more-btn"
-            items={[
-              { label: connected ? 'Sync Gmail, Calendar and Drive' : 'Connect Google', icon: 'sync', onSelect: onSync },
-              { label: 'Export everything to Excel', icon: 'excel', onSelect: () => void exportAll() },
-            ]}
+            items={[{ label: 'Export everything to Excel', icon: 'excel', onSelect: () => void exportAll() }]}
           />
         </div>
       </header>
-
-      {!connected && (
-        <div className="banner dash-connect">
-          <Icon name="mail" size={18} />
-          <span className="grow">Connect Google to bring in meetings, client mail, payouts and receipts without copying anything by hand.</span>
-          <button type="button" className="primary" onClick={() => go({ view: 'settings' })}>
-            Connect Google
-          </button>
-        </div>
-      )}
 
       {layout === 'board' ? (
         <Board state={state} now={now} addItems={addItems} />
@@ -620,69 +587,33 @@ export function Today({ state, now, onSync }: { state: AppState; now: Date; onSy
               <Calendar state={state} now={now} />
               <section className="panel dash-week" aria-label="This week">
                 <h2>This week</h2>
-                {!connected && (
-                  <div className="dash-week-note">
-                    <span className="muted small grow">Connect Google to see your meetings here.</span>
-                    <button type="button" className="mini primary" onClick={() => go({ view: 'settings' })}>
-                      Connect
-                    </button>
-                  </div>
-                )}
-                {connected && !anyMeeting && <p className="muted small">No meetings in the next 7 days.</p>}
+                {!week.length && <p className="muted small">Nothing due in the next 7 days.</p>}
                 <ul>
-                  {week.map(w => {
-                    const dateTile = (c: ClientKey) => (
-                      <span className={`dash-date c-${c} ${c === 'other' ? 'plain' : 'c-soft'}`} aria-hidden="true">
-                        <small>{w.at.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase()}</small>
-                        <b>{w.at.getDate()}</b>
-                      </span>
-                    );
-                    if (w.kind === 'deadline') {
-                      const d = w.deadline;
-                      const c = find(d.company);
-                      // Waveink's Friday log is built from the status changes, so its row offers the export.
-                      const log = d.company === 'waveink' && d.id === 'wi-report';
-                      return (
-                        <li key={`dl-${d.company}-${d.id}-${d.date}`}>
-                          {dateTile(d.company)}
-                          <span className="grow dash-week-t">
-                            <b className="ellipsis">{d.label}</b>
-                            <span className="ellipsis">{[clientName(d.company), dueText(d)].join(' · ')}</span>
-                          </span>
-                          {log ? (
-                            <button type="button" className="mini" onClick={() => void exportLog()} title="Builds the Daily Update Log sheet from your status changes">
-                              Export
-                            </button>
-                          ) : (
-                            c && (
-                              <button type="button" className="mini" onClick={() => go(clientTarget(c))} aria-label={`Open ${c.name}`}>
-                                Open
-                              </button>
-                            )
-                          )}
-                        </li>
-                      );
-                    }
-                    const m = w.meeting;
-                    const c: ClientKey = m.company === 'other' ? 'other' : m.company;
+                  {week.map(d => {
+                    const c = find(d.company);
+                    // Waveink's Friday log is built from the status changes, so its row offers the export.
+                    const log = d.company === 'waveink' && d.id === 'wi-report';
                     return (
-                      <li key={m.id}>
-                        {dateTile(c)}
-                        <span className="grow dash-week-t">
-                          <b className="ellipsis">{m.title}</b>
-                          <span className="ellipsis">
-                            {[m.company !== 'other' ? clientName(m.company) : '', platform(m.joinUrl ?? m.link), `${localDate(w.at) === today ? 'Today ' : ''}${clock(m.start)}`].filter(Boolean).join(' · ')}
-                          </span>
+                      <li key={`dl-${d.company}-${d.id}-${d.date}`}>
+                        <span className={`dash-date c-${d.company} c-soft`} aria-hidden="true">
+                          <small>{d.at.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase()}</small>
+                          <b>{d.at.getDate()}</b>
                         </span>
-                        {m.joinUrl ? (
-                          <button type="button" className={`mini ${m.id === firstJoin ? 'primary' : ''}`} onClick={() => hub.openUrl(m.joinUrl!)} aria-label={`Join ${m.title}`}>
-                            Join
+                        <span className="grow dash-week-t">
+                          <b className="ellipsis">{d.label}</b>
+                          <span className="ellipsis">{[clientName(d.company), dueText(d)].join(' · ')}</span>
+                        </span>
+                        {log ? (
+                          <button type="button" className="mini" onClick={() => void exportLog()} title="Builds the Daily Update Log sheet from your status changes">
+                            Export
                           </button>
-                        ) : m.link ? (
-                          <button type="button" className="mini" onClick={() => hub.openUrl(m.link!)} aria-label={`Open ${m.title}`}>
-                            Open
-                          </button>
-                        ) : null}
+                        ) : (
+                          c && (
+                            <button type="button" className="mini" onClick={() => go(clientTarget(c))} aria-label={`Open ${c.name}`}>
+                              Open
+                            </button>
+                          )
+                        )}
                       </li>
                     );
                   })}
@@ -791,16 +722,15 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
   const count = new Date(y, first.getMonth() + 1, 0).getDate();
   const lead = (first.getDay() + 6) % 7;
   const today = localDate(now);
-  const marks = new Map<number, { kind: 'trial' | 'meet' | 'pay'; label: string }[]>();
-  const add = (date: string | undefined, kind: 'trial' | 'meet' | 'pay', label: string) => {
+  const marks = new Map<number, { kind: 'trial' | 'due' | 'pay'; label: string }[]>();
+  const add = (date: string | undefined, kind: 'trial' | 'due' | 'pay', label: string) => {
     if (!date?.startsWith(key)) return;
     const d = Number(date.slice(8, 10));
     marks.set(d, [...(marks.get(d) ?? []), { kind, label }]);
   };
-  for (const m of state.meetings) add(localDate(m.start), 'meet', `${m.title}, ${clock(m.start)}`);
-  // Each client's recurring deadlines, unless the calendar already brought one in as a meeting
+  // Each client's recurring deadlines
   for (const d of deadlinesBetween(state, `${key}-01`, `${key}-${pad(count)}`, now)) {
-    if (!meetingFor(state.meetings, d)) add(d.date, 'meet', `${state.companies.find(c => c.id === d.company)?.name ?? d.company}: ${d.label}, ${d.time ?? 'by end of day'}`);
+    add(d.date, 'due', `${state.companies.find(c => c.id === d.company)?.name ?? d.company}: ${d.label}, ${d.time ?? 'by end of day'}`);
   }
   for (const s of state.subscriptions) if (s.status === 'trial') add(rollRenewal(s, now), 'trial', `${s.name} trial ends`);
   for (const c of state.companies) {
@@ -843,7 +773,7 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
           const dow = (lead + i) % 7;
           const band = !!win && d >= win[0] && d <= win[1];
           const ms = marks.get(d) ?? [];
-          const mark = `${key}-${pad(d)}` === today ? 'today' : (['trial', 'meet', 'pay'] as const).find(k => ms.some(m => m.kind === k)) ?? '';
+          const mark = `${key}-${pad(d)}` === today ? 'today' : (['trial', 'due', 'pay'] as const).find(k => ms.some(m => m.kind === k)) ?? '';
           const labels = [...(band ? ['MetaZtech payout window'] : []), ...ms.map(m => m.label)];
           const cls = ['dash-day', band && 'band', band && (d === win![0] || dow === 0) && 'band-l', band && (d === win![1] || dow === 6) && 'band-r', mark && `is-${mark}`].filter(Boolean).join(' ');
           return (
@@ -865,8 +795,8 @@ function Calendar({ state, now }: { state: AppState; now: Date }) {
           MetaZtech payout
         </span>
         <span>
-          <i className="meet" />
-          Meeting / deadline
+          <i className="due" />
+          Deadline
         </span>
         <span>
           <i className="trial" />

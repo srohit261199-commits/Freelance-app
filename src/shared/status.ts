@@ -155,7 +155,3 @@ export function trackerStatusText(status: ModelStatus): string {
       return 'Not Started ⏳';
   }
 }
-
-export function normaliseCode(code: string): string {
-  return code.toUpperCase().replace(/\.GLB$/i, '').replace(/[\s_-]+/g, ' ').trim();
-}

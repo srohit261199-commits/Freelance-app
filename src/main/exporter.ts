@@ -117,7 +117,6 @@ function waveink(wb: ExcelJS.Workbook, state: AppState): void {
     { header: 'Status', key: 'status', width: 18 },
     { header: '% Complete', key: 'pct', width: 11 },
     { header: 'GLB File Name', key: 'glb', width: 20 },
-    { header: 'On Drive', key: 'drive', width: 10 },
     { header: 'Rohit Update', key: 'notes', width: 40 },
     { header: 'Last Updated', key: 'updated', width: 12 },
   ]);
@@ -134,7 +133,6 @@ function waveink(wb: ExcelJS.Workbook, state: AppState): void {
       status: trackerStatusText(m.status),
       pct: (m.percent ?? (isComplete(m.status) ? 100 : 0)) / 100,
       glb: m.glbFile ?? '',
-      drive: m.driveFileUrl ? 'Yes' : '',
       notes: m.notes ?? '',
       updated: day(lastWorked(m)),
     });

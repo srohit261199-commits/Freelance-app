@@ -5,23 +5,8 @@
 .subs-page .page-head > div:first-child {
   gap: 4px;
 }
-.subs-page .page-head .actions button.lg {
-  padding: 0 18px;
-}
 .subs-page .page-head .actions button.primary.lg {
   padding: 0 20px;
-}
-.subs-page .subs-count {
-  min-width: 22px;
-  height: 22px;
-  padding: 0 7px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  font-weight: 700;
-  background: var(--st-rev-bg);
-  color: var(--st-rev);
 }
 
 /* stat tiles */
@@ -199,10 +184,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.subs-page button.subs-src:hover {
-  color: var(--text);
-  text-decoration: none;
-}
 .subs-page .subs-src .icon {
   flex: none;
 }
@@ -312,11 +293,6 @@
 }
 
 /* add / edit dialog */
-.subs-page .subs-lede {
-  font-size: 13px;
-  color: var(--muted);
-  margin-top: -10px;
-}
 .subs-page .modal input,
 .subs-page .modal select,
 .subs-page .subs-static {

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppState } from '../shared/types';
 import { statusLabel } from '../shared/status';
-import { mailLine } from '../shared/planner';
 import { ClientTile, Icon, type IconName, type Route } from './ui';
 import type { ClientKey } from './ui';
 
@@ -45,12 +44,10 @@ function search(state: AppState, screens: Screen[], q: string): Hit[] {
     out.push({ group: 'Skeidar jobs', title: j.name, sub: `${j.fabrics.length} fabrics × ${j.images.length} images`, client: 'skeidar', route: { view: 'skeidar', jobId: j.id } });
   for (const s of state.subscriptions.filter(s => hit(s.name, s.vendor)).slice(0, 4))
     out.push({ group: 'Subscriptions', title: s.name, sub: s.vendor, icon: 'repeat', route: { view: 'subscriptions' } });
-  for (const e of state.emails.filter(e => hit(e.subject, e.fromName, e.from, e.snippet)).slice(0, 5))
-    out.push({ group: 'Mail', title: mailLine(e), sub: e.fromName || e.from, icon: 'mail', route: { view: 'inbox', emailId: e.id } });
   return out;
 }
 
-/** The top-bar search: models, jobs, subscriptions, mail and screens. Ctrl K focuses it. */
+/** The top-bar search: models, jobs, subscriptions and screens. Ctrl K focuses it. */
 export function Omni({ state, screens, onGo }: { state: AppState; screens: Screen[]; onGo(r: Route): void }) {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
@@ -92,8 +89,8 @@ export function Omni({ state, screens, onGo }: { state: AppState; screens: Scree
         <input
           ref={input}
           value={q}
-          placeholder="Search models, clients, mail…"
-          aria-label="Search models, clients and mail"
+          placeholder="Search models, clients, subscriptions…"
+          aria-label="Search models, clients and subscriptions"
           role="combobox"
           aria-expanded={open && !!q}
           aria-controls="omni-results"

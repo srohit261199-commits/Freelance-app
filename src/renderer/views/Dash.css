@@ -82,9 +82,6 @@
   display: grid;
   color: var(--c-deep);
 }
-.dash-connect {
-  padding: 12px 14px 12px 18px;
-}
 
 /* ---------- tiles ---------- */
 .dash-tiles {
@@ -501,7 +498,7 @@
   border-top-right-radius: 999px;
   border-bottom-right-radius: 999px;
 }
-.dash-day.is-meet > span {
+.dash-day.is-due > span {
   background: var(--wi);
   color: var(--on-pastel);
 }
@@ -537,7 +534,7 @@
 .dash-legend .mz {
   background: var(--mz);
 }
-.dash-legend .meet {
+.dash-legend .due {
   background: var(--wi);
 }
 .dash-legend .trial {
@@ -565,11 +562,6 @@
   gap: 12px;
   min-width: 0;
 }
-.dash-week-note {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
 .dash-date {
   width: 48px;
   height: 52px;
@@ -580,10 +572,6 @@
   justify-content: center;
   line-height: 1.1;
   flex: none;
-}
-.dash-date.plain {
-  background: var(--fill);
-  color: var(--text-2);
 }
 .dash-date small {
   font-size: 11px;

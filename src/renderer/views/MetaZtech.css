@@ -1,4 +1,4 @@
-/* MetaZtech: header with pay chips, status tabs, model table and a right column (daily target, Teams, fee tiers).
+/* MetaZtech: header with pay chips, status tabs, model table and a right column (daily target, fee tiers).
    Bundled before styles.css, so every rule is scoped under .mz-page. */
 .mz-page {
   height: 100%;
@@ -514,18 +514,6 @@
   color: var(--muted);
   line-height: 1.5;
 }
-.mz-page .mz-teams {
-  flex: 1;
-  min-height: 150px;
-  gap: 12px;
-}
-.mz-page .mz-teams h2 {
-  font-size: 18px;
-}
-.mz-page .mz-teams-ic {
-  display: grid;
-  color: var(--st-rev);
-}
 .mz-page .mz-link {
   font-size: 12px;
   font-weight: 600;
@@ -536,77 +524,6 @@
 }
 .mz-page .mz-link:hover {
   color: var(--text);
-}
-.mz-page .mz-bubbles {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  overflow-y: auto;
-  min-height: 0;
-  flex: 1;
-  margin: 0 -6px;
-  padding: 0 6px 24px;
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
-}
-.mz-page .mz-bubbles > li {
-  max-width: 300px;
-  min-width: 0;
-}
-.mz-page .mz-bubble {
-  height: auto;
-  padding: 12px 14px;
-  border-radius: 4px 18px 18px 18px;
-  background: var(--hover);
-  box-shadow: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  text-align: left;
-  white-space: normal;
-  font-weight: 400;
-  max-width: 100%;
-}
-.mz-page .mz-bubble:hover {
-  background: var(--fill);
-}
-.mz-page .mz-who {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-size: 12px;
-}
-.mz-page .mz-who b {
-  font-weight: 700;
-  color: var(--mz-deep);
-}
-.mz-page .mz-who span {
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 11px;
-}
-.mz-page .mz-msg {
-  font-size: 14px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-.mz-page .mz-bubble.warn {
-  background: var(--st-bad-bg);
-}
-.mz-page .mz-bubble.warn:hover {
-  filter: brightness(0.98);
-}
-.mz-page .mz-bubble.warn .mz-who b {
-  color: var(--st-bad);
-}
-.mz-page .mz-quiet {
-  font-size: 13px;
-  color: var(--muted);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
 }
 .mz-page .mz-fees {
   padding: 20px 22px;
@@ -818,11 +735,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
   }
-  .mz-page .mz-teams {
-    grid-row: span 2;
-    min-height: 0;
-    max-height: 520px;
-  }
 }
 
 /* ---------- phone ---------- */
@@ -957,9 +869,6 @@
   .mz-page .mz-side {
     display: flex;
   }
-  .mz-page .mz-teams {
-    max-height: 460px;
-  }
   .mz-page .mz-target {
     padding: 18px 16px;
   }
@@ -971,14 +880,10 @@
   }
 }
 
-/* Laptop-height windows: give the Teams messages room and let the page scroll instead */
+/* Laptop-height windows: let the page scroll instead of squeezing the model table */
 @media (min-width: 1100px) and (max-height: 1000px) {
   .mz-page {
     height: auto;
-  }
-  .mz-page .mz-teams {
-    flex: none;
-    height: 380px;
   }
 }
 @media (max-width: 760px) {

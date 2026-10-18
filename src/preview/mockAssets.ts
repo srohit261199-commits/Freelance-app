@@ -1,9 +1,10 @@
 // Preview stand-ins for job folders and client assets. The app reads real folders on disk; the preview has a small
 // labelled sample: Skeidar's "Justin stol" job (the real supplier sheet, three placeholder photos, a few finished images)
 // and a handful of files for Waveink and MetaZtech.
-import type { FolderSyncResult } from '../shared/api';
+import type { FolderSyncResult, ReferenceResult } from '../shared/api';
 import type { AppState, AssetFile, CompanyId, FolderEntry, JobFolderInfo } from '../shared/types';
 import { applyJobFolders, classifyJobFiles, clientFolder, fileKind, parseProductSheet, samePath } from '../shared/assets';
+import { applySppFolders, modelFolderName, referenceStem, type SppFolder, type SppResult } from '../shared/outputs';
 import { JUSTIN_SHEET } from './sampleJob';
 
 export interface MockCtx {
@@ -127,4 +128,52 @@ export async function thumbnail(ctx: MockCtx, file: string): Promise<string | nu
   const view = /3-4|three|34/.test(name) ? 'skewX(-8)' : '';
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120"><rect width="160" height="120" fill="#f4f4f6"/><g transform="translate(80 64) ${view}" fill="${output ? tint : '#8d8892'}"><rect x="-38" y="-30" width="76" height="${back ? 44 : 34}" rx="6"/>${back ? '' : '<rect x="-30" y="2" width="60" height="16" rx="5" opacity=".85"/>'}<rect x="-46" y="-12" width="12" height="34" rx="4"/><rect x="34" y="-12" width="12" height="34" rx="4"/></g><g fill="#2b2b30"><rect x="40" y="86" width="3" height="14"/><rect x="117" y="86" width="3" height="14"/></g><text x="8" y="14" font-family="sans-serif" font-size="9" fill="#77757e">sample</text></svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+/** Preview of Download images: the app fetches the catalog images; here the files are only listed under the sample folder. */
+export async function downloadReferences(ctx: MockCtx, id: string): Promise<ReferenceResult> {
+  const s = ctx.state();
+  const m = s.models.find(x => x.id === id);
+  if (!m) throw new Error('That model is no longer in the app.');
+  const root = clientFolder(s, m.company);
+  if (!root) throw new Error('Choose the output folder first.');
+  if (!m.sourceUrls?.length) throw new Error(`${m.code ?? m.name} has no image links in the catalog.`);
+  const dir = modelFolderName(m);
+  const tree = (TREE[root] ??= []);
+  const have = new Set(tree.map(([rel]) => rel.toLowerCase()));
+  let saved = 0;
+  m.sourceUrls.forEach((_, i) => {
+    const rel = `${dir}\\${referenceStem(m, i)}.jpg`;
+    if (have.has(rel.toLowerCase())) return;
+    tree.push([rel, 380 + i * 17, new Date().toISOString()]);
+    saved++;
+  });
+  const folder = `${root}\\${dir}`;
+  ctx.commit(d => {
+    const x = d.models.find(y => y.id === id);
+    if (x) x.outputFolder = folder;
+  });
+  ctx.notice(`Preview: in the app this downloads ${m.sourceUrls.length} catalog images into ${folder}.`);
+  return { folder, saved, skipped: m.sourceUrls.length - saved, failed: [] };
+}
+
+/** Job folders in the sample MetaZtech folder, each with its .spp file if it has one. */
+function sppFolders(root: string): SppFolder[] {
+  const byJob = new Map<string, SppFolder>();
+  for (const f of filesUnder(root)) {
+    const [top, ...rest] = f.rel.split('\\');
+    if (!rest.length) continue;
+    const entry = byJob.get(top) ?? { name: top, path: `${root}\\${top}` };
+    if (/\.spp$/i.test(f.name) && !entry.spp) Object.assign(entry, { spp: f.path, sppModified: f.modified });
+    byJob.set(top, entry);
+  }
+  return [...byJob.values()];
+}
+
+export async function checkSppFolders(ctx: MockCtx): Promise<SppResult> {
+  const root = clientFolder(ctx.state(), 'metaztech');
+  if (!root) throw new Error('Link the MetaZtech output folder first.');
+  let result: SppResult = { approved: [], created: [], onDashboard: 0 };
+  ctx.commit(d => (result = applySppFolders(d, sppFolders(root), new Date().toISOString())));
+  return result;
 }

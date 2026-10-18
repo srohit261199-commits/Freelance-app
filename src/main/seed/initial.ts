@@ -31,13 +31,6 @@ export const COMPANIES: CompanyConfig[] = [
     color: '#2563eb',
     currency: 'AED',
     pay: { kind: 'retainer', amount: 3000, startDate: '2026-09-01', payday: 1 },
-    match: {
-      domains: ['waveink.ae'],
-      // The Weekly Demo invite comes from the team's personal Gmail addresses.
-      emails: ['sibiabin92@gmail.com', 'ahmedjayx@gmail.com', 'danial.aftab.01@gmail.com', 'faisalam.005@gmail.com'],
-      names: ['Sibi', 'Ahmed Abudaff'],
-      keywords: ['waveink', 'weekly demo'],
-    },
     links: [
       { label: 'Tech catalog (Excel)', url: 'https://docs.google.com/spreadsheets/d/1yIwb69mBOttfKM2mpl812XXOKyR9kS0L/edit' },
       { label: 'GLB Task Tracker', url: 'https://docs.google.com/spreadsheets/d/1XfMQxFp7etSaG-8aHMvjEPfE9HGoDlM-2_y7KKtE0hY/edit' },
@@ -72,11 +65,6 @@ export const COMPANIES: CompanyConfig[] = [
       payoutFrom: 3,
       payoutTo: 10,
     },
-    match: {
-      domains: ['metaztech.ai'],
-      names: ['Ritu Agrawal', 'Sharon', 'Divya Kanneganti', 'Pratignya', 'Santhosh Kumar', 'Manikanta', 'Anjali', 'Riyazuddin', 'Dheeraj', 'Janam Praveen', 'Bestha'],
-      keywords: ['metaztech', 'core prod team'],
-    },
     links: [
       { label: 'CMS dashboard', url: 'https://cms.metaztech.ai/dashboard' },
       { label: 'Microsoft Teams', url: 'https://teams.microsoft.com' },
@@ -100,7 +88,6 @@ export const COMPANIES: CompanyConfig[] = [
     color: '#ea580c',
     currency: 'AED',
     pay: { kind: 'per-item', rate: 5, unit: 'image' },
-    match: { domains: ['skeidar.no'], names: [], keywords: ['skeidar', 'skediar'] },
     links: [{ label: 'Microsoft Teams', url: 'https://teams.microsoft.com' }],
     notes: 'Each job: 2 source images and a list of fabrics; make every image in every fabric. 5 AED per finished image. Files live in D:\\Files\\Projects\\Skediar\\genrativeAI.',
     builtIn: true,
@@ -156,12 +143,12 @@ const APPAREL: [string, string, string][] = [
 ];
 
 const SUBSCRIPTIONS: Omit<Subscription, 'id'>[] = [
-  { name: 'Claude Pro', vendor: 'Anthropic (Google Play)', amount: 1999, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-11-06', lastCharged: '2026-10-06', status: 'active', paymentMethod: 'UPI: GPay', category: 'work', source: 'seed', emailId: '1a110ce48908a0f0' },
-  { name: 'LinkedIn Premium', vendor: 'LinkedIn (Google Play)', amount: 1850, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-11-04', lastCharged: '2026-10-04', status: 'active', paymentMethod: 'UPI: GPay', category: 'work', notes: 'Trial ended 4 Sep 2026.', source: 'seed', emailId: '1a108302b3d902cf' },
-  { name: 'Google AI Pro (5 TB)', vendor: 'Google One (Google Play)', amount: 210, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-10-09', lastCharged: '2026-09-09', status: 'active', paymentMethod: 'UPI: GPay', category: 'work', source: 'seed', emailId: '1a0858ab515a8f6d' },
-  { name: 'Tripo AI Starter (annual)', vendor: 'Tripo AI', amount: 1986.6, currency: 'INR', cycle: 'yearly', nextRenewal: '2027-09-16', lastCharged: '2026-09-16', status: 'active', paymentMethod: 'UPI via Link', category: 'work', source: 'seed', emailId: '1a0ae1b08b086c3b' },
-  { name: 'Chaos V-Ray (annual)', vendor: 'Chaos', amount: 540, currency: 'USD', cycle: 'yearly', lastCharged: '2026-09-28', endsOn: '2027-09-28', status: 'cancelling', category: 'work', notes: 'Auto-renew turned off on 28 Sep 2026; licence stays active until 28 Sep 2027.', source: 'seed', emailId: '1a0e9674eef72d7a' },
-  { name: 'ChatGPT Go', vendor: 'OpenAI (Google Play)', amount: null, currency: 'INR', cycle: 'yearly', endsOn: '2026-11-09', status: 'cancelling', category: 'work', notes: 'Cancelled; access ends 9 Nov 2026.', source: 'seed', emailId: '19d3acb021503880' },
+  { name: 'Claude Pro', vendor: 'Anthropic (Google Play)', amount: 1999, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-11-06', lastCharged: '2026-10-06', status: 'active', paymentMethod: 'UPI: GPay', category: 'work', source: 'seed' },
+  { name: 'LinkedIn Premium', vendor: 'LinkedIn (Google Play)', amount: 1850, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-11-04', lastCharged: '2026-10-04', status: 'active', paymentMethod: 'UPI: GPay', category: 'work', notes: 'Trial ended 4 Sep 2026.', source: 'seed' },
+  { name: 'Google AI Pro (5 TB)', vendor: 'Google One (Google Play)', amount: 210, currency: 'INR', cycle: 'monthly', nextRenewal: '2026-10-09', lastCharged: '2026-09-09', status: 'active', paymentMethod: 'UPI: GPay', category: 'work', source: 'seed' },
+  { name: 'Tripo AI Starter (annual)', vendor: 'Tripo AI', amount: 1986.6, currency: 'INR', cycle: 'yearly', nextRenewal: '2027-09-16', lastCharged: '2026-09-16', status: 'active', paymentMethod: 'UPI via Link', category: 'work', source: 'seed' },
+  { name: 'Chaos V-Ray (annual)', vendor: 'Chaos', amount: 540, currency: 'USD', cycle: 'yearly', lastCharged: '2026-09-28', endsOn: '2027-09-28', status: 'cancelling', category: 'work', notes: 'Auto-renew turned off on 28 Sep 2026; licence stays active until 28 Sep 2027.', source: 'seed' },
+  { name: 'ChatGPT Go', vendor: 'OpenAI (Google Play)', amount: null, currency: 'INR', cycle: 'yearly', endsOn: '2026-11-09', status: 'cancelling', category: 'work', notes: 'Cancelled; access ends 9 Nov 2026.', source: 'seed' },
 ];
 
 /** Gaps found in the portfolio artifact (claude.ai/artifact/CVzrqrT88oH78BFdp9wELz) on 9 Oct 2026. */
@@ -264,25 +251,17 @@ export function initialState(now: string): AppState {
         reference: '33TF068381319',
         note: 'Salary Transfer Reference – September 2026 (receipt confirmed to Sibi)',
         source: 'seed',
-        emailId: '1a0f62fc0db37984',
       },
     ],
     subscriptions: SUBSCRIPTIONS.map((s, i) => ({ ...s, id: id('sub', `${i + 1}-${s.name}`) })),
-    emails: [],
-    meetings: [],
     portfolioTasks: tasks,
     portfolioLog: [],
-    suggestions: [],
-    handledEmails: ['1a0f62fc0db37984', ...SUBSCRIPTIONS.map(s => s.emailId!).filter(Boolean)],
     settings: {
-      google: { clientId: '', clientSecret: '', connected: false },
       baseCurrency: 'INR',
       rates: { INR: 1, AED: 24, USD: 88 },
-      syncMinutes: 15,
       notifications: true,
       launchAtStartup: false,
       skeidarFolder: 'D:\\Files\\Projects\\Skediar\\genrativeAI',
-      waveinkDriveFolderId: '1CIm-RBi5mBjOwCZbPmCEtsXD7olSrfpP',
       metaztechPortalUrl: 'https://cms.metaztech.ai/dashboard',
       portfolioUrl: 'https://claude.ai/artifact/CVzrqrT88oH78BFdp9wELz',
       portalMappings: [],

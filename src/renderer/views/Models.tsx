@@ -73,13 +73,12 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
 
   const done = all.filter(m => isComplete(m.status)).length;
   const total = all.filter(m => m.status !== 'skipped').length;
-  const driveWaiting = all.filter(m => m.driveFileUrl && (m.status === 'todo' || m.status === 'in_progress'));
   const current = openModel ? all.find(m => m.id === openModel) : undefined;
   const picked = shown.filter(m => selected.has(m.id)).map(m => m.id);
   const unpriced = all.filter(m => isComplete(m.status) && !m.complexity).length;
 
-  const set = async (ids: string[], to: ModelStatus, note?: string) => {
-    await hub.setStatus(ids, to, note);
+  const set = async (ids: string[], to: ModelStatus) => {
+    await hub.setStatus(ids, to);
     const one = ids.length === 1 && all.find(m => m.id === ids[0]);
     toast(`${one ? modelLabel(one) : `${ids.length} models`} → ${statusLabel(to, company)}`);
   };
@@ -149,17 +148,6 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
       </div>
       {showNotes && <div className="note-card">{cfg.notes}</div>}
 
-      {company === 'waveink' && driveWaiting.length > 0 && (
-        <div className="banner">
-          <span>
-            <strong>{driveWaiting.length}</strong> GLB{driveWaiting.length > 1 ? 's are' : ' is'} already in the Drive folder but still marked To do / In progress ({driveWaiting.slice(0, 5).map(m => m.code).join(', ')}
-            {driveWaiting.length > 5 ? '…' : ''}).
-          </span>
-          <button type="button" className="mini primary" onClick={() => set(driveWaiting.map(m => m.id), 'review', 'GLB uploaded to Drive')}>
-            Mark as Under review
-          </button>
-        </div>
-      )}
       {company === 'metaztech' && all.length === 0 && (
         <div className="banner info">
           <span>
@@ -257,7 +245,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
                     <th className="num">Rejections</th>
                   </>
                 ) : (
-                  <th>GLB</th>
+                  <th>Progress</th>
                 )}
                 <th>Updated</th>
                 <th />
@@ -312,24 +300,7 @@ export function Models({ state, company, openId, now }: { state: AppState; compa
                         <td className="num">{m.revisions || ''}</td>
                       </>
                     ) : (
-                      <td className="small">
-                        {m.driveFileUrl ? (
-                          <button
-                            type="button"
-                            className="tag ok link"
-                            onClick={e => {
-                              e.stopPropagation();
-                              hub.openUrl(m.driveFileUrl!);
-                            }}
-                          >
-                            on Drive
-                          </button>
-                        ) : m.percent ? (
-                          `${m.percent}%`
-                        ) : (
-                          ''
-                        )}
-                      </td>
+                      <td className="small">{m.percent ? `${m.percent}%` : ''}</td>
                     )}
                     <td className="small muted">{lastWorked(m) ? relTime(lastWorked(m)!, now) : ''}</td>
                     <td className="row-actions" onClick={e => e.stopPropagation()}>
@@ -390,11 +361,6 @@ export function ModelDrawer({ model: m, state, onClose }: { model: Model; state:
         <button type="button" className={`chip ${m.starred ? 'on' : ''}`} onClick={() => patch({ starred: !m.starred })}>
           <Icon name="star" size={13} /> {m.starred ? 'Starred' : 'Star'}
         </button>
-        {m.driveFileUrl && (
-          <button type="button" className="chip" onClick={() => hub.openUrl(m.driveFileUrl!)}>
-            GLB on Drive <Icon name="external" size={12} />
-          </button>
-        )}
         {m.portalUrl && (
           <button type="button" className="chip" onClick={() => hub.openUrl(m.portalUrl!)}>
             Portal page <Icon name="external" size={12} />

@@ -1,6 +1,5 @@
-import type { AppState, Complexity, Model, ModelStatus, Payment, Subscription } from './types';
+import type { AppState, CompanyConfig, Complexity, Model, ModelStatus, Settings } from './types';
 import { isComplete, setStatus } from './status';
-import { convert } from './money';
 
 export function uid(prefix: string): string {
   const rnd = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -136,18 +135,33 @@ export function importPortalRows(state: AppState, rows: PortalRow[], now: string
   return counts;
 }
 
-/** Fills in what older saved data lacks: new lists, and new fields on the built-in clients. */
+/** A saved shape with fields older versions wrote and this one no longer reads. */
+type WithOld<T, K extends string> = T & { [k in K]?: unknown };
+
+/**
+ * Fills in what older saved data lacks (new lists, new fields on the built-in clients) and drops what older versions
+ * kept for reading Gmail, Calendar and Drive: mail, meetings, mail proposals, mail rules, the Google sign-in, the sync
+ * interval and Drive matches.
+ */
 export function upgradeState(state: AppState, seed: AppState): AppState {
   if (!Array.isArray(state.accounts)) state.accounts = [];
-  for (const c of state.companies) {
+  const old = state as WithOld<AppState, 'emails' | 'meetings' | 'suggestions' | 'handledEmails'>;
+  delete old.emails;
+  delete old.meetings;
+  delete old.suggestions;
+  delete old.handledEmails;
+  const settings = state.settings as WithOld<Settings, 'google' | 'syncMinutes' | 'waveinkDriveFolderId'>;
+  delete settings.google;
+  delete settings.syncMinutes;
+  delete settings.waveinkDriveFolderId;
+  for (const m of state.models as WithOld<Model, 'driveFileUrl' | 'driveModifiedAt'>[]) {
+    delete m.driveFileUrl;
+    delete m.driveModifiedAt;
+  }
+  for (const c of state.companies as WithOld<CompanyConfig, 'match'>[]) {
+    delete c.match;
     const def = seed.companies.find(x => x.id === c.id);
     if (!def) continue;
-    // Files from the first builds predate per-sender mail rules (Waveink's demo invites come from personal Gmail);
-    // fill them in once, so later edits in Settings stay.
-    if (!c.match.emails && def.match.emails) {
-      c.match.emails = [...def.match.emails];
-      c.match.keywords = [...new Set([...c.match.keywords, ...def.match.keywords])];
-    }
     c.builtIn ??= def.builtIn;
     c.workflow ??= def.workflow;
     c.startDate ??= def.startDate;
@@ -161,47 +175,4 @@ export function upgradeState(state: AppState, seed: AppState): AppState {
 export function repairState(state: AppState): AppState {
   state.payments = state.payments.filter(p => !(p.source === 'email' && /^\s*(re|fw|fwd|aw)\s*:/i.test(p.note ?? '')));
   return state;
-}
-
-export function acceptSuggestion(state: AppState, id: string, override: { payment?: Partial<Payment>; subscription?: Partial<Subscription> }): void {
-  const sg = state.suggestions.find(s => s.id === id);
-  if (!sg) return;
-  if (sg.kind === 'payment') {
-    const p = { ...sg.payment, ...override.payment } as Payment;
-    const amount = Number(p.amount) || 0;
-    // Fix the value in the company's currency now, so a later rate change doesn't rewrite this payment.
-    const own = state.companies.find(c => c.id === p.company)?.currency;
-    const settledAmount = own && p.currency !== own ? convert(amount, p.currency, own, state.settings.rates) : undefined;
-    state.payments.push({ ...p, id: uid('pay'), source: 'email', emailId: sg.emailId, amount, ...(settledAmount != null ? { settledAmount } : {}) });
-  } else {
-    const s: Partial<Subscription> = { ...sg.subscription, ...override.subscription };
-    state.subscriptions.push({
-      name: s.name || 'Subscription',
-      vendor: s.vendor || s.name || 'Unknown',
-      category: s.category ?? 'work',
-      currency: s.currency ?? 'INR',
-      cycle: s.cycle ?? 'monthly',
-      status: s.status ?? 'active',
-      nextRenewal: s.nextRenewal,
-      endsOn: s.endsOn,
-      lastCharged: s.lastCharged,
-      paymentMethod: s.paymentMethod,
-      notes: s.notes,
-      accountId: s.accountId,
-      licence: s.licence,
-      seats: s.seats,
-      id: uid('sub'),
-      amount: s.amount == null ? null : Number(s.amount),
-      source: 'email',
-      emailId: sg.emailId,
-    });
-  }
-  state.suggestions = state.suggestions.filter(s => s.id !== id);
-  state.handledEmails = [...state.handledEmails, sg.emailId];
-}
-
-export function dismissSuggestion(state: AppState, id: string): void {
-  const sg = state.suggestions.find(s => s.id === id);
-  state.suggestions = state.suggestions.filter(s => s.id !== id);
-  if (sg) state.handledEmails = [...state.handledEmails, sg.emailId];
 }

@@ -340,13 +340,6 @@
 .wi-page .wi-active .chip {
   height: 30px;
 }
-.wi-page .wi-banner {
-  border-radius: 16px;
-}
-.wi-page .wi-banner > .icon {
-  color: var(--wi-deep);
-  flex: none;
-}
 .wi-page .wi-bulk {
   display: flex;
   flex-wrap: wrap;
@@ -380,8 +373,8 @@
 }
 .wi-page .wi-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 120px 28px;
-  grid-template-areas: 'main st drv';
+  grid-template-columns: minmax(0, 1fr) 120px;
+  grid-template-areas: 'main st';
   align-items: center;
   gap: 14px;
   padding: 8px 10px;
@@ -393,8 +386,8 @@
     box-shadow 0.15s ease;
 }
 .wi-page .wi-rows.selecting .wi-row {
-  grid-template-columns: 20px minmax(0, 1fr) 120px 28px;
-  grid-template-areas: 'chk main st drv';
+  grid-template-columns: 20px minmax(0, 1fr) 120px;
+  grid-template-areas: 'chk main st';
 }
 .wi-page .wi-row:hover {
   background: var(--hover);
@@ -492,23 +485,6 @@
   grid-area: st;
   min-width: 0;
 }
-.wi-page .wi-drv {
-  grid-area: drv;
-  display: grid;
-  place-items: center;
-}
-.wi-page .wi-drv button {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-radius: 50%;
-  background: transparent;
-  box-shadow: none;
-  color: var(--wi-deep);
-}
-.wi-page .wi-drv button:hover {
-  background: var(--panel);
-}
 
 @container wirows (max-width: 700px) {
   .wi-page .wi-main {
@@ -523,17 +499,17 @@
 }
 @container wirows (max-width: 470px) {
   .wi-page .wi-row {
-    grid-template-columns: minmax(0, 1fr) 28px;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'main drv'
-      'st drv';
+      'main'
+      'st';
     row-gap: 4px;
   }
   .wi-page .wi-rows.selecting .wi-row {
-    grid-template-columns: 20px minmax(0, 1fr) 28px;
+    grid-template-columns: 20px minmax(0, 1fr);
     grid-template-areas:
-      'chk main drv'
-      'chk st drv';
+      'chk main'
+      'chk st';
   }
   .wi-page .wi-st {
     padding-left: 58px;
@@ -669,15 +645,6 @@
 .wi-page .wi-glb {
   background: repeating-linear-gradient(135deg, var(--wi-tint) 0 12px, color-mix(in srgb, var(--wi-tint) 86%, var(--wi)) 12px 24px);
   color: var(--wi-deep);
-}
-.wi-page button.wi-glb {
-  width: 100%;
-  padding: 0 12px;
-  box-shadow: inset 0 0 0 1.5px var(--wi);
-  white-space: normal;
-}
-.wi-page button.wi-glb:hover {
-  background: repeating-linear-gradient(135deg, var(--wi-tint) 0 12px, color-mix(in srgb, var(--wi-tint) 72%, var(--wi)) 12px 24px);
 }
 .wi-page .wi-photo.has {
   position: relative;

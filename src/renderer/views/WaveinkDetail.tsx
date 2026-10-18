@@ -14,9 +14,8 @@ function wiStatusText(m: Model): string {
 const day = (iso?: string) => (iso ? new Date(iso.length === 10 ? iso + 'T00:00:00' : iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '');
 const sheetRows = (m: Model) => (m.rows?.length ? `sheet row${m.rows.length > 1 ? 's' : ''} ${m.rows.map(r => r + 2).join(', ')}` : '');
 
+/** The GLB upload folder among Waveink's links. */
 function glbFolderUrl(state: AppState): string | undefined {
-  const id = state.settings.waveinkDriveFolderId?.trim();
-  if (id) return `https://drive.google.com/drive/folders/${id}`;
   return state.companies.find(c => c.id === 'waveink')?.links.find(l => /glb.*folder/i.test(l.label))?.url;
 }
 
@@ -160,6 +159,7 @@ const ORIGIN: Record<Model['source'], string> = {
   'apparel-pdf': 'Imported from the apparel catalogue',
   portal: 'Pulled from the portal',
   manual: 'Added by hand',
+  folder: 'Found in the output folder',
 };
 
 function History({ m }: { m: Model }) {
@@ -286,10 +286,6 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
     setMore(false);
   }, [m.id]);
   useEffect(() => flush, [m.id, flush]);
-  // A Drive sync can fill in the GLB name while the panel is open.
-  useEffect(() => {
-    if (pending.current?.patch.glbFile === undefined) setGlb(m.glbFile ?? '');
-  }, [m.glbFile]);
 
   const set = (to: ModelStatus) => (onPin?.(), hub.setStatus([m.id], to)).then(() => toast(`${modelLabel(m)} → ${statusLabel(to, 'waveink')}`));
   const done = isComplete(m.status);
@@ -298,7 +294,6 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
   const sub = (m.subcategories ?? []).join(', ') || m.group || '';
   const links = [
     m.sourceUrls?.[0] && { label: 'Product photo, full size', url: m.sourceUrls[0] },
-    m.driveFileUrl && { label: 'GLB on Drive', url: m.driveFileUrl },
     m.portalUrl && { label: 'Portal page', url: m.portalUrl },
   ].filter(Boolean) as { label: string; url: string }[];
   const facts: [string, ReactNode][] = [
@@ -306,17 +301,6 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
     ['Colour', m.colour || '—'],
     ['Branding area', m.brandingAreas || (m.hasPrintArea === false ? 'No print area' : '—')],
     ['Print methods', m.printMethods || '—'],
-    [
-      'On Drive',
-      m.driveFileUrl ? (
-        <button type="button" className="link-btn wi-link" onClick={() => hub.openUrl(m.driveFileUrl!)}>
-          {m.glbFile || `${m.code ?? 'model'}.glb`}
-          {m.driveModifiedAt && ` · modified ${day(m.driveModifiedAt)}`} <Icon name="external" size={12} />
-        </button>
-      ) : (
-        'Not uploaded yet'
-      ),
-    ],
   ];
   if (m.variants) facts.push(['Variants', m.variants]);
   if (m.templateId) facts.push(['Template ID', `${m.templateId} (backend image files are named by this)`]);
@@ -371,7 +355,7 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
           <Icon name="checkCircle" size={20} weight="fill" />
           {done ? 'Marked done' : 'Mark done'}
         </button>
-        <button type="button" className="wi-folder" disabled={!folder} onClick={() => folder && hub.openUrl(folder)} title="Open the shared GLB upload folder on Drive">
+        <button type="button" className="wi-folder" disabled={!folder} onClick={() => folder && hub.openUrl(folder)} title="Open the GLB upload folder from Waveink's links">
           <Icon name="folderOpen" size={18} />
           GLB folder
         </button>
@@ -379,19 +363,11 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
 
       <div className="wi-media">
         <Photo key={m.id} urls={m.sourceUrls ?? []} />
-        {m.driveFileUrl ? (
-          <button type="button" className="wi-media-tile wi-glb" onClick={() => hub.openUrl(m.driveFileUrl!)} title="Open the GLB on Drive">
-            <Icon name="cube" size={26} />
-            Open GLB on Drive
-            <small>{m.driveModifiedAt ? `Modified ${day(m.driveModifiedAt)}` : m.glbFile}</small>
-          </button>
-        ) : (
-          <div className="wi-media-tile wi-glb">
-            <Icon name="cube" size={26} />
-            GLB preview
-            <small>Not on Drive yet</small>
-          </div>
-        )}
+        <div className="wi-media-tile wi-glb">
+          <Icon name="cube" size={26} />
+          GLB preview
+          <small>{m.glbFile || 'No GLB file yet'}</small>
+        </div>
       </div>
 
       <dl className="wi-facts">

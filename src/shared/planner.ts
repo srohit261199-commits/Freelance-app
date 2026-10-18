@@ -1,12 +1,11 @@
-import type { AppState, CompanyConfig, CompanyId, EmailItem, Model, StatusEvent } from './types';
+import type { AppState, CompanyConfig, CompanyId, Model, StatusEvent } from './types';
 import { companyEarnings, daysUntil, formatMoney, jobOutputs, localDate, monthLabel, ordinal, rollRenewal, tierFee } from './money';
 import { isComplete, statusLabel } from './status';
-import { meetingFor, nextDeadlines, WEEKDAYS, weekProgress } from './pace';
+import { nextDeadlines, WEEKDAYS, weekProgress } from './pace';
 
 export type ActionTarget =
   | { view: 'company'; company: CompanyId; modelId?: string }
   | { view: 'skeidar'; company?: CompanyId; jobId?: string }
-  | { view: 'inbox'; emailId?: string }
   | { view: 'earnings' }
   | { view: 'subscriptions' }
   | { view: 'portfolio' }
@@ -16,7 +15,7 @@ export interface NextAction {
   id: string;
   /** 1 = do today, 2 = soon, 3 = queue. */
   priority: 1 | 2 | 3;
-  company?: CompanyId | 'portfolio' | 'money';
+  company: CompanyId | 'portfolio' | 'money';
   title: string;
   detail?: string;
   target?: ActionTarget;
@@ -24,7 +23,6 @@ export interface NextAction {
   modelId?: string;
 }
 
-const DAY = 86400000;
 const BUILT_IN = new Set<CompanyId>(['waveink', 'metaztech', 'skeidar']);
 /** Wording the built-in clients' actions have always had. */
 const TARGET_NOTE: Record<string, string> = { metaztech: 'Ritu asked for 1–2 files per day if you skip weekends.' };
@@ -33,10 +31,6 @@ const VERB = { submitted: 'submit', done: 'finish', images: 'make' } as const;
 /** Where a client's own screen is. */
 export function clientTarget(c: Pick<CompanyConfig, 'id' | 'workflow'>): ActionTarget {
   return c.id === 'skeidar' ? { view: 'skeidar' } : c.workflow === 'variations' ? { view: 'skeidar', company: c.id } : { view: 'company', company: c.id };
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 /** Waveink "to do" queue: starred first, then subcategory by size (big batches first), then name. */
@@ -62,22 +56,6 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
   const live = state.companies.filter(c => !c.archived);
   const gone = new Set(state.companies.filter(c => c.archived).map(c => c.id));
   const today = localDate(now);
-
-  // Meetings in the next 24 hours
-  for (const m of state.meetings) {
-    const t = new Date(m.start).getTime();
-    if (t > now.getTime() - 60 * 60000 && t < now.getTime() + DAY) {
-      const when = new Date(m.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      out.push({
-        id: `meet-${m.id}`,
-        priority: 1,
-        company: m.company === 'other' ? undefined : m.company,
-        title: `Meeting at ${when}: ${m.title}`,
-        detail: sameDay(new Date(m.start), now) ? 'Today' : 'Tomorrow',
-        target: m.joinUrl ? { url: m.joinUrl } : m.link ? { url: m.link } : { view: 'inbox' },
-      });
-    }
-  }
 
   // Money that should have arrived
   for (const c of state.companies) {
@@ -169,10 +147,9 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
     }
   }
 
-  // Recurring deadlines due today or tomorrow (a calendar meeting for the same thing already has its own row)
+  // Recurring deadlines due today or tomorrow
   for (const c of live) {
     for (const d of nextDeadlines(c, now, 1)) {
-      if (meetingFor(state.meetings, d)) continue;
       const friday = d.id === 'wi-report' && d.at.getDay() === 5;
       const when = d.days === 0 ? 'today' : 'tomorrow';
       out.push({
@@ -222,19 +199,6 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
     });
   }
 
-  // Waveink models on Drive that are still marked as not started
-  const onDrive = state.models.filter(m => m.company === 'waveink' && m.driveFileUrl && (m.status === 'todo' || m.status === 'in_progress'));
-  if (onDrive.length) {
-    out.push({
-      id: 'wi-drive',
-      priority: 2,
-      company: 'waveink',
-      title: `${onDrive.length} Waveink GLB${onDrive.length > 1 ? 's are' : ' is'} on Drive but not marked as submitted`,
-      detail: onDrive.slice(0, 4).map(m => m.code).join(', '),
-      target: { view: 'company', company: 'waveink' },
-    });
-  }
-
   // Skeidar jobs with images left
   for (const job of state.skeidarJobs.filter(j => j.status === 'open' && !gone.has(j.company ?? 'skeidar'))) {
     const { total, done } = jobOutputs(job);
@@ -249,18 +213,6 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
         target: cid === 'skeidar' ? { view: 'skeidar', jobId: job.id } : { view: 'skeidar', company: cid, jobId: job.id },
       });
     }
-  }
-
-  // Mail that reads like a request
-  for (const e of attentionMail(state.emails, now)) {
-    out.push({
-      id: `mail-${e.id}`,
-      priority: e.unread ? 1 : 2,
-      company: e.company === 'other' ? undefined : e.company,
-      title: `${e.fromName}: ${mailLine(e)}`,
-      detail: e.kind === 'teams' ? 'Teams message' : e.snippet.slice(0, 140),
-      target: { url: e.url },
-    });
   }
 
   // Renewals and trials in the next week
@@ -328,24 +280,6 @@ export function nextActions(state: AppState, now: Date): NextAction[] {
   }
 
   return out.sort((a, b) => a.priority - b.priority);
-}
-
-/** A client mail that reads like a request and is still unread, or arrived in the last 3 days. */
-export function needsAction(e: EmailItem, now: Date): boolean {
-  return e.company !== 'other' && e.attention.length > 0 && (e.unread || new Date(e.date).getTime() > now.getTime() - 3 * DAY);
-}
-
-/** The line worth showing for a mail: a Teams notification's subject only repeats the sender's name. */
-export function mailLine(e: EmailItem): string {
-  return e.kind === 'teams' && e.snippet && !/^\[image\]/i.test(e.snippet) ? e.snippet : e.subject;
-}
-
-/** Newest mails that need action, for the Today page. */
-export function attentionMail(emails: EmailItem[], now: Date): EmailItem[] {
-  return emails
-    .filter(e => needsAction(e, now))
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 6);
 }
 
 export interface DailyLogRow {

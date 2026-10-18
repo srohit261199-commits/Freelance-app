@@ -51,20 +51,14 @@ function nextNote(s: Subscription, next: string | undefined, now: Date): { text:
   return { text: inDays(d), tone: d >= 0 && d <= 3 ? 'warn' : undefined };
 }
 
-/** Where the subscription came from: the receipt it was read from, or added by hand. */
+/** Where the subscription came from: a receipt mail an older version read, a software account, or added by hand. */
 function foundIn(s: Subscription, state: AppState): { icon: IconName; text: string } {
-  if (s.emailId) {
-    const mail = state.emails.find(e => e.id === s.emailId);
-    const who = mail?.fromName || s.vendor.match(/\(([^)]+)\)/)?.[1] || s.vendor || 'Gmail';
-    return { icon: 'mail', text: `${who} ${mail && !/receipt|invoice|order/i.test(mail.subject) ? 'mail' : 'receipt'}` };
-  }
-  if (s.source === 'email') return { icon: 'mail', text: 'Gmail receipt' };
+  if (s.emailId || s.source === 'email') return { icon: 'receipt', text: 'From a receipt mail' };
   if (s.source === 'account') return { icon: 'user', text: `${state.accounts.find(a => a.id === s.accountId)?.label ?? 'Software'} account` };
   return { icon: 'hand', text: s.source === 'manual' ? 'Added by hand' : 'Added at setup' };
 }
 
 export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
-  const { go } = useApp();
   const [editing, setEditing] = useState<Partial<Subscription> | null>(null);
   const [showEnded, setShowEnded] = useState(false);
   const base = state.settings.baseCurrency;
@@ -77,8 +71,8 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
   const ended = state.subscriptions.length - live.length;
   const fromMail = live.filter(s => s.emailId || s.source === 'email').length;
   const fromAccounts = live.filter(s => !s.emailId && s.source === 'account').length;
-  const byHand = live.length - fromMail - fromAccounts;
-  const subSuggestions = state.suggestions.filter(s => s.kind === 'subscription').length;
+  const atSetup = live.filter(s => !s.emailId && s.source === 'seed').length;
+  const byHand = live.length - fromMail - fromAccounts - atSetup;
 
   const rows = state.subscriptions
     .filter(s => showEnded || s.status !== 'cancelled')
@@ -104,20 +98,11 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
         <div>
           <h1>Subscriptions</h1>
           <p>
-            {[fromMail && `${fromMail} found in Gmail receipts`, fromAccounts && `${fromAccounts} read from software accounts`, byHand && `${byHand} added by hand`].filter(Boolean).join(' · ') ||
+            {[fromMail && `${fromMail} from receipt mails`, fromAccounts && `${fromAccounts} read from software accounts`, atSetup && `${atSetup} added at setup`, byHand && `${byHand} added by hand`].filter(Boolean).join(' · ') ||
               'Nothing tracked yet'}
           </p>
         </div>
         <div className="actions">
-          <button type="button" className="lg" onClick={() => go({ view: 'inbox' })} title="Open Mail scan to review what Gmail found">
-            <Icon name="mail" size={18} /> Scan Gmail
-            {subSuggestions > 0 && (
-              <span className="subs-count">
-                {subSuggestions}
-                <span className="sr-only"> to review</span>
-              </span>
-            )}
-          </button>
           <button type="button" className="primary lg" onClick={() => setEditing({ currency: 'INR', cycle: 'monthly', status: 'active', category: 'work' })}>
             <Icon name="plus" size={18} /> Add manually
           </button>
@@ -245,17 +230,10 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
                           )}
                         </td>
                         <td className="c-fd">
-                          {s.emailId ? (
-                            <button type="button" className="link-btn subs-src" title="Open the mail" onClick={() => hub.openUrl(`https://mail.google.com/mail/u/0/#all/${s.emailId}`)}>
-                              <Icon name={src.icon} size={16} />
-                              <span>{src.text}</span>
-                            </button>
-                          ) : (
-                            <span className="subs-src">
-                              <Icon name={src.icon} size={16} />
-                              <span>{src.text}</span>
-                            </span>
-                          )}
+                          <span className="subs-src">
+                            <Icon name={src.icon} size={16} />
+                            <span>{src.text}</span>
+                          </span>
                         </td>
                         <td className="c-mn">
                           <RowMenu sub={s} onEdit={() => setEditing(s)} />
@@ -267,7 +245,7 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
               </table>
             </div>
           ) : (
-            <Empty title="No subscriptions yet">Add one by hand, or connect Gmail in Settings & import so receipts are found for you.</Empty>
+            <Empty title="No subscriptions yet">Add one by hand, or read the plans from a software account below.</Empty>
           )}
           {ended > 0 && (
             <div className="subs-foot">
@@ -330,7 +308,7 @@ export function Subscriptions({ state, now }: { state: AppState; now: Date }) {
   );
 }
 
-/** The ⋮ menu on each row: edit, open the receipt, delete. Fixed position so the table's scroll box never clips it. */
+/** The ⋮ menu on each row: edit, delete. Fixed position so the table's scroll box never clips it. */
 function RowMenu({ sub, onEdit }: { sub: Subscription; onEdit(): void }) {
   const [pos, setPos] = useState<CSSProperties | null>(null);
   const ref = useRef<HTMLDivElement>(null);
@@ -390,18 +368,6 @@ function RowMenu({ sub, onEdit }: { sub: Subscription; onEdit(): void }) {
           >
             <Icon name="pencil" size={15} /> Edit
           </button>
-          {sub.emailId && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                close(true);
-                hub.openUrl(`https://mail.google.com/mail/u/0/#all/${sub.emailId}`);
-              }}
-            >
-              <Icon name="mail" size={15} /> Open the mail
-            </button>
-          )}
           <ConfirmButton className="danger" icon={<Icon name="trash" size={15} />} label="Delete" confirmLabel="Click again to delete" onConfirm={() => hub.remove('subscriptions', sub.id)} />
         </div>
       )}
@@ -466,7 +432,6 @@ function SubEditor({ sub, accounts, notifications, onClose }: { sub: Partial<Sub
         </>
       }
     >
-      {!sub.id && <p className="subs-lede">For anything that doesn’t send receipts to Gmail.</p>}
       <Field label="Name">
         <input autoFocus value={s.name ?? ''} onChange={e => set({ name: e.target.value })} placeholder="e.g. Substance 3D Painter" />
       </Field>

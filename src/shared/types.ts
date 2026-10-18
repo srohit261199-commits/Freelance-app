@@ -49,8 +49,6 @@ export interface Model {
   /** % complete before it was marked done, restored if Done is undone. */
   percentBeforeDone?: number;
   glbFile?: string;
-  driveFileUrl?: string;
-  driveModifiedAt?: string;
   notes?: string;
   description?: string;
   brand?: string;
@@ -67,7 +65,10 @@ export interface Model {
   rows?: number[];
   /** "done (R)" in the catalog: delivered, then revised. */
   revised?: boolean;
-  source: 'catalog' | 'apparel-pdf' | 'portal' | 'manual';
+  /** Where it came from; 'folder' is a MetaZtech job found only in the output folder. */
+  source: 'catalog' | 'apparel-pdf' | 'portal' | 'manual' | 'folder';
+  /** The model's own folder in the client's output folder: Waveink reference images, or a MetaZtech job folder. */
+  outputFolder?: string;
   portalRow?: Record<string, string>;
   portalUrl?: string;
   dueDate?: string;
@@ -123,6 +124,7 @@ export interface Payment {
   period?: string;
   reference?: string;
   note?: string;
+  /** 'email': recorded from a mail by an older version of the app. */
   source: 'email' | 'manual' | 'seed';
   emailId?: string;
   /** Amount in the company's own currency, fixed at the rate on the day it was recorded. */
@@ -146,6 +148,7 @@ export interface Subscription {
   paymentMethod?: string;
   category: 'work' | 'personal';
   notes?: string;
+  /** 'email': found in a receipt mail by an older version of the app. */
   source: 'email' | 'manual' | 'seed' | 'account';
   emailId?: string;
   /** Software account (Autodesk, Adobe, Chaos…) this plan was read from or belongs to. */
@@ -170,7 +173,7 @@ export interface SoftwareAccount {
   createdAt: string;
 }
 
-/** A plan read from a vendor's account page or mail, before it becomes a Subscription. */
+/** A plan read from a vendor's account page, before it becomes a Subscription. */
 export interface FoundPlan {
   product: string;
   plan?: string;
@@ -239,36 +242,6 @@ export interface Expectations {
   notes?: string;
 }
 
-export type EmailCompany = CompanyId | 'other';
-
-export interface EmailItem {
-  id: string;
-  threadId: string;
-  company: EmailCompany;
-  from: string;
-  fromName: string;
-  subject: string;
-  snippet: string;
-  date: string;
-  unread: boolean;
-  url: string;
-  kind: 'mail' | 'teams' | 'payment' | 'invite' | 'receipt';
-  /** Words that make the mail look like it needs action. */
-  attention: string[];
-}
-
-export interface Meeting {
-  id: string;
-  company: EmailCompany;
-  title: string;
-  start: string;
-  end?: string;
-  joinUrl?: string;
-  link?: string;
-  organizer?: string;
-  source: 'calendar' | 'email';
-}
-
 export interface PortfolioTask {
   id: string;
   title: string;
@@ -285,18 +258,6 @@ export interface LogEntry {
   text: string;
 }
 
-export interface Suggestion {
-  id: string;
-  kind: 'payment' | 'subscription';
-  emailId: string;
-  emailUrl: string;
-  title: string;
-  detail: string;
-  payment?: Partial<Payment>;
-  subscription?: Partial<Subscription>;
-  createdAt: string;
-}
-
 export type PayRule =
   | { kind: 'retainer'; amount: number; startDate: string; payday: number }
   | { kind: 'tiered'; tiers: Record<Complexity, number>; tdsPercent: number; payoutFrom: number; payoutTo: number }
@@ -309,9 +270,6 @@ export interface CompanyConfig {
   color: string;
   currency: Currency;
   pay: PayRule;
-  /** Used to sort mail, Teams notifications and meetings into this company. */
-  /** Mail domains, exact addresses (for people who write from personal Gmail), sender names and subject words. */
-  match: { domains: string[]; emails?: string[]; names: string[]; keywords: string[] };
   links: { label: string; url: string }[];
   notes: string;
   /** 'models': a list of models with statuses (Waveink, MetaZtech). 'variations': fabric/variation jobs (Skeidar). */
@@ -341,25 +299,17 @@ export interface PortalMapping {
 export type PortalField = 'id' | 'name' | 'status' | 'complexity' | 'revisions' | 'due' | 'approved' | 'project';
 
 export interface Settings {
-  google: {
-    clientId: string;
-    clientSecret: string;
-    connected: boolean;
-    email?: string;
-    lastSync?: string;
-    lastError?: string;
-  };
   baseCurrency: Currency;
   /** Value of one unit of each currency in the base currency. */
   rates: Record<Currency, number>;
-  syncMinutes: number;
   notifications: boolean;
   launchAtStartup: boolean;
   skeidarFolder: string;
-  waveinkDriveFolderId: string;
   metaztechPortalUrl: string;
   portfolioUrl: string;
   portalMappings: PortalMapping[];
+  /** Job IDs in the last full pull of the MetaZtech dashboard; approved jobs drop off it. */
+  portalLastPull?: { at: string; codes: string[] };
   theme: 'system' | 'light' | 'dark';
 }
 
@@ -370,13 +320,8 @@ export interface AppState {
   skeidarJobs: SkeidarJob[];
   payments: Payment[];
   subscriptions: Subscription[];
-  emails: EmailItem[];
-  meetings: Meeting[];
   portfolioTasks: PortfolioTask[];
   portfolioLog: LogEntry[];
-  suggestions: Suggestion[];
-  /** Email ids already turned into a payment, subscription or dismissed suggestion. */
-  handledEmails: string[];
   accounts: SoftwareAccount[];
   settings: Settings;
 }
@@ -410,14 +355,4 @@ export interface FolderEntry {
   images: number;
   lastModified: string | null;
   samples: string[];
-}
-
-export interface SyncResult {
-  ok: boolean;
-  error?: string;
-  newEmails: number;
-  meetings: number;
-  driveMatches: number;
-  newSuggestions: number;
-  newPayments: number;
 }

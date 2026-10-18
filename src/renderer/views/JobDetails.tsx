@@ -221,19 +221,10 @@ interface Draft {
   deadlines: Deadline[];
   workdays: number[];
   notes: string;
-  domains: string;
-  emails: string;
-  names: string;
-  keywords: string;
   links: { label: string; url: string }[];
   folder: string;
 }
 
-const list = (s: string) =>
-  s
-    .split(',')
-    .map(x => x.trim())
-    .filter(Boolean);
 const num = (s: string) => (s.trim() === '' ? NaN : Number(s));
 
 function draftOf(c: CompanyConfig | undefined, state: AppState, today: string): Draft {
@@ -262,10 +253,6 @@ function draftOf(c: CompanyConfig | undefined, state: AppState, today: string): 
     deadlines: ex?.deadlines?.map(d => ({ ...d })) ?? [],
     workdays: ex?.workdays?.length ? ex.workdays : DEFAULT_WORKDAYS,
     notes: ex?.notes ?? '',
-    domains: (c?.match.domains ?? []).join(', '),
-    emails: (c?.match.emails ?? []).join(', '),
-    names: (c?.match.names ?? []).join(', '),
-    keywords: (c?.match.keywords ?? []).join(', '),
     links: c?.links.map(l => ({ ...l })) ?? [],
     folder: c?.folder ?? '',
   };
@@ -299,7 +286,7 @@ function Pills<T extends string | number>({ label, value, options, onPick }: { l
   );
 }
 
-/** Edits a client's job details, pay, mail matching, links and folder; with no `company` it adds a new client. */
+/** Edits a client's job details, pay, links and folder; with no `company` it adds a new client. */
 export function JobEditor({ state, company, onClose, onSaved }: { state: AppState; company?: CompanyId; onClose(): void; onSaved?(c: CompanyConfig): void }) {
   const { toast } = useApp();
   const existing = company ? state.companies.find(c => c.id === company) : undefined;
@@ -360,7 +347,6 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
       currency: d.currency,
       pay,
       notes: d.brief.trim(),
-      match: { domains: list(d.domains).map(x => x.toLowerCase()), emails: list(d.emails).map(x => x.toLowerCase()), names: list(d.names), keywords: list(d.keywords) },
       links: links.map(l => ({ label: l.label || l.url.replace(/^https?:\/\//, '').split('/')[0], url: /^[a-z]+:/i.test(l.url) ? l.url : `https://${l.url}` })),
       startDate: d.startDate || undefined,
       endDate: d.endDate || undefined,
@@ -612,26 +598,12 @@ export function JobEditor({ state, company, onClose, onSaved }: { state: AppStat
 
         <details className="jd-more">
           <summary>
-            <Icon name="caretRight" size={14} weight="bold" /> Brief, mail matching, links and folder
+            <Icon name="caretRight" size={14} weight="bold" /> Brief, links and folder
           </summary>
           <div className="jd-more-body">
             <Field label="Brief & pay terms">
               <textarea rows={3} value={d.brief} onChange={e => set({ brief: e.target.value })} />
             </Field>
-            <div className="jd-row">
-              <Field label="Mail domains" hint="Comma separated">
-                <input value={d.domains} onChange={e => set({ domains: e.target.value })} placeholder="studio.com" />
-              </Field>
-              <Field label="Email addresses" hint="People who write from personal addresses">
-                <input value={d.emails} onChange={e => set({ emails: e.target.value })} />
-              </Field>
-              <Field label="People" hint="Teams / mail sender names">
-                <input value={d.names} onChange={e => set({ names: e.target.value })} />
-              </Field>
-              <Field label="Keywords in subject">
-                <input value={d.keywords} onChange={e => set({ keywords: e.target.value })} />
-              </Field>
-            </div>
             <div className="field">
               <span>Links</span>
               {d.links.length > 0 && (

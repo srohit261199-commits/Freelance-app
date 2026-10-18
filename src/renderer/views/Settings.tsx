@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import type { AppState, CompanyConfig, CompanyId, Complexity, Currency, Model, PortalField, PortalMapping, PortalTable } from '../../shared/types';
 import { COMPLEXITY_LABELS, isComplete } from '../../shared/status';
 import { daysUntil, ordinal } from '../../shared/money';
 import { DEFAULT_WORKDAYS, paceText, weekProgress, WEEKDAYS } from '../../shared/pace';
 import { clientFolder, withFolder } from '../../shared/assets';
 import { hub } from '../hub';
-import { ClientTile, ConfirmButton, Field, Icon, fmtDate, relTime, useApp, type IconName } from '../ui';
+import { ClientTile, ConfirmButton, Field, Icon, fmtDate, useApp, type IconName } from '../ui';
 import { FIELDS, PortalImport, parsePaste } from './PortalImport';
 import { AddClient, JobEditor, clientIcon, daysText, isBuiltIn, jobPayText } from './JobDetails';
 import './Settings.css';
@@ -22,13 +22,12 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
     <div className="page set-page">
       <header className="set-head">
         <h1>Settings &amp; import</h1>
-        <p>Bring in client sheets, manage clients, connect Google, set currencies and folders</p>
+        <p>Bring in client sheets, manage clients, set currencies and folders</p>
       </header>
 
       <div className="set-grid">
         <ImportPanel state={state} />
         <div className="set-side">
-          <GoogleCard state={state} now={now} />
           <MoneyCard state={state} />
           <FoldersCard state={state} />
           <AppCard state={state} />
@@ -38,10 +37,10 @@ export function Settings({ state, now }: { state: AppState; now: Date }) {
 
       <ClientList state={state} now={now} />
 
-      <section className="set-clients" aria-labelledby="set-match-title">
+      <section className="set-clients" aria-labelledby="set-pay-title">
         <div className="set-sec-head">
-          <h2 id="set-match-title">Pay and mail matching</h2>
-          <p>Pay rules, and how mail, Teams notices and meetings are matched to each client</p>
+          <h2 id="set-pay-title">Pay and briefs</h2>
+          <p>Each client's pay rule, and the brief kept with it</p>
         </div>
         <div className="set-client-grid">
           {state.companies
@@ -469,147 +468,6 @@ function ClientList({ state, now }: { state: AppState; now: Date }) {
 
 /* ---------- right column ---------- */
 
-function GoogleCard({ state, now }: { state: AppState; now: Date }) {
-  const { toast } = useApp();
-  const s = state.settings;
-  const g = s.google;
-  const [clientId, setClientId] = useState(g.clientId);
-  const [secret, setSecret] = useState(g.clientSecret);
-  useEffect(() => setClientId(g.clientId), [g.clientId]);
-  useEffect(() => setSecret(g.clientSecret), [g.clientSecret]);
-  const [busy, setBusy] = useState(false);
-  const [guide, setGuide] = useState(!g.connected);
-  const [edit, setEdit] = useState(false);
-  const form = !g.connected || edit;
-  const mins = [...new Set([5, 15, 30, 60, s.syncMinutes])].sort((a, b) => a - b);
-
-  // Kept as typed so leaving Settings doesn't lose them; while connected they only apply on Reconnect.
-  const saveClient = () => {
-    const google = { clientId: clientId.trim(), clientSecret: secret.trim() };
-    if (!g.connected && (google.clientId !== g.clientId || google.clientSecret !== g.clientSecret)) void hub.patchSettings({ google });
-  };
-  const connect = async () => {
-    if (!clientId.trim() || !secret.trim()) return toast('Paste the client ID and secret, or load the JSON file.', 'error');
-    if (!/\.apps\.googleusercontent\.com$/.test(clientId.trim()))
-      return toast('That client ID should end in .apps.googleusercontent.com. Copy it from Google Cloud → Clients, or load the downloaded JSON.', 'error');
-    setBusy(true);
-    toast('Your browser will open for Google sign-in…');
-    const r = await hub.googleConnect(clientId, secret);
-    setBusy(false);
-    if (r.ok) {
-      setEdit(false);
-      toast(`Connected ${r.email ?? ''}. First sync is running.`);
-    } else toast(r.error ?? 'Could not connect', 'error');
-  };
-  const loadJson = async () => {
-    const r = await hub.loadGoogleCredentials();
-    if (!r) return;
-    if ('error' in r) return toast(r.error, 'error');
-    setClientId(r.clientId);
-    setSecret(r.clientSecret);
-    await hub.patchSettings({ google: { clientId: r.clientId, clientSecret: r.clientSecret } });
-    toast('Client loaded. Now click Connect.');
-  };
-
-  return (
-    <section className="panel set-card" aria-labelledby="set-google-title">
-      <h2 id="set-google-title">Google account</h2>
-      <div className="set-acct">
-        <span className={`set-acct-ic ${g.connected ? 'on' : ''}`} aria-hidden="true">
-          <Icon name={g.connected ? 'checkCircle' : 'mail'} size={22} weight="fill" />
-        </span>
-        <div className="set-acct-txt">
-          <b className="ellipsis">{g.connected ? (g.email ?? 'Your account') : 'Not connected'}</b>
-          <small>
-            {g.connected ? 'Read-only Gmail, Calendar and Drive' : 'Connect once to read Gmail, Calendar and Drive (read-only)'}
-          </small>
-        </div>
-        {g.connected && (
-          <button type="button" className="set-small" onClick={() => hub.googleDisconnect()}>
-            Disconnect
-          </button>
-        )}
-      </div>
-      {g.lastError && <div className="banner warn small">{g.lastError}</div>}
-      {form && (
-        <>
-          <Field label="OAuth client ID">
-            <input value={clientId} onChange={e => setClientId(e.target.value)} onBlur={saveClient} placeholder="…apps.googleusercontent.com" />
-          </Field>
-          <Field label="OAuth client secret">
-            <input type="password" value={secret} onChange={e => setSecret(e.target.value)} onBlur={saveClient} placeholder="GOCSPX-…" />
-          </Field>
-          <div className="set-btns">
-            <button type="button" onClick={loadJson}>
-              <Icon name="upload" /> Load client JSON
-            </button>
-            <button type="button" className="primary" onClick={connect} disabled={busy}>
-              {busy ? 'Waiting for Google…' : g.connected ? 'Reconnect' : 'Connect'}
-            </button>
-          </div>
-        </>
-      )}
-      <div className="set-line">
-        <span className="set-line-txt">
-          Sync every
-          {g.connected && g.lastSync && <small>Last synced {relTime(g.lastSync, now)}</small>}
-        </span>
-        <div className="set-seg" role="group" aria-label="Sync every">
-          {mins.map(m => (
-            <button key={m} type="button" className={s.syncMinutes === m ? 'on' : ''} aria-pressed={s.syncMinutes === m} onClick={() => hub.patchSettings({ syncMinutes: m })}>
-              {m < 60 ? `${m} min` : m === 60 ? '1 hour' : `${m / 60} hours`}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="set-links">
-        {g.connected && (
-          <button type="button" className="link-btn" aria-expanded={edit} onClick={() => setEdit(!edit)}>
-            {edit ? 'Keep the current client' : 'Change Google client'}
-          </button>
-        )}
-        <button type="button" className="link-btn" aria-expanded={guide} onClick={() => setGuide(!guide)}>
-          {guide ? 'Hide' : 'Show'} setup steps (about 10 minutes)
-          <Icon name={guide ? 'caretDown' : 'caretRight'} size={12} />
-        </button>
-      </div>
-      {guide && (
-        <ol className="set-guide">
-          <li>
-            Open <Ext href="https://console.cloud.google.com/projectcreate">console.cloud.google.com/projectcreate</Ext>, name the project <b>Freelance Hub</b>, click Create, and make sure it is selected at the top.
-          </li>
-          <li>
-            Turn on three APIs (open each, click <b>Enable</b>): <Ext href="https://console.cloud.google.com/apis/library/gmail.googleapis.com">Gmail API</Ext>,{' '}
-            <Ext href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com">Google Calendar API</Ext>,{' '}
-            <Ext href="https://console.cloud.google.com/apis/library/drive.googleapis.com">Google Drive API</Ext>.
-          </li>
-          <li>
-            Open <Ext href="https://console.cloud.google.com/auth/overview">Google Auth Platform</Ext> → <b>Get started</b>. App name: Freelance Hub; support email: your Gmail; Audience: <b>External</b>; contact
-            email: your Gmail. Finish.
-          </li>
-          <li>
-            In <Ext href="https://console.cloud.google.com/auth/audience">Audience</Ext>, add <b>s.rohit.261199@gmail.com</b> as a test user, then click <b>Publish app</b> → In production. (Left in "Testing",
-            Google signs you out every 7 days.)
-          </li>
-          <li>
-            In <Ext href="https://console.cloud.google.com/auth/clients">Clients</Ext> → <b>Create client</b> → Application type <b>Desktop app</b> → Create → <b>Download JSON</b>.
-          </li>
-          <li>
-            Click <b>Load client JSON</b>{g.connected ? ' (under Change Google client)' : ' above'}, pick that file, then <b>{g.connected ? 'Reconnect' : 'Connect'}</b>. Your browser opens; Google will say the app isn't
-            verified (it's your own app): click <b>Advanced → Go to Freelance Hub</b> and allow read-only access to Gmail, Calendar and Drive.
-          </li>
-        </ol>
-      )}
-      {(form || guide) && (
-        <p className="set-fine">
-          Read-only access. The app looks at mail from the client domains below, Teams notification mails, and receipts; your Calendar for 7 days back and 30 ahead; and the Waveink GLB folder on Drive to see
-          which Jasani codes are uploaded. Nothing is sent anywhere else.
-        </p>
-      )}
-    </section>
-  );
-}
-
 function MoneyCard({ state }: { state: AppState }) {
   const s = state.settings;
   return (
@@ -658,16 +516,6 @@ function FoldersCard({ state }: { state: AppState }) {
           if (p) await setSkeidarRoot(p);
         }}
       />
-      <FolderRow
-        client="waveink"
-        icon="drive"
-        label="Waveink · GLB upload folder"
-        name="Waveink GLB Drive folder ID or link"
-        placeholder="Paste the Drive folder link"
-        hint="From the folder link: drive.google.com/drive/folders/<ID>"
-        value={s.waveinkDriveFolderId}
-        onSave={v => hub.patchSettings({ waveinkDriveFolderId: v.replace(/.*folders\//, '').replace(/[?#].*/, '') })}
-      />
       <FolderRow client="metaztech" icon="link" label="MetaZtech · CMS" name="MetaZtech portal URL" value={s.metaztechPortalUrl} onSave={v => hub.patchSettings({ metaztechPortalUrl: v })} />
       <FolderRow client="money" icon="globe" label="Portfolio" name="Portfolio link" placeholder="https://…" value={s.portfolioUrl} onSave={v => hub.patchSettings({ portfolioUrl: v })} />
     </section>
@@ -675,14 +523,13 @@ function FoldersCard({ state }: { state: AppState }) {
 }
 
 /** A folder or link on one line. The value is editable in place; Change opens the folder picker, or selects the value to paste over it. */
-function FolderRow({ client, icon, label, name, value, placeholder, hint, onSave, onChange }: {
+function FolderRow({ client, icon, label, name, value, placeholder, onSave, onChange }: {
   client: string;
   icon: IconName;
   label: string;
   name: string;
   value: string;
   placeholder?: string;
-  hint?: string;
   onSave(v: string): void;
   onChange?(): void;
 }) {
@@ -690,7 +537,7 @@ function FolderRow({ client, icon, label, name, value, placeholder, hint, onSave
   useEffect(() => setV(value), [value]);
   const ref = useRef<HTMLInputElement>(null);
   return (
-    <div className={`set-folder c-${client}`} title={hint ?? name}>
+    <div className={`set-folder c-${client}`} title={name}>
       <span className="set-folder-ic" aria-hidden="true">
         <Icon name={icon} size={18} weight="fill" />
       </span>
@@ -751,7 +598,7 @@ function AppCard({ state }: { state: AppState }) {
   return (
     <section className="panel set-card" aria-labelledby="set-app-title">
       <h2 id="set-app-title">App</h2>
-      <Toggle label="Desktop reminders" hint="Meetings, new client mail, renewals and the Friday report" on={s.notifications} onFlip={v => hub.patchSettings({ notifications: v })} />
+      <Toggle label="Desktop reminders" hint="Renewals and the Friday report" on={s.notifications} onFlip={v => hub.patchSettings({ notifications: v })} />
       <Toggle label="Start with Windows" on={s.launchAtStartup} onFlip={v => hub.patchSettings({ launchAtStartup: v })} />
       <div className="set-line">
         <span>Theme</span>
@@ -809,26 +656,6 @@ function DataCard({ info }: { info: AppInfo | null }) {
 
 /* ---------- helpers ---------- */
 
-function Ext({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <a
-      href={href}
-      onClick={e => {
-        e.preventDefault();
-        void hub.openUrl(href);
-      }}
-    >
-      {children}
-    </a>
-  );
-}
-
-function TextInput({ value, onSave, className }: { value: string; onSave(v: string): void; className?: string }) {
-  const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
-  return <input className={className} value={v} onChange={e => setV(e.target.value)} onBlur={() => v !== value && onSave(v.trim())} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />;
-}
-
 function NumberInput({ value, onSave, digits }: { value: number; onSave(v: number): void; digits?: number }) {
   const show = (n: number) => (digits ? n.toFixed(digits) : String(n));
   const [v, setV] = useState(show(value));
@@ -844,12 +671,6 @@ function NumberInput({ value, onSave, digits }: { value: number; onSave(v: numbe
     />
   );
 }
-
-const list = (s: string) =>
-  s
-    .split(',')
-    .map(x => x.trim())
-    .filter(Boolean);
 
 const PAY_KIND: Record<CompanyConfig['pay']['kind'], string> = { retainer: 'Monthly retainer', tiered: 'Paid per approved model', 'per-item': 'Paid per item' };
 
@@ -903,21 +724,6 @@ function CompanyEditor({ company: c }: { company: CompanyConfig }) {
           </Field>
         </div>
       )}
-      <h4>Mail matching</h4>
-      <div className="set-match">
-        <Field label="Mail domains" hint="Comma separated">
-          <TextInput value={c.match.domains.join(', ')} onSave={v => save({ match: { ...c.match, domains: list(v) } })} />
-        </Field>
-        <Field label="Email addresses" hint="People who write from personal addresses">
-          <TextInput value={(c.match.emails ?? []).join(', ')} onSave={v => save({ match: { ...c.match, emails: list(v).map(e => e.toLowerCase()) } })} />
-        </Field>
-        <Field label="People (Teams / mail names)" hint="Teams notification mails are matched by sender name">
-          <TextInput value={c.match.names.join(', ')} onSave={v => save({ match: { ...c.match, names: list(v) } })} />
-        </Field>
-        <Field label="Keywords in subject">
-          <TextInput value={c.match.keywords.join(', ')} onSave={v => save({ match: { ...c.match, keywords: list(v) } })} />
-        </Field>
-      </div>
       <Field label="Brief / notes">
         <textarea rows={4} defaultValue={c.notes} onBlur={e => e.target.value !== c.notes && save({ notes: e.target.value })} />
       </Field>

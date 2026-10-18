@@ -90,7 +90,7 @@ export function Board({ state, now, addItems }: { state: AppState; now: Date; ad
         const at = doneAt(m);
         if (!at || now.getTime() - new Date(at).getTime() > RECENT) continue;
         when = { date: short(at) };
-        meta = m.company === 'metaztech' ? `${label}${fee ? ` ${fee}` : ''}` : m.driveFileUrl ? 'GLB on Drive' : fee ? `${label} · ${fee}` : label;
+        meta = m.company === 'metaztech' ? `${label}${fee ? ` ${fee}` : ''}` : fee ? `${label} · ${fee}` : label;
         order = at;
       } else if (col === 'todo') {
         when = due(m.dueDate) ?? { date: m.company === 'waveink' && m.rows?.length ? `Row ${m.rows[0]}` : 'Queue' };

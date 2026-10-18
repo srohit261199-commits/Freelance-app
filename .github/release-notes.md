@@ -6,7 +6,7 @@
 - **New look**, in light and dark.
 - **Your own clients**: add any client with a start date, weekly target, recurring deadlines and notes. The dashboard shows how each one is pacing and puts what's due first.
 - **Skeidar job folders**: each subfolder of the Skeidar folder becomes a job from its supplier sheet and photos. Finished images saved in the job's `output` folder tick themselves off, and the app writes the prompt and file name for every image.
-- **Software accounts**: add Autodesk, Adobe or Chaos, sign in once in the app, and read your plans, prices and renewal dates. Their order, invoice and renewal mails are read on every Gmail sync.
+- **Software accounts**: add Autodesk, Adobe or Chaos, sign in once in the app, and read your plans, prices and renewal dates.
 
 ### Fixed
 - The window no longer goes blank after leaving the Waveink screen.

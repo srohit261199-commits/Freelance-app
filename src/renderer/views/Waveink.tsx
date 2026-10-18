@@ -120,7 +120,6 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
   const report = cfg.notes.match(new RegExp(`\\bto ([A-Z][a-z]+) every (${DAYS})`));
   const pace = weekProgress(state, 'waveink', now);
   const dueToday = nextDeadlines(cfg, now, 0);
-  const driveWaiting = all.filter(m => m.driveFileUrl && (m.status === 'todo' || m.status === 'in_progress'));
   const picked = shown.filter(m => selected.has(m.id)).map(m => m.id);
   const allPicked = shown.length > 0 && picked.length === shown.length;
   const filtered = status !== 'all' || sub !== 'all' || starred;
@@ -131,8 +130,8 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
     detailBox.current?.scrollTo(0, 0);
   }, [current?.id]);
 
-  const set = async (ids: string[], to: ModelStatus, note?: string) => {
-    await hub.setStatus(ids, to, note);
+  const set = async (ids: string[], to: ModelStatus) => {
+    await hub.setStatus(ids, to);
     const one = ids.length === 1 && all.find(m => m.id === ids[0]);
     toast(`${one ? modelLabel(one) : `${ids.length} models`} → ${statusLabel(to, 'waveink')}`);
   };
@@ -378,19 +377,6 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
             </div>
           )}
 
-          {driveWaiting.length > 0 && (
-            <div className="banner small wi-banner">
-              <Icon name="drive" size={18} weight="fill" />
-              <span className="grow">
-                <strong>{driveWaiting.length}</strong> GLB{driveWaiting.length > 1 ? 's are' : ' is'} already in the Drive folder but still marked To do / In progress ({driveWaiting.slice(0, 5).map(m => m.code).join(', ')}
-                {driveWaiting.length > 5 ? '…' : ''}).
-              </span>
-              <button type="button" className="mini primary" onClick={() => set(driveWaiting.map(m => m.id), 'review', 'GLB uploaded to Drive')}>
-                Mark as Under review
-              </button>
-            </div>
-          )}
-
           {selecting && (
             <div className="wi-bulk">
               <label className="row gap">
@@ -477,21 +463,6 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                     </button>
                     <div className="wi-st">
                       <WiStatus m={m} onPick={s => set([m.id], s)} />
-                    </div>
-                    <div className="wi-drv">
-                      {m.driveFileUrl && (
-                        <button
-                          type="button"
-                          aria-label={`Open ${m.code ?? m.name} GLB on Drive`}
-                          title="GLB is on Drive"
-                          onClick={e => {
-                            e.stopPropagation();
-                            hub.openUrl(m.driveFileUrl!);
-                          }}
-                        >
-                          <Icon name="drive" size={18} weight="fill" />
-                        </button>
-                      )}
                     </div>
                   </div>
                 );

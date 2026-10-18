@@ -8,7 +8,7 @@ import { ClientTile, Empty, Icon, Modal, StatusPicker, fmtDate, useApp } from '.
 import { modelPriority, PRIORITY_LABEL, PRIORITY_ORDER, type Priority } from '../priority';
 import { AddModel, ModelDrawer } from './Models';
 import { PortalImport } from './PortalImport';
-import { DailyTarget, FeeTiers, FromTeams, MzPop, when } from './MetaZtechParts';
+import { DailyTarget, FeeTiers, MzPop, when } from './MetaZtechParts';
 import { JobDrawer } from './JobDetails';
 import './MetaZtech.css';
 
@@ -520,9 +520,8 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
           )}
         </section>
 
-        <aside className="mz-side" aria-label="Today and the team">
+        <aside className="mz-side" aria-label="Target and fees">
           <DailyTarget state={state} now={now} />
-          <FromTeams state={state} cfg={cfg} now={now} />
           <FeeTiers
             cfg={cfg}
             all={all}

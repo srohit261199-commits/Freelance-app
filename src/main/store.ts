@@ -42,13 +42,8 @@ export function loadState(): AppState {
 /** Brings an older saved file up to the current shape without losing the user's edits. */
 function migrate(saved: AppState, seed: AppState): AppState {
   const out: AppState = { ...seed, ...saved };
-  out.settings = {
-    ...seed.settings,
-    ...saved.settings,
-    google: { ...seed.settings.google, ...saved.settings?.google },
-    rates: { ...seed.settings.rates, ...saved.settings?.rates },
-  };
-  for (const key of ['models', 'skeidarJobs', 'payments', 'subscriptions', 'emails', 'meetings', 'portfolioTasks', 'portfolioLog', 'suggestions', 'handledEmails'] as const) {
+  out.settings = { ...seed.settings, ...saved.settings, rates: { ...seed.settings.rates, ...saved.settings?.rates } };
+  for (const key of ['models', 'skeidarJobs', 'payments', 'subscriptions', 'portfolioTasks', 'portfolioLog'] as const) {
     if (!Array.isArray(out[key])) (out as any)[key] = (seed as any)[key];
   }
   for (const c of seed.companies) if (!out.companies.some(x => x.id === c.id)) out.companies.push(c);

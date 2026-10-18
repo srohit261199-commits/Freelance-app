@@ -1,7 +1,5 @@
-// Software vendors: where each keeps its plans page, which mails it sends, and how to read plans out of both.
+// Software vendors: where each keeps its plans page, and how to read plans out of it.
 import type { Currency, FoundPlan, SoftwareAccount, Subscription, VendorId } from './types';
-import { parseFrom, type RawMail } from './mail';
-import { localDate } from './money';
 
 export interface Vendor {
   id: VendorId;
@@ -12,8 +10,6 @@ export interface Vendor {
   domains: string[];
   /** Pages that mean "not signed in yet". */
   signIn: RegExp;
-  /** Mail domains for orders, invoices and renewal notices. */
-  senders: string[];
   /** Product names as the vendor writes them, longest first when matching. */
   products: string[];
   /** A few well-known products, to say what the vendor is. */
@@ -28,7 +24,6 @@ export const VENDORS: Vendor[] = [
     plansUrl: 'https://manage.autodesk.com/billing/subscriptions-contracts',
     domains: ['autodesk.com'],
     signIn: /accounts\.autodesk\.com|signin\.autodesk\.com|manage\.autodesk\.com\/login/i,
-    senders: ['autodesk.com'],
     products: [
       'Media & Entertainment Collection',
       'Architecture, Engineering & Construction Collection',
@@ -60,7 +55,6 @@ export const VENDORS: Vendor[] = [
     plansUrl: 'https://account.adobe.com/plans',
     domains: ['adobe.com', 'adobelogin.com'],
     signIn: /auth\.services\.adobe\.com|adobelogin\.com|adobeid/i,
-    senders: ['adobe.com'],
     products: [
       'Creative Cloud All Apps',
       'Creative Cloud Pro',
@@ -94,7 +88,6 @@ export const VENDORS: Vendor[] = [
     plansUrl: 'https://my.chaos.com/',
     domains: ['chaos.com', 'chaosgroup.com'],
     signIn: /login\.chaos\.com|auth\.chaos\.com|chaos\.com\/(login|sign-?in)/i,
-    senders: ['chaos.com', 'chaosgroup.com'],
     products: [
       'V-Ray Premium',
       'V-Ray Enterprise',
@@ -127,7 +120,7 @@ const SHARED_HOSTS = /(^|\.)(github\.io|gitlab\.io|netlify\.app|vercel\.app|page
 
 /**
  * The site a plans page belongs to: "manage.autodesk.com" → "autodesk.com", "portal.foundry.co.in" → "foundry.co.in".
- * Hosts on shared platforms (github.io, gumroad.com…) stay whole, so their mail domain never matches strangers.
+ * Hosts on shared platforms (github.io, gumroad.com…) stay whole, so an account's window never takes in strangers' pages.
  */
 export function siteOf(url: string): string {
   let host: string;
@@ -143,13 +136,11 @@ export function siteOf(url: string): string {
   return labels.length <= keep ? host : labels.slice(-keep).join('.');
 }
 
-/** Domains an account's window may show and its mails come from: the preset's, or the plans page's own site. */
+/** Domains an account's window may show: the preset's, or the plans page's own site. */
 export function accountDomains(a: Pick<SoftwareAccount, 'vendor' | 'plansUrl'>): string[] {
   const v = vendorById(a.vendor);
-  return [...new Set([...(v?.domains ?? []), ...(v?.senders ?? []), siteOf(a.plansUrl)].filter(Boolean))];
+  return [...new Set([...(v?.domains ?? []), siteOf(a.plansUrl)].filter(Boolean))];
 }
-
-const onDomain = (host: string, domains: string[]) => domains.some(d => host === d || host.endsWith(`.${d}`));
 
 /** True for a page that asks to sign in rather than showing the account. */
 export function looksSignedOut(vendor: VendorId, url: string, text: string, hasPassword: boolean): boolean {
@@ -329,104 +320,6 @@ export function parsePlansText(vendor: VendorId, text: string, extraProducts: st
   return [...out.values()];
 }
 
-/* ---------- vendor mails ---------- */
-
-/** The vendor a mail came from, by sender domain. */
-export function vendorOfMail(mail: Pick<RawMail, 'from'>, accounts: SoftwareAccount[] = []): { vendor: Vendor | undefined; account?: SoftwareAccount; name: string } | null {
-  const host = parseFrom(mail.from).email.split('@')[1] ?? '';
-  const preset = VENDORS.find(v => onDomain(host, v.senders));
-  const account = accounts.find(a => (preset ? a.vendor === preset.id : onDomain(host, accountDomains(a))));
-  if (!preset && !account) return null;
-  return { vendor: preset, account, name: preset?.name ?? account!.label };
-}
-
-const MARKETING = /finish (purchasing|your purchase)|complete your (purchase|order)|\d+ ?% off|save (up to|\d)|special offer|limited[- ]time|black friday|cyber monday|webinar|newsletter|what'?s new|tips (and|&) tricks|inspiration|tutorial|we miss you|come back|discover|event invitation/i;
-const TRANSACTIONAL =
-  /order\s*(#|number|no\.?)|your order|invoice|receipt|payment (received|confirmation|successful)|subscription .{0,30}(cancel+ed|renewed|expir|will renew)|auto-?renew|renewal (notice|reminder|confirmation)|has been renewed|will (auto-?)?renew|expires? on|expiration|trial (ends|will end|has ended|expires)|your (free )?trial|licen[cs]e (key|activated)/i;
-
-/** What one vendor mail says about a plan. `renewsAgain` marks auto-renew turned back on; it is never saved. */
-export type VendorFinding = Partial<Subscription> & { renewsAgain?: boolean };
-
-/**
- * A subscription proposal from a vendor's order, invoice, renewal, cancellation or trial mail. Marketing mail ("finish
- * purchasing", offers) is ignored even when it names a product.
- */
-export function parseVendorMail(mail: RawMail, accounts: SoftwareAccount[] = []): VendorFinding | null {
-  const who = vendorOfMail(mail, accounts);
-  if (!who) return null;
-  const body = mail.body ?? mail.snippet ?? '';
-  const text = `${mail.subject}\n${body}`;
-  if (MARKETING.test(mail.subject) || !TRANSACTIONAL.test(text)) return null;
-  const re = productPattern(who.vendor?.products ?? []);
-  const hit = re ? text.match(re)?.[1] : undefined;
-  const product = hit ? ((who.vendor?.products ?? []).find(p => p.toLowerCase() === hit.toLowerCase().replace(/\s+/g, ' ')) ?? hit) : undefined;
-  const date = localDate(mail.date);
-  const base: Partial<Subscription> = {
-    name: product ?? who.name,
-    vendor: who.name,
-    source: 'email',
-    emailId: mail.id,
-    category: 'work',
-    ...(who.account ? { accountId: who.account.id } : {}),
-  };
-  const addDays = (n: number) => new Date(new Date(`${date}T00:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
-  const licence = readLicence(product ? (text.match(new RegExp(`${escape(product)}[^\\n]{0,60}`, 'i'))?.[0] ?? '') : '');
-
-  // Auto-renew turned back on: the plan renews again.
-  if (/\breactivated\b|auto-?renew(?:al)?\s*(?:is\s*|has been\s*)?(?:turned (?:back )?on|enabled|re-?enabled)/i.test(text)) {
-    const renews = readDate(after(text, /(?:renew(?:s|ing)? on|renewal date|next (?:billing|payment) date)\s*:?\s*/i) ?? '') ?? readDate(body);
-    return { ...base, status: 'active', nextRenewal: renews, renewsAgain: true };
-  }
-  // Auto-renew turned off / cancelled: access runs to the date it would have renewed.
-  if (OFF.test(text)) {
-    const ends = readDate(after(text, /(?:renewing on|renew on|until|expires? on|expiration date|access ends(?: on)?)\s*:?\s*/i) ?? '') ?? readDate(body);
-    return { ...base, status: 'cancelling', endsOn: ends };
-  }
-  // Trial started or ending.
-  const trialEnd = text.match(/trial (?:ends|will end|expires)\s+(tomorrow|today|on\s+[^\n.]+|in (\d+) days)/i);
-  if (trialEnd) {
-    const when = trialEnd[1].toLowerCase();
-    const ends = when === 'tomorrow' ? addDays(1) : when === 'today' ? date : trialEnd[2] ? addDays(+trialEnd[2]) : readDate(when);
-    return { ...base, status: 'trial', nextRenewal: ends, licence: 'trial' };
-  }
-  const trialStart = text.match(/trial\s*[-–—:]?\s*(\d{1,3})[- ]days?/i) ?? text.match(/(\d{1,3})[- ]day (?:free )?trial/i);
-  if (trialStart && /(started|start|get started|welcome|let'?s get you started|activated)/i.test(text)) {
-    return { ...base, status: 'trial', nextRenewal: addDays(+trialStart[1]), licence: 'trial' };
-  }
-  // Orders and renewals: product, term and the date the term ends or renews.
-  const price = labelledPrice(text) ?? readMoney(text);
-  const term = readDate(after(text, RENEWS) ?? '') ?? readDate(after(text, ENDS) ?? '');
-  const isInvoice = /invoice|receipt/i.test(mail.subject);
-  const cycle = readCycle(product ? (text.match(new RegExp(`${escape(product)}[^\\n]{0,60}`, 'i'))?.[0] ?? text) : text);
-  if (!product && !price) return null;
-  return {
-    ...base,
-    status: 'active',
-    amount: price?.amount ?? null,
-    currency: price?.currency,
-    cycle,
-    lastCharged: date,
-    // An invoice's own dates are due dates, not renewals.
-    nextRenewal: isInvoice ? undefined : term,
-    licence: licence && licence !== 'trial' ? licence : undefined,
-  };
-}
-
-/** The price on the last "Total" (or amount paid, balance…) line: after the subtotal and tax, not before. */
-function labelledPrice(text: string): { amount: number; currency: Currency } | undefined {
-  let last: { amount: number; currency: Currency } | undefined;
-  for (const m of text.matchAll(/(?<!sub[- ]?)\b(?:grand total|order total|total(?: due| paid| amount| charged)?|amount (?:paid|due|charged)|account balance|price)\b\s*:?\s*/gi))
-    last = readMoney(text.slice(m.index! + m[0].length, m.index! + m[0].length + 40)) ?? last;
-  return last;
-}
-
-/** Gmail query for the vendors' order and renewal mail (promotions excluded), or null when there's nothing to watch. */
-export function vendorMailQuery(accounts: SoftwareAccount[]): string | null {
-  const domains = [...new Set([...VENDORS.flatMap(v => v.senders), ...accounts.flatMap(accountDomains)])];
-  if (!domains.length) return null;
-  return `newer_than:400d -category:promotions {${domains.map(d => `from:${d}`).join(' ')}}`;
-}
-
 /* ---------- matching plans to subscriptions ---------- */
 
 const NOISE = new Set(['plan', 'subscription', 'annual', 'monthly', 'yearly', 'the', 'for', 'and', 'adobe', 'autodesk', 'chaos', 'trial']);
@@ -442,9 +335,9 @@ const words = (s: string) =>
 const core = (ws: Set<string>) => new Set([...ws].filter(w => !EDITION.has(w)));
 
 /**
- * The subscription a found plan or vendor mail belongs to, among the vendor's (or account's) subscriptions: one sharing
- * the product's own words ("V-Ray Solo" ↔ "Chaos V-Ray (annual)"), not just an edition word like Indie or Pro. A mail
- * that names no product matches only when the vendor has exactly one live subscription.
+ * The subscription a found plan belongs to, among the vendor's (or account's) subscriptions: one sharing the product's
+ * own words ("V-Ray Solo" ↔ "Chaos V-Ray (annual)"), not just an edition word like Indie or Pro. A plan that names no
+ * product matches only when the vendor has exactly one live subscription.
  */
 export function matchVendorSub(subs: Subscription[], found: { name?: string; vendor?: string; accountId?: string; product?: string }): Subscription | undefined {
   const vendor = (found.vendor ?? '').toLowerCase();
@@ -489,49 +382,4 @@ export function planToSubscription(p: FoundPlan, account: SoftwareAccount, exist
     source: existing?.source ?? 'account',
     accountId: account.id,
   };
-}
-
-/**
- * One vendor mail folded into what earlier mails said (fold oldest first): an order names the product and term, an
- * invoice adds the price, a cancellation turns auto-renew off, a trial only counts until something is paid.
- */
-export function foldVendorMail(cur: Partial<Subscription>, found: VendorFinding): Partial<Subscription> {
-  const next: Partial<Subscription> = { ...cur };
-  if (found.name && found.name !== found.vendor && (!cur.name || cur.name === cur.vendor)) next.name = found.name;
-  next.vendor ??= found.vendor;
-  next.name ??= found.name ?? found.vendor;
-  if (found.accountId) next.accountId ??= found.accountId;
-  if (found.amount != null) {
-    next.amount = found.amount;
-    next.currency = found.currency ?? next.currency;
-  }
-  if (found.cycle) next.cycle = found.cycle;
-  if (found.licence && found.licence !== 'trial') next.licence = found.licence;
-  const charged = !!found.lastCharged && (!next.lastCharged || found.lastCharged >= next.lastCharged);
-  if (charged) next.lastCharged = found.lastCharged;
-  if (found.status === 'cancelling') {
-    next.status = 'cancelling';
-    next.endsOn = found.endsOn ?? next.endsOn ?? next.nextRenewal;
-  } else if (found.status === 'trial') {
-    if (!next.status || next.status === 'trial') {
-      next.status = 'trial';
-      next.licence = 'trial';
-      next.nextRenewal = found.nextRenewal ?? next.nextRenewal;
-    }
-  } else if (found.status === 'active') {
-    const ended = next.status === 'cancelling' || next.status === 'cancelled';
-    // Back to renewing: auto-renew turned on again, a new term past the old end, or a charge after access ended.
-    const renewed = !!found.renewsAgain || (!!found.nextRenewal && (!next.endsOn || found.nextRenewal > next.endsOn)) || (charged && !!next.endsOn && found.lastCharged! >= next.endsOn);
-    if (found.nextRenewal && (!ended || renewed)) next.nextRenewal = found.nextRenewal;
-    if (!next.status || next.status === 'trial' || (ended && renewed)) {
-      next.status = 'active';
-      // Cleared rather than deleted, so an update to a saved subscription clears it too.
-      next.endsOn = undefined;
-    }
-    if (next.licence === 'trial') next.licence = undefined;
-  }
-  next.emailId = found.emailId ?? next.emailId;
-  next.category ??= 'work';
-  next.source ??= 'email';
-  return next;
 }

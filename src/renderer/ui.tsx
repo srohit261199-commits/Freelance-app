@@ -8,7 +8,6 @@ export type Route =
   | { view: 'today' }
   | { view: 'company'; company: CompanyId; modelId?: string }
   | { view: 'skeidar'; company?: CompanyId; jobId?: string }
-  | { view: 'inbox'; emailId?: string }
   | { view: 'earnings' }
   | { view: 'subscriptions' }
   | { view: 'portfolio' }
@@ -31,7 +30,6 @@ const ICONS = {
   wallet: P.Wallet,
   image: P.Image,
   mail: P.EnvelopeSimple,
-  mailOpen: P.EnvelopeSimpleOpen,
   money: P.CurrencyInr,
   repeat: P.Repeat,
   star: P.Star,
@@ -66,7 +64,6 @@ const ICONS = {
   filePdf: P.FilePdf,
   excel: P.MicrosoftExcelLogo,
   teams: P.MicrosoftTeamsLogo,
-  drive: P.GoogleDriveLogo,
   cloudDown: P.CloudArrowDown,
   clipboard: P.ClipboardText,
   table: P.Table,
@@ -78,7 +75,6 @@ const ICONS = {
   trophy: P.Trophy,
   trendUp: P.TrendUp,
   receipt: P.Receipt,
-  bag: P.ShoppingBag,
   send: P.PaperPlaneTilt,
   bell: P.BellRinging,
   hand: P.HandPointing,
@@ -88,7 +84,6 @@ const ICONS = {
   sun: P.Sun,
   moon: P.Moon,
   pencil: P.PencilSimple,
-  upload: P.UploadSimple,
 } satisfies Record<string, P.Icon>;
 
 export type IconName = keyof typeof ICONS;
@@ -99,8 +94,8 @@ export function Icon({ name, size = 16, weight = 'regular' }: { name: IconName; 
   return <C size={size} weight={weight} aria-hidden="true" className="icon" />;
 }
 
-export type ClientKey = CompanyId | 'money' | 'portfolio' | 'other';
-export const CLIENT_ICON: Record<ClientKey, IconName> = { waveink: 'cube', metaztech: 'cubeFocus', skeidar: 'brush', money: 'wallet', portfolio: 'globe', other: 'mail' };
+export type ClientKey = CompanyId | 'money' | 'portfolio';
+export const CLIENT_ICON: Record<ClientKey, IconName> = { waveink: 'cube', metaztech: 'cubeFocus', skeidar: 'brush', money: 'wallet', portfolio: 'globe' };
 
 /** Rounded square in a client's tint with its icon in the deep colour. */
 export function ClientTile({ client, size = 'md', icon }: { client: ClientKey; size?: 'sm' | 'md'; icon?: IconName }) {

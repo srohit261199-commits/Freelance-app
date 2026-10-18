@@ -55,7 +55,7 @@ export function AccountsPanel({ state, now }: { state: AppState; now: Date }) {
         <div className="grow">
           <h2 id="ac-h">Software accounts</h2>
           <p className="small muted">
-            Sign in once in the app’s own window, then Read plans pulls renewal dates and prices from the account page. Order, invoice and renewal mails from these vendors are read on every Gmail scan.
+            Sign in once in the app’s own window, then Read plans pulls renewal dates and prices from the account page.
           </p>
         </div>
         {state.accounts.length > 0 && (
@@ -249,27 +249,15 @@ function PlansReview({ state, account, plans, url, onClose }: { state: AppState;
   const flip = (i: number, patch: Partial<Row>) => setRows(rows.map((r, k) => (k === i ? { ...r, ...patch } : r)));
   const picked = rows.filter(r => r.on);
   const save = async () => {
-    const waiting = state.suggestions.filter(sg => sg.kind === 'subscription' && sg.subscription);
-    let cleared = 0;
     for (const r of picked) {
       const raw = r.sub.amount as unknown;
       const amount = raw === '' || raw == null ? null : Number(raw);
       const fields = { ...r.sub, amount: Number.isFinite(amount) ? amount : null };
-      // A saved subscription gets only the fields this dialog shows, so a sync that changed it meanwhile isn't undone.
+      // A saved subscription gets only the fields this dialog shows; the rest stays as saved.
       const patch = r.existing ? Object.fromEntries(REVIEWED.map(k => [k, fields[k]])) : fields;
       await hub.upsert('subscriptions', { ...patch, id: r.existing?.id ?? uid('sub') });
-      // The same plan waiting in Mail scan as a proposal from its mails would become a duplicate.
-      const dup = matchVendorSub(
-        waiting.map(sg => ({ ...(sg.subscription as Subscription), id: sg.id })),
-        { product: r.plan.product, vendor: vendorName(account), accountId: account.id },
-      );
-      if (dup) {
-        await hub.dismissSuggestion(dup.id);
-        waiting.splice(waiting.findIndex(sg => sg.id === dup.id), 1);
-        cleared++;
-      }
     }
-    toast(`${picked.length} plan${picked.length === 1 ? '' : 's'} saved from ${account.label}${cleared ? ` · ${cleared} matching proposal${cleared === 1 ? '' : 's'} cleared from Mail scan` : ''}`);
+    toast(`${picked.length} plan${picked.length === 1 ? '' : 's'} saved from ${account.label}`);
     onClose();
   };
   return (

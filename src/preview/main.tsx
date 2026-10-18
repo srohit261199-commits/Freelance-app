@@ -27,8 +27,7 @@ function PreviewBar() {
       <div className="pv-main">
         <strong>Browser preview</strong>
         <span>
-          Your Waveink catalog, pay terms and subscriptions are real. Google sign-in, the MetaZtech portal and folder scans are simulated; sign-in loads a snapshot of your mail and calendar from
-          9 Oct. Changes stay in this browser.
+          Your Waveink catalog, pay terms and subscriptions are real. The MetaZtech portal and folder scans are simulated. Changes stay in this browser.
         </span>
         <ConfirmButton className="mini" label="Reset preview" confirmLabel="Click again to reset" onConfirm={resetPreview} />
       </div>

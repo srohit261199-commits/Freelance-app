@@ -1,4 +1,4 @@
-import type { AppState, CompanyConfig, CompanyId, Expectations, Meeting, StatusEvent } from './types';
+import type { AppState, CompanyConfig, CompanyId, Expectations, StatusEvent } from './types';
 import { jobOutputs, localDate } from './money';
 import { isComplete, statusEvents } from './status';
 
@@ -184,30 +184,9 @@ export function deadlinesBetween(state: AppState, from: string, to: string, now:
   return state.companies.flatMap(c => deadlineDates(c, from, to).map(o => hitOf(c, o, now))).sort((a, b) => a.at.getTime() - b.at.getTime());
 }
 
-const words = (t: string) => new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4));
-
-/** The calendar meeting that is this deadline (same client, within 45 minutes, a word in common), if one came in. */
-export function meetingFor(meetings: Meeting[], d: DeadlineHit): Meeting | undefined {
-  if (!d.time) return undefined;
-  const label = words(d.label);
-  return meetings.find(m => m.company === d.company && Math.abs(new Date(m.start).getTime() - d.at.getTime()) <= 45 * 60000 && [...words(m.title)].some(w => label.has(w)));
-}
-
-export type AgendaItem = { at: Date } & ({ kind: 'meeting'; meeting: Meeting } | { kind: 'deadline'; deadline: DeadlineHit });
-
-/**
- * The next `days` days for the dashboard: meetings that haven't ended and recurring deadlines whose time hasn't gone, soonest first.
- * A deadline that came in from the calendar as a meeting is listed once, as the meeting.
- */
-export function agenda(state: AppState, now: Date, days = 7): AgendaItem[] {
-  const last = addDays(localDate(now), days);
-  const meetings = state.meetings
-    .filter(m => new Date(m.end ?? m.start).getTime() > now.getTime() && localDate(m.start) <= last)
-    .map((m): AgendaItem => ({ kind: 'meeting', at: new Date(m.start), meeting: m }));
-  const deadlines = allDeadlines(state, now, days)
-    .filter(d => !d.passed && !meetingFor(state.meetings, d))
-    .map((d): AgendaItem => ({ kind: 'deadline', at: d.at, deadline: d }));
-  return [...meetings, ...deadlines].sort((a, b) => a.at.getTime() - b.at.getTime());
+/** The next `days` days for the dashboard: every client's recurring deadlines whose time hasn't gone, soonest first. */
+export function agenda(state: AppState, now: Date, days = 7): DeadlineHit[] {
+  return allDeadlines(state, now, days).filter(d => !d.passed);
 }
 
 /** "Today 18:00", "Tomorrow", "Wed 14 Oct 19:30". */

@@ -156,7 +156,6 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
   }
   txs.sort((a, b) => (a.record!.period ?? '').localeCompare(b.record!.period ?? '') || STACK.indexOf(b.company) - STACK.indexOf(a.company));
   for (const p of [...state.payments].sort((a, b) => b.date.localeCompare(a.date))) {
-    const mail = p.emailId ? state.emails.find(m => m.id === p.emailId) : undefined;
     const what = [p.period && `${monthName(p.period, +p.period.slice(0, 4) !== thisYear)} ${WORK[p.company] ?? ''}`.trim(), p.reference && `ref ${p.reference}`].filter(Boolean).join(' · ');
     txs.push({
       key: p.id,
@@ -171,7 +170,7 @@ export function Earnings({ state, now }: { state: AppState; now: Date }) {
         p.source === 'manual'
           ? { icon: 'hand', text: 'Added by hand' }
           : p.source === 'email' || p.emailId
-            ? { icon: 'mail', text: mail ? `Mail from ${mail.fromName.split(/\s+/)[0] || mail.from}` : 'From mail' }
+            ? { icon: 'mail', text: 'From mail' }
             : { icon: 'fileUp', text: 'Imported' },
       payment: p,
     });

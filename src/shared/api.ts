@@ -1,11 +1,11 @@
-import type { AppState, AssetFile, Collection, CompanyId, FolderEntry, FoundPlan, JobFolderInfo, Model, ModelStatus, Payment, PortalSnapshot, Settings, Subscription, SyncResult } from './types';
+import type { AppState, AssetFile, Collection, CompanyId, FolderEntry, FoundPlan, JobFolderInfo, Model, ModelStatus, PortalSnapshot, Settings } from './types';
 import type { ImportCounts, PortalRow } from './ops';
+import type { SppResult } from './outputs';
 
 /** What to export: one built-in client's sheet, one added client's sheet, or everything. */
 export type ExportScope = 'waveink' | 'metaztech' | 'skeidar' | 'all' | `client:${string}`;
 
-export type SettingsPatch = Partial<Omit<Settings, 'google' | 'rates'>> & {
-  google?: Partial<Settings['google']>;
+export type SettingsPatch = Partial<Omit<Settings, 'rates'>> & {
   rates?: Partial<Settings['rates']>;
 };
 
@@ -20,15 +20,13 @@ export interface HubApi {
   upsert(collection: Collection, item: { id?: string } & Record<string, unknown>): Promise<string>;
   remove(collection: Collection, id: string): Promise<void>;
   patchSettings(patch: SettingsPatch): Promise<void>;
-  acceptSuggestion(id: string, override: { payment?: Partial<Payment>; subscription?: Partial<Subscription> }): Promise<void>;
-  dismissSuggestion(id: string): Promise<void>;
-  googleConnect(clientId: string, clientSecret: string): Promise<{ ok: boolean; email?: string; error?: string }>;
-  googleDisconnect(): Promise<void>;
-  loadGoogleCredentials(): Promise<{ clientId: string; clientSecret: string } | { error: string } | null>;
-  sync(): Promise<SyncResult>;
   portalOpen(): Promise<void>;
   portalPull(): Promise<PortalSnapshot | { error: string }>;
-  portalImport(rows: PortalRow[]): Promise<ImportCounts>;
+  /**
+   * Adds or updates MetaZtech models from a table. `fullList` marks it as the whole dashboard: its job IDs are kept so
+   * jobs that later drop off it (approved) can be found, and the output folder is checked straight away.
+   */
+  portalImport(rows: PortalRow[], opts?: { fullList?: boolean }): Promise<ImportCounts & { spp?: SppResult | { error: string } }>;
   pickFolder(defaultPath?: string): Promise<string | null>;
   scanFolder(path: string): Promise<FolderEntry[] | { error: string }>;
   countImages(path: string): Promise<number>;
@@ -45,12 +43,25 @@ export interface HubApi {
   readJobFolder(folder: string): Promise<JobFolderInfo | { error: string }>;
   /** Scans the client's watched folder: creates or updates a job per subfolder and ticks off finished images. */
   syncJobFolders(company: CompanyId): Promise<FolderSyncResult | { error: string }>;
+  /** Saves a Waveink model's catalog images into "<output folder>/<Code - Name>/". */
+  downloadReferences(modelId: string): Promise<ReferenceResult | { error: string }>;
+  /** Marks MetaZtech jobs approved when they left the dashboard and their job folder holds a .spp file. */
+  checkSppFolders(): Promise<SppResult | { error: string }>;
   /** Small data-URL preview of a local image, or null if it can't be read. */
   thumbnail(path: string, size?: number): Promise<string | null>;
   /** Opens the vendor's plans page in an app window (sign in once; the session is kept). */
   accountOpen(id: string): Promise<void>;
   /** Reads the plans from the vendor window's current page. */
   accountRead(id: string): Promise<{ plans: FoundPlan[]; url: string } | { error: string }>;
+}
+
+export interface ReferenceResult {
+  /** The model's folder the images were saved in. */
+  folder: string;
+  saved: number;
+  /** Already in the folder from an earlier download. */
+  skipped: number;
+  failed: { url: string; error: string }[];
 }
 
 export interface FolderSyncResult {
@@ -71,12 +82,6 @@ export const HUB_METHODS: (keyof HubApi)[] = [
   'upsert',
   'remove',
   'patchSettings',
-  'acceptSuggestion',
-  'dismissSuggestion',
-  'googleConnect',
-  'googleDisconnect',
-  'loadGoogleCredentials',
-  'sync',
   'portalOpen',
   'portalPull',
   'portalImport',
@@ -93,6 +98,8 @@ export const HUB_METHODS: (keyof HubApi)[] = [
   'listAssets',
   'readJobFolder',
   'syncJobFolders',
+  'downloadReferences',
+  'checkSppFolders',
   'thumbnail',
   'accountOpen',
   'accountRead',

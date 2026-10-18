@@ -1,66 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { RawMail } from '../src/shared/mail';
 import type { SoftwareAccount, Subscription } from '../src/shared/types';
-import { initialState } from '../src/main/seed/initial';
-import { applySync, ingestMail } from '../src/shared/ingest';
-import type { AppState, SyncResult } from '../src/shared/types';
-import { acceptSuggestion } from '../src/shared/ops';
-import { foldVendorMail, matchVendorSub, parsePlansText, parseVendorMail, planToSubscription, readCycle, readDate, readMoney, siteOf, vendorMailQuery, vendorOfMail } from '../src/shared/vendors';
-
-const mail = (id: string, from: string, date: string, subject: string, body: string): RawMail => ({ id, threadId: id, from, subject, snippet: body.slice(0, 120), date, labelIds: ['INBOX'], body });
-
-// Rohit's real Chaos mails (trimmed of tracking links).
-const ORDER = mail(
-  'c1',
-  'Chaos <no-reply@chaos.com>',
-  '2026-09-28T05:05:26Z',
-  'Thanks Rohit, your order #O-06554706 is complete',
-  `Hello Rohit, Thank you for choosing Chaos®. Here are your order details plus everything you need to get up and running.
-Order information
-Order number: O-06554706 Order date: September 28, 2026 Customer number: R8PDZZ297TTX
-V-Ray Solo (named, annual)
-Total quantity: 1 Expires on: September 28, 2027
-Download now
-To manage your products, please sign in to your Chaos account. Your login email is s.rohit.261199@gmail.com`,
-);
-const INVOICE = mail(
-  'c2',
-  'Chaos <no-reply@chaos.com>',
-  '2026-09-28T18:20:31Z',
-  'Your invoice #INV12441647 is ready',
-  `Hello Rohit,
-We wanted to let you know that your invoice INV12441647 is available:
-Invoice Due Date: 09/28/2026Account Balance: 540.00 USD
-Please remit payment within your payment term.
-Your payment term is: Due Upon Receipt`,
-);
-const CANCEL = mail(
-  'c3',
-  'Chaos <no-reply@chaos.com>',
-  '2026-09-28T19:04:16Z',
-  'Your subscription A-S02552315 was canceled',
-  `Auto-renewal turned off for A-S02552315 Your subscription will remain active until its expiration date
-Hello Rohit, You have successfully canceled your subscription A-S02552315. This will stop it from renewing on 2027-09-28, but your licenses will remain active until then. If you change your mind, you can reactivate the subscription before it expires from your account.`,
-);
-const TRIAL_END = mail(
-  'c4',
-  'Chaos <service@email.chaos.com>',
-  '2026-09-27T18:46:44Z',
-  '👋 Review your Chaos subscription',
-  `Your free trial ends tomorrow.
-Hi Rohit,
-Your Chaos® free trial ends tomorrow!
-Please note that your selected subscription will renew automatically, and the payment method you have provided will be charged.`,
-);
-const TRIAL_START = mail('c5', 'Chaos <no-reply@chaos.com>', '2026-08-29T18:44:34Z', "Rohit, let's get you started with your V-Ray Solo Trial - 30 days", 'Everything you need to know about your trial.');
-const ADOBE_PROMO = mail(
-  'a1',
-  'Adobe <mail@mail.adobe.com>',
-  '2026-09-10T10:00:00Z',
-  'Finish purchasing Adobe Creative Cloud',
-  'You left Creative Cloud All Apps in your cart. Complete your purchase today and save 20% on your first year.',
-);
-const ADOBE_WELCOME = mail('a2', 'Adobe <mail@e.adobe.com>', '2026-09-11T10:00:00Z', 'Welcome to Creative Cloud', 'Discover what you can make with Photoshop, Illustrator and more.');
+import { matchVendorSub, parsePlansText, planToSubscription, readCycle, readDate, readMoney, siteOf } from '../src/shared/vendors';
 
 describe('readers', () => {
   it('reads dates in the formats vendor pages use', () => {
@@ -82,58 +22,6 @@ describe('readers', () => {
     // "years 2027" is not rupees, and euros aren't guessed.
     expect(readMoney('for 3 years 2027')).toBeUndefined();
     expect(readMoney('€ 59.00')).toBeUndefined();
-  });
-});
-
-describe('vendor mails', () => {
-  const acct: SoftwareAccount = { id: 'acc1', vendor: 'chaos', label: 'Chaos', plansUrl: 'https://my.chaos.com/', createdAt: '2026-10-01T00:00:00Z' };
-
-  it('knows the sender, and links the account', () => {
-    expect(vendorOfMail(ORDER)?.name).toBe('Chaos');
-    expect(vendorOfMail(TRIAL_END, [acct])?.account?.id).toBe('acc1');
-    expect(vendorOfMail({ from: 'Someone <a@example.com>' })).toBeNull();
-  });
-
-  it('reads the order: product, annual term and the date it runs to', () => {
-    const s = parseVendorMail(ORDER, [acct])!;
-    expect(s).toMatchObject({ name: 'V-Ray Solo', vendor: 'Chaos', cycle: 'yearly', status: 'active', nextRenewal: '2027-09-28', lastCharged: '2026-09-28', accountId: 'acc1', emailId: 'c1' });
-  });
-
-  it('reads the invoice amount without taking its due date as a renewal', () => {
-    const s = parseVendorMail(INVOICE)!;
-    expect(s).toMatchObject({ name: 'Chaos', amount: 540, currency: 'USD', lastCharged: '2026-09-28' });
-    expect(s.nextRenewal).toBeUndefined();
-  });
-
-  it('reads auto-renew off as cancelling with access to the renewal date', () => {
-    expect(parseVendorMail(CANCEL)).toMatchObject({ status: 'cancelling', endsOn: '2027-09-28' });
-  });
-
-  it('reads trials (dates are Rohit’s local days: both mails arrived just after midnight in India)', () => {
-    expect(parseVendorMail(TRIAL_END)).toMatchObject({ status: 'trial', nextRenewal: '2026-09-29' });
-    expect(parseVendorMail(TRIAL_START)).toMatchObject({ name: 'V-Ray Solo', status: 'trial', nextRenewal: '2026-09-29' });
-  });
-
-  it('ignores marketing even when it names a product', () => {
-    expect(parseVendorMail(ADOBE_PROMO)).toBeNull();
-    expect(parseVendorMail(ADOBE_WELCOME)).toBeNull();
-  });
-
-  it('builds one Gmail query over every vendor and added account', () => {
-    const q = vendorMailQuery([{ ...acct, id: 'x', vendor: 'foundry', label: 'Foundry', plansUrl: 'https://www.foundry.com/account' }])!;
-    expect(q).toContain('from:chaos.com');
-    expect(q).toContain('from:autodesk.com');
-    expect(q).toContain('from:foundry.com');
-    expect(q).toContain('-category:promotions');
-  });
-
-  it('matches mails to the vendor subscription they belong to', () => {
-    const vray: Subscription = { id: 's1', name: 'V-Ray Solo', vendor: 'Chaos', amount: null, currency: 'USD', cycle: 'yearly', status: 'active', category: 'work', source: 'email' };
-    const claude: Subscription = { ...vray, id: 's2', name: 'Claude Pro', vendor: 'Anthropic' };
-    expect(matchVendorSub([claude, vray], parseVendorMail(CANCEL)!)?.id).toBe('s1');
-    expect(matchVendorSub([claude, vray], parseVendorMail(INVOICE)!)?.id).toBe('s1');
-    expect(matchVendorSub([claude, vray, { ...vray, id: 's3', name: 'Chaos Vantage' }], parseVendorMail(INVOICE)!)).toBeUndefined();
-    expect(matchVendorSub([claude, vray, { ...vray, id: 's3', name: 'Chaos Vantage' }], parseVendorMail(ORDER)!)?.id).toBe('s1');
   });
 });
 
@@ -197,56 +85,16 @@ Trial ends Oct 20, 2026`;
     const had: Subscription = { id: 's9', name: 'Maya (work PC)', vendor: 'Autodesk', amount: 120000, currency: 'INR', cycle: 'yearly', status: 'active', category: 'work', source: 'manual', paymentMethod: 'HDFC card' };
     expect(planToSubscription(maya, acct, had)).toMatchObject({ id: 's9', name: 'Maya (work PC)', amount: 122000, paymentMethod: 'HDFC card', source: 'manual', accountId: 'acc2' });
   });
-});
 
-describe('vendor mail in a sync', () => {
-  const NOW = '2026-10-10T09:00:00.000Z';
-  const ALL = [ADOBE_PROMO, ADOBE_WELCOME, CANCEL, INVOICE, ORDER, TRIAL_END, TRIAL_START];
-  const sync = (s: AppState, raws: RawMail[]) => {
-    const result: SyncResult = { ok: true, newEmails: 0, meetings: 0, driveMatches: 0, newSuggestions: 0, newPayments: 0 };
-    applySync(s, ingestMail(s, raws, new Set(raws.map(r => r.id)), new Set(), NOW), [], null, Date.parse(NOW), result);
-    return result;
-  };
-
-  it('turns five Chaos mails into one proposal and ignores Adobe promotions', () => {
-    const s = initialState(NOW);
-    s.subscriptions = s.subscriptions.filter(x => x.vendor !== 'Chaos');
-    s.suggestions = [];
-    expect(sync(s, ALL).newSuggestions).toBe(1);
-    expect(s.suggestions[0].subscription).toMatchObject({
-      name: 'V-Ray Solo',
-      vendor: 'Chaos',
-      amount: 540,
-      currency: 'USD',
-      cycle: 'yearly',
-      status: 'cancelling',
-      endsOn: '2027-09-28',
-      lastCharged: '2026-09-28',
-    });
-    expect(s.suggestions[0].detail).toMatch(/^5 Chaos mails/);
-    expect(s.handledEmails).toEqual(expect.arrayContaining(ALL.map(m => m.id)));
-    // Nothing new next time.
-    expect(sync(s, ALL).newSuggestions).toBe(0);
-    expect(s.suggestions).toHaveLength(1);
-  });
-
-  it('updates the subscription already in the list instead of proposing a new one', () => {
-    const s = initialState(NOW);
-    s.suggestions = [];
-    const before = s.subscriptions.find(x => x.vendor === 'Chaos')!;
-    expect(sync(s, [ORDER, INVOICE, CANCEL]).newSuggestions).toBe(0);
-    expect(s.subscriptions.find(x => x.id === before.id)).toMatchObject({ name: before.name, amount: 540, status: 'cancelling', endsOn: '2027-09-28' });
-  });
-
-  it('adds later mail to a proposal still waiting in Mail scan', () => {
-    const s = initialState(NOW);
-    s.subscriptions = s.subscriptions.filter(x => x.vendor !== 'Chaos');
-    s.suggestions = [];
-    sync(s, [ORDER]);
-    expect(s.suggestions[0].subscription).toMatchObject({ name: 'V-Ray Solo', status: 'active' });
-    sync(s, [INVOICE, CANCEL]);
-    expect(s.suggestions).toHaveLength(1);
-    expect(s.suggestions[0].subscription).toMatchObject({ name: 'V-Ray Solo', amount: 540, status: 'cancelling' });
+  it('matches a plan to the vendor subscription it belongs to', () => {
+    const vray: Subscription = { id: 's1', name: 'V-Ray Solo', vendor: 'Chaos', amount: null, currency: 'USD', cycle: 'yearly', status: 'active', category: 'work', source: 'manual' };
+    const claude: Subscription = { ...vray, id: 's2', name: 'Claude Pro', vendor: 'Anthropic' };
+    const vantage: Subscription = { ...vray, id: 's3', name: 'Chaos Vantage' };
+    expect(matchVendorSub([claude, vray], { product: 'V-Ray Solo', vendor: 'Chaos' })?.id).toBe('s1');
+    // A plan that names no product matches only the vendor's one live subscription.
+    expect(matchVendorSub([claude, vray], { vendor: 'Chaos' })?.id).toBe('s1');
+    expect(matchVendorSub([claude, vray, vantage], { vendor: 'Chaos' })).toBeUndefined();
+    expect(matchVendorSub([claude, vray, vantage], { product: 'V-Ray Solo', vendor: 'Chaos' })?.id).toBe('s1');
   });
 });
 
@@ -278,53 +126,11 @@ describe('fixes from review', () => {
     expect(matchVendorSub(subs, { product: 'Creative Cloud Pro', vendor: 'Adobe' })?.id).toBe('b');
   });
 
-  it('turns a cancelled plan back on when auto-renew is turned on again or a new term is bought', () => {
-    const back = parseVendorMail(
-      mail('r1', 'Chaos <no-reply@chaos.com>', '2026-10-05T10:00:00Z', 'Your subscription A-S02552315 was reactivated', 'Auto-renewal turned on for A-S02552315. Your subscription will renew on 2027-09-28.'),
-    )!;
-    expect(back).toMatchObject({ status: 'active', nextRenewal: '2027-09-28' });
-    const cancelling = { name: 'V-Ray Solo', vendor: 'Chaos', status: 'cancelling' as const, endsOn: '2027-09-28', nextRenewal: '2027-09-28' };
-    expect(foldVendorMail(cancelling, back)).toMatchObject({ status: 'active', endsOn: undefined, nextRenewal: '2027-09-28' });
-    // The invoice for the cancelled term changes nothing; a new term past the old end does.
-    expect(foldVendorMail(cancelling, parseVendorMail(INVOICE)!).status).toBe('cancelling');
-    const reorder = { ...parseVendorMail(ORDER)!, nextRenewal: '2028-09-28', lastCharged: '2027-09-28' };
-    expect(foldVendorMail(cancelling, reorder)).toMatchObject({ status: 'active', nextRenewal: '2028-09-28', endsOn: undefined });
-  });
-
-  it('never proposes a nameless plan, and folds an added vendor’s invoices together', () => {
-    const NOW = '2026-10-10T09:00:00.000Z';
-    const s: AppState = initialState(NOW);
-    s.subscriptions = s.subscriptions.filter(x => x.vendor !== 'Chaos');
-    s.suggestions = [];
-    const result: SyncResult = { ok: true, newEmails: 0, meetings: 0, driveMatches: 0, newSuggestions: 0, newPayments: 0 };
-    const run = (raws: RawMail[]) => applySync(s, ingestMail(s, raws, new Set(raws.map(r => r.id)), new Set(), NOW), [], null, Date.parse(NOW), result);
-    run([TRIAL_END]);
-    expect(s.suggestions).toHaveLength(0);
-    s.accounts = [{ id: 'f1', vendor: 'foundry', label: 'Foundry', plansUrl: 'https://www.foundry.com/account', createdAt: '' }];
-    const inv = (id: string, d: string) => mail(id, 'Foundry <billing@foundry.com>', d, `Your invoice ${id} is ready`, 'Total: US$499.00');
-    run([inv('i1', '2026-08-01T10:00:00Z'), inv('i2', '2026-09-01T10:00:00Z')]);
-    expect(s.suggestions.map(x => x.subscription?.name)).toEqual(['Foundry']);
-    run([inv('i3', '2026-10-01T10:00:00Z')]);
-    expect(s.suggestions).toHaveLength(1);
-  });
-
-  it('keeps an added vendor’s mail domain to its own site', () => {
+  it('reads an added vendor’s site from its plans page, keeping shared hosts whole', () => {
     expect(siteOf('https://portal.foundry.co.in/plans')).toBe('foundry.co.in');
     expect(siteOf('https://manage.autodesk.com/billing')).toBe('autodesk.com');
     expect(siteOf('https://someone.github.io/plans')).toBe('someone.github.io');
     expect(siteOf('https://www.foundry.com/account')).toBe('foundry.com');
-  });
-
-  it('keeps account, licence and seats when a proposal is accepted', () => {
-    const s = initialState('2026-10-10T09:00:00.000Z');
-    s.suggestions = [{ id: 'sg1', kind: 'subscription', emailId: 'm1', emailUrl: '', title: '', detail: '', subscription: { name: 'V-Ray Solo', vendor: 'Chaos', accountId: 'acc1', licence: 'education', seats: 2 }, createdAt: '' }];
-    acceptSuggestion(s, 'sg1', {});
-    expect(s.subscriptions.at(-1)).toMatchObject({ accountId: 'acc1', licence: 'education', seats: 2 });
-  });
-
-  it('takes the total after tax, not the subtotal', () => {
-    const m = mail('t1', 'Autodesk <orders@autodesk.com>', '2026-10-01T10:00:00Z', 'Your Autodesk order receipt', 'Maya annual subscription\nSubtotal: ₹3,585.00\nGST: ₹645.30\nTotal: ₹4,230.30');
-    expect(parseVendorMail(m)).toMatchObject({ name: 'Maya', amount: 4230.3, currency: 'INR' });
   });
 
   it('reads the renewal date below an "Auto-renewal: On" line', () => {

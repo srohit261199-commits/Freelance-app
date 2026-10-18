@@ -3,17 +3,12 @@ import type { AppState, CompanyConfig, Model } from '../../shared/types';
 import { isComplete } from '../../shared/status';
 import { formatMoney, localDate, tierFee } from '../../shared/money';
 import { paceFor, weekProgress, type Target } from '../../shared/pace';
-import { mailLine } from '../../shared/planner';
-import { hub } from '../hub';
-import { Icon, useApp } from '../ui';
 
 /** Ritu's ask on Teams: 1–2 files a day. Used when MetaZtech's job details have no output target. */
 export const DAILY_TARGET = 2;
 const FALLBACK: Target = { count: DAILY_TARGET, per: 'day', unit: 'files', counts: 'submitted' };
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-/** Teams lines that read like a warning from management get a red bubble. */
-const WARN = /remov|low perform|zero approval|terminat|warning|last chance|final notice|strict|management/i;
 
 /** "Today 9:12", "Yesterday", "8 Oct" (with the year when it isn't this year). */
 export function when(iso: string, now: Date): string {
@@ -123,63 +118,6 @@ export function DailyTarget({ state, now }: { state: AppState; now: Date }) {
         <h2>{day ? 'Daily target' : 'Weekly target'}</h2>
         <p>{text}</p>
       </div>
-    </section>
-  );
-}
-
-/** Teams notification mails for MetaZtech, newest first, as chat bubbles. */
-export function FromTeams({ state, cfg, now }: { state: AppState; cfg: CompanyConfig; now: Date }) {
-  const { go } = useApp();
-  const id = useId();
-  const msgs = state.emails
-    .filter(e => e.company === 'metaztech' && e.kind === 'teams')
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 20);
-  const teams = cfg.links.find(l => /teams/i.test(l.label) || /teams\.microsoft/i.test(l.url));
-  return (
-    <section className="panel mz-teams" aria-labelledby={id}>
-      <div className="panel-head">
-        <span className="mz-teams-ic">
-          <Icon name="teams" size={22} />
-        </span>
-        <h2 id={id}>From Teams</h2>
-        {teams && (
-          <button type="button" className="link-btn end mz-link" onClick={() => hub.openUrl(teams.url)}>
-            Open Teams <Icon name="external" size={12} />
-          </button>
-        )}
-      </div>
-      {msgs.length ? (
-        <ul className="mz-bubbles">
-          {msgs.map(e => {
-            const line = mailLine(e);
-            return (
-              <li key={e.id}>
-                <button type="button" className={`mz-bubble ${WARN.test(line) ? 'warn' : ''}`} onClick={() => hub.openUrl(e.url)} title="Open the notification mail">
-                  <span className="mz-who">
-                    <b>{e.fromName}</b>
-                    <span>{when(e.date, now)}</span>
-                  </span>
-                  <span className="mz-msg">{line}</span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : (
-        <div className="mz-quiet">
-          {state.settings.google.connected ? (
-            'No Teams messages from MetaZtech yet. Teams notification mails show up here after a sync.'
-          ) : (
-            <>
-              <span>Connect Google to see Teams messages from the MetaZtech team here.</span>
-              <button type="button" className="mini" onClick={() => go({ view: 'settings' })}>
-                Connect Google
-              </button>
-            </>
-          )}
-        </div>
-      )}
     </section>
   );
 }

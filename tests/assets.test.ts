@@ -323,19 +323,20 @@ describe('upgrading from an older build', () => {
     expect(withFolder(sk, sk.folder).folderSince).toBe('2026-09-26');
   });
 
-  it('gives saved files from the first builds the newer mail rules once', () => {
-    const seed = initialState(NOW);
+  it('drops what versions that read Gmail, Calendar and Drive saved, and keeps the rest', () => {
     const old = initialState(NOW);
-    const wi = old.companies.find(c => c.id === 'waveink')!;
-    delete wi.match.emails;
-    wi.match.keywords = wi.match.keywords.filter(k => !/weekly demo/i.test(k));
-    upgradeState(old, seed);
-    expect(wi.match.emails).toEqual(seed.companies.find(c => c.id === 'waveink')!.match.emails);
-    expect(wi.match.keywords.some(k => /weekly demo/i.test(k))).toBe(seed.companies.find(c => c.id === 'waveink')!.match.keywords.some(k => /weekly demo/i.test(k)));
-    // Rules Rohit edited later stay as they are.
-    wi.match.emails = ['someone@example.com'];
-    upgradeState(old, seed);
-    expect(wi.match.emails).toEqual(['someone@example.com']);
+    Object.assign(old, { emails: [{ id: 'm1' }], meetings: [{ id: 'c1' }], suggestions: [{ id: 'sg1' }], handledEmails: ['m1'] });
+    Object.assign(old.settings, { google: { clientId: 'x', clientSecret: 'y', connected: true }, syncMinutes: 15, waveinkDriveFolderId: 'abc' });
+    Object.assign(old.models[0], { driveFileUrl: 'https://example.com/glb', driveModifiedAt: NOW });
+    Object.assign(old.companies[0], { match: { domains: ['waveink.ae'], names: [], keywords: [] } });
+    const s = upgradeState(old, initialState(NOW));
+    for (const key of ['emails', 'meetings', 'suggestions', 'handledEmails']) expect(s).not.toHaveProperty(key);
+    for (const key of ['google', 'syncMinutes', 'waveinkDriveFolderId']) expect(s.settings).not.toHaveProperty(key);
+    expect(s.models[0]).not.toHaveProperty('driveFileUrl');
+    expect(s.models[0]).not.toHaveProperty('driveModifiedAt');
+    expect(s.companies[0]).not.toHaveProperty('match');
+    expect(s.settings.skeidarFolder).toBe(initialState(NOW).settings.skeidarFolder);
+    expect(s.models).toHaveLength(initialState(NOW).models.length);
   });
 
   it('reads CSV sheets in every encoding Excel saves', () => {
