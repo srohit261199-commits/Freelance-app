@@ -771,7 +771,8 @@ select {
   height: 8px;
   border-radius: 50%;
   flex: none;
-  margin: 0 3px;
+  margin: 0 5px;
+  background: var(--c-dot, var(--side-muted));
 }
 .nav-item .badge {
   min-width: 20px;
@@ -796,30 +797,6 @@ select {
 .nav-item.on .badge {
   background: var(--side-accent);
   color: #0d1f1c;
-}
-.side-card {
-  margin-top: auto;
-  border-radius: var(--r);
-  background: var(--side-hover);
-  color: var(--side-text);
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.side-card b {
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.3;
-}
-.side-card p {
-  font-size: 12px;
-  color: var(--side-muted);
-  line-height: 1.45;
-}
-.side-card button {
-  height: 30px;
-  font-size: 12.5px;
 }
 main.content {
   flex: 1;
@@ -1759,10 +1736,7 @@ th.num,
   .omni .kbd {
     display: none;
   }
-  .topbar .sync-status {
-    flex: none;
-  }
-  .sync-status .txt {
+  .topbar .end {
     display: none;
   }
   .body {
@@ -1772,7 +1746,7 @@ th.num,
     width: auto;
     flex-direction: row;
     gap: 6px;
-    padding: 0 16px 10px;
+    padding: 6px 12px;
     overflow-x: auto;
     overflow-y: hidden;
     scrollbar-width: none;
@@ -1781,7 +1755,6 @@ th.num,
     display: none;
   }
   .side .profile,
-  .side .side-card,
   .nav-sec > h4 {
     display: none;
   }
@@ -1791,20 +1764,20 @@ th.num,
   }
   .nav-item {
     width: auto;
-    height: 40px;
-    padding: 0 14px;
+    height: 32px;
+    padding: 0 12px;
   }
   .nav-item.on {
-    box-shadow: none;
+    box-shadow: inset 0 -2px 0 var(--side-accent);
   }
   .nav-item .label {
     overflow: visible;
   }
   main.content {
-    padding: 4px 16px 24px;
+    padding: 14px 16px 24px;
   }
   h1 {
-    font-size: 26px;
+    font-size: 20px;
   }
   .kpis,
   .kpis.three,
@@ -1814,20 +1787,10 @@ th.num,
   }
   .panel,
   .card {
-    padding: 18px 16px;
-    border-radius: 22px;
+    padding: 14px;
   }
   .search {
     width: 100%;
-  }
-  .tab {
-    height: 40px;
-    font-size: 14px;
-    padding: 0 6px 0 14px;
-  }
-  .tab .n {
-    min-width: 26px;
-    height: 26px;
   }
   .overlay {
     padding: 12px;
@@ -1864,8 +1827,8 @@ th.num,
   gap: 12px;
 }
 .screen-error-ic {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: var(--r);
   display: grid;
   place-items: center;
@@ -1873,7 +1836,7 @@ th.num,
   color: var(--st-bad);
 }
 .screen-error h2 {
-  font-size: 20px;
+  font-size: 17px;
 }
 .screen-error p {
   color: var(--text-2);
@@ -1881,7 +1844,7 @@ th.num,
 .screen-error pre {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--r);
   background: var(--hover);
   font-size: 12px;
   white-space: pre-wrap;

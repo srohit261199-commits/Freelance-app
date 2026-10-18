@@ -9,6 +9,8 @@ import { modelPriority, PRIORITY_LABEL } from '../priority';
 import { AddWaveinkModel, Pop, WaveinkDetail, WiStatus } from './WaveinkDetail';
 import { JobDrawer } from './JobDetails';
 import { nextDeadlines, paceText, weekProgress } from '../../shared/pace';
+import { clientFolder, withFolder } from '../../shared/assets';
+import { useReferenceDownload } from './References';
 import './Waveink.css';
 
 type Sort = 'queue' | 'sheet' | 'status' | 'updated' | 'name';
@@ -41,6 +43,8 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
   const { go, toast } = useApp();
   const wide = useWide();
   const cfg = state.companies.find(c => c.id === 'waveink')!;
+  const root = clientFolder(state, 'waveink');
+  const { run: download, busy: downloading } = useReferenceDownload(state);
   const all = useMemo(() => state.models.filter(m => m.company === 'waveink'), [state.models]);
   const groups = useMemo(() => [...new Set(all.map(groupOf))].sort((a, b) => groupRank(a) - groupRank(b) || a.localeCompare(b)), [all]);
   const [groupPick, setGroup] = useState(() => {
@@ -262,6 +266,34 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                   <Icon name="calendar" size={15} />
                   <span className="grow">Job details & files</span>
                 </button>
+                <hr />
+                {root && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title={root}
+                    onClick={() => {
+                      close();
+                      hub.openPath(root);
+                    }}
+                  >
+                    <Icon name="folderOpen" size={15} />
+                    <span className="grow">Open output folder</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  title="Download images saves each model's catalog images in its own folder here"
+                  onClick={async () => {
+                    close();
+                    const p = await hub.pickFolder(root || undefined);
+                    if (p) await hub.upsert('companies', { ...withFolder(cfg, p) });
+                  }}
+                >
+                  <Icon name="folder" size={15} />
+                  <span className="grow">{root ? 'Change output folder' : 'Choose output folder'}</span>
+                </button>
               </>
             )}
           </Pop>
@@ -383,21 +415,28 @@ export function Waveink({ state, openId, now }: { state: AppState; openId?: stri
                 <input type="checkbox" checked={allPicked} onChange={e => setSelected(e.target.checked ? new Set(shown.map(m => m.id)) : new Set())} aria-label="Select all shown" />
                 <strong>{picked.length} selected</strong>
               </label>
-              <span className="muted small">Set status</span>
-              {COMPANY_STATUSES.waveink.map(s => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`pill st-${s} wi-pill`}
-                  disabled={!picked.length}
-                  onClick={async () => {
-                    await set(picked, s);
-                    setSelected(new Set());
-                  }}
-                >
-                  {statusLabel(s, 'waveink')}
-                </button>
-              ))}
+              <Pop label="Set status of the selected models" text={<>Set status <Icon name="caretDown" size={12} weight="bold" /></>} className="mini" disabled={!picked.length}>
+                {close =>
+                  COMPANY_STATUSES.waveink.map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      role="menuitem"
+                      onClick={async () => {
+                        close();
+                        await set(picked, s);
+                        setSelected(new Set());
+                      }}
+                    >
+                      <span className={`dot st-${s}`} />
+                      {statusLabel(s, 'waveink')}
+                    </button>
+                  ))
+                }
+              </Pop>
+              <button type="button" className="mini" disabled={!picked.length || !!downloading} onClick={() => download(all.filter(m => picked.includes(m.id)))}>
+                <Icon name="download" size={14} /> {downloading ?? 'Download images'}
+              </button>
             </div>
           )}
 

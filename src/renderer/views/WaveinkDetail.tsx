@@ -5,6 +5,7 @@ import { modelLabel } from '../../shared/planner';
 import { hub } from '../hub';
 import { ConfirmButton, Field, Icon, Modal, fmtDate, useApp } from '../ui';
 import { modelPriority, PRIORITY_LABEL } from '../priority';
+import { ReferenceButtons } from './References';
 
 /** "Done (R)" for catalog rows that were delivered, then revised. */
 function wiStatusText(m: Model): string {
@@ -27,6 +28,7 @@ export function Pop({
   className = 'wi-ibtn',
   kind = 'menu',
   dot,
+  disabled,
   children,
 }: {
   label: string;
@@ -35,6 +37,7 @@ export function Pop({
   className?: string;
   kind?: 'menu' | 'dialog';
   dot?: boolean;
+  disabled?: boolean;
   children(close: () => void): ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -72,7 +75,7 @@ export function Pop({
   };
   return (
     <div className="wi-pop" ref={ref}>
-      <button ref={btn} type="button" className={className} aria-label={text ? undefined : label} title={label} aria-haspopup={kind} aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button ref={btn} type="button" className={className} aria-label={text ? undefined : label} title={label} aria-haspopup={kind} aria-expanded={open} disabled={disabled} onClick={() => setOpen(!open)}>
         {icon}
         {text}
         {dot && <span className="wi-dot" aria-hidden="true" />}
@@ -87,7 +90,7 @@ export function Pop({
 }
 
 /** Status pill that opens the Waveink statuses; shows "Done (R)" like the catalog. */
-export function WiStatus({ m, onPick }: { m: Model; onPick(s: ModelStatus): void }) {
+export function WiStatus({ m, onPick, className = 'wi-pill' }: { m: Model; onPick(s: ModelStatus): void; className?: string }) {
   const [open, setOpen] = useState(false);
   const [up, setUp] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -119,7 +122,7 @@ export function WiStatus({ m, onPick }: { m: Model; onPick(s: ModelStatus): void
   };
   return (
     <div className="picker" ref={ref} onClick={e => e.stopPropagation()}>
-      <button ref={btn} type="button" className={`pill st-${m.status} wi-pill`} onClick={toggle} title="Change status" aria-haspopup="menu" aria-expanded={open}>
+      <button ref={btn} type="button" className={`pill st-${m.status} ${className}`} onClick={toggle} title="Change status" aria-haspopup="menu" aria-expanded={open}>
         {wiStatusText(m)}
         <Icon name="caretDown" size={11} weight="bold" />
       </button>
@@ -293,6 +296,7 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
   const prio = modelPriority(m, state, now);
   const sub = (m.subcategories ?? []).join(', ') || m.group || '';
   const links = [
+    folder && { label: 'GLB upload folder', url: folder },
     m.sourceUrls?.[0] && { label: 'Product photo, full size', url: m.sourceUrls[0] },
     m.portalUrl && { label: 'Portal page', url: m.portalUrl },
   ].filter(Boolean) as { label: string; url: string }[];
@@ -342,23 +346,15 @@ export function WaveinkDetail({ m, state, now, inDrawer, onDeleted, onPin }: { m
       </div>
       {!inDrawer && <h2 className="wi-dtitle">{m.name}</h2>}
 
-      <div className="wi-stbtns" role="group" aria-label="Status">
-        {COMPANY_STATUSES.waveink.map(s => (
-          <button key={s} type="button" className={`wi-stbtn ${m.status === s ? 'on' : ''}`} aria-pressed={m.status === s} title={statusLabel(s, 'waveink')} onClick={() => m.status !== s && set(s)}>
-            {s === 'done' ? wiStatusText({ ...m, status: 'done' }) : s === 'live' ? 'Live' : statusLabel(s, 'waveink')}
-          </button>
-        ))}
-      </div>
-
       <div className="wi-doacts">
-        <button type="button" className={`wi-done ${done ? 'is-done' : 'primary'}`} disabled={done} onClick={() => set('done')}>
-          <Icon name="checkCircle" size={20} weight="fill" />
-          {done ? 'Marked done' : 'Mark done'}
-        </button>
-        <button type="button" className="wi-folder" disabled={!folder} onClick={() => folder && hub.openUrl(folder)} title="Open the GLB upload folder from Waveink's links">
-          <Icon name="folderOpen" size={18} />
-          GLB folder
-        </button>
+        <WiStatus m={m} onPick={s => void set(s)} className="wi-stpick" />
+        {!done && (
+          <button type="button" className="primary" onClick={() => set('done')}>
+            <Icon name="checkCircle" size={16} weight="fill" />
+            Mark done
+          </button>
+        )}
+        <ReferenceButtons m={m} state={state} />
       </div>
 
       <div className="wi-media">

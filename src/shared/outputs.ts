@@ -140,3 +140,13 @@ export function applySppFolders(draft: AppState, folders: SppFolder[], now: stri
   }
   return result;
 }
+
+/** What a check of the output folder found, as one line; null when there's nothing to say. */
+export function sppMessage(r: SppResult): string | null {
+  if (r.needsPull) return 'Pull from the portal once, so the app knows which jobs are still on your dashboard.';
+  const names = [...r.approved, ...r.created];
+  if (!names.length) return null;
+  const who = names.length === 1 ? names[0] : `${names.length} models`;
+  const fresh = r.created.length ? ` ${r.created.length === 1 ? 'One was' : `${r.created.length} were`} new to the app: set the complexity so the fee counts.` : '';
+  return `${who} approved: off the dashboard, with the .spp in your output folder.${fresh}`;
+}

@@ -10,7 +10,7 @@ import { AssetsPanel } from './AssetsPanel';
 import './JobDetails.css';
 
 /** Pastel colours for clients added by hand; they carry dark text like the built-in ones. */
-export const PALETTE = ['#c7b8ff', '#8fd3e8', '#f6d365', '#ffb3b3', '#b5e48c', '#f4a7c4', '#9ad0c2', '#e0c49c'];
+export const PALETTE = ['#6a8cc0', '#9b74b2', '#c4884b', '#46a07f', '#4f9aa8', '#b56576', '#8c8f3e', '#7b7f87'];
 const BUILT_IN = new Set(['waveink', 'metaztech', 'skeidar']);
 const RESERVED = new Set([...BUILT_IN, 'money', 'portfolio', 'other', 'all', 'open']);
 /** Monday first. */

@@ -4,6 +4,7 @@ import type { PortalRow } from '../../shared/ops';
 import { COMPLEXITY_LABELS, mapComplexity, mapPortalStatus } from '../../shared/status';
 import { hub } from '../hub';
 import { Field, Icon, Modal, StatusPill, fmtDate, useApp } from '../ui';
+import { sppMessage } from '../../shared/outputs';
 import './PortalImport.css';
 
 const ID = /(^#$)|\b(id|code|no|number|ref)\b/i;
@@ -120,6 +121,8 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
   const [error, setError] = useState('');
   const [pick, setPick] = useState(0);
   const [paste, setPaste] = useState('');
+  // A full pull is the whole dashboard, so jobs missing from it (approved) can be found in the output folder.
+  const [whole, setWhole] = useState(mode === 'pull');
   const [fields, setFields] = useState<Partial<Record<PortalField, number>>>({});
   const has = (f: PortalField) => (fields[f] ?? -1) >= 0;
 
@@ -181,10 +184,14 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
 
   const doImport = async () => {
     if (!table) return;
-    const counts = await hub.portalImport(rows);
+    const counts = await hub.portalImport(rows, { fullList: whole });
     const mapping: PortalMapping = { signature: signature(table), fields };
     await hub.patchSettings({ portalMappings: [...state.settings.portalMappings.filter(m => m.signature !== mapping.signature), mapping] });
     toast(`MetaZtech: ${counts.added} added, ${counts.updated} updated, ${counts.unchanged} unchanged.`);
+    if (counts.spp && !('error' in counts.spp)) {
+      const text = sppMessage(counts.spp);
+      if (text) toast(text);
+    }
     onClose();
   };
 
@@ -203,6 +210,10 @@ export function PortalImport({ state, mode, file, onClose }: { state: AppState; 
               <Icon name="sync" /> {loading ? 'Reading the page…' : 'Pull again'}
             </button>
           )}
+          <label className="pi-whole" title="Jobs that drop off the dashboard are approved: when one has a .spp in the MetaZtech output folder, it's marked Approved">
+            <input type="checkbox" checked={whole} onChange={e => setWhole(e.target.checked)} />
+            My whole dashboard list
+          </label>
           <span className="grow" />
           <button type="button" onClick={onClose}>
             Cancel

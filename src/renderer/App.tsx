@@ -6,6 +6,7 @@ import { isComplete } from '../shared/status';
 import { hub, useAppState, useNow } from './hub';
 import { AppCtx, Icon, type Route } from './ui';
 import { Omni, type Screen } from './Omni';
+import { Logo } from './Logo';
 import { allEarnings, localDate } from '../shared/money';
 import { Today, readDone } from './views/Today';
 import { Waveink } from './views/Waveink';
@@ -141,13 +142,12 @@ export function App() {
       <div className="shell">
         <header className="topbar">
           <div className="brand">
-            <span className="mark" aria-hidden="true">
-              FH
-            </span>
+            <Logo />
             <span className="name">Freelance Hub</span>
             {title && <span className="where">— {title}</span>}
           </div>
           <Omni state={state} screens={screens} onGo={go} />
+          <div className="end" />
         </header>
         <div className="body">
           <nav className="side" ref={side} aria-label="Screens">
@@ -166,7 +166,7 @@ export function App() {
                   .filter(s => s.section === sec)
                   .map(s => (
                     <button key={s.label} type="button" className={`nav-item ${active(s.route) ? 'on' : ''}`} aria-current={active(s.route) ? 'page' : undefined} onClick={() => setRoute(s.route)}>
-                      {s.client ? <span className={`swatch c-${s.client} c-fill`} /> : <Icon name={s.icon} size={20} />}
+                      {s.client ? <span className={`swatch c-${s.client}`} /> : <Icon name={s.icon} size={18} />}
                       <span className="label">{s.label}</span>
                       {s.badge !== undefined && <span className="badge">{s.badge}</span>}
                     </button>
@@ -218,6 +218,9 @@ export function App() {
 function clientColours(companies: CompanyConfig[]): string {
   return companies
     .filter(c => !c.builtIn && /^[a-z0-9-]+$/i.test(c.id) && /^#[0-9a-f]{3,8}$/i.test(c.color))
-    .map(c => `.c-${c.id}{--c:${c.color};--c-tint:color-mix(in srgb,${c.color} 22%,var(--panel));--c-deep:color-mix(in srgb,${c.color} 62%,var(--text))}`)
+    .map(
+      c =>
+        `.c-${c.id}{--c:color-mix(in srgb,${c.color} 16%,var(--panel));--c-tint:color-mix(in srgb,${c.color} 9%,var(--panel));--c-deep:color-mix(in srgb,${c.color} 70%,var(--text));--c-dot:${c.color}}`,
+    )
     .join('');
 }

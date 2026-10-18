@@ -10,6 +10,8 @@ import { AddModel, ModelDrawer } from './Models';
 import { PortalImport } from './PortalImport';
 import { DailyTarget, FeeTiers, MzPop, when } from './MetaZtechParts';
 import { JobDrawer } from './JobDetails';
+import { clientFolder, withFolder } from '../../shared/assets';
+import { sppMessage } from '../../shared/outputs';
 import './MetaZtech.css';
 
 type Sort = 'queue' | 'status' | 'updated' | 'name';
@@ -47,6 +49,25 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
   const [importing, setImporting] = useState<'pull' | 'paste' | null>(null);
   const [brief, setBrief] = useState(false);
   const [job, setJob] = useState(false);
+
+  const root = clientFolder(state, 'metaztech');
+  // Jobs approved since the last look: their job folder holds a .spp and they've left the dashboard.
+  const checkFolder = async (quiet: boolean) => {
+    const r = await hub.checkSppFolders();
+    if ('error' in r) return quiet || toast(r.error, 'error');
+    const text = sppMessage(r);
+    if (text && !(quiet && r.needsPull)) toast(text);
+    else if (!quiet) toast(`Output folder checked: nothing new${r.onDashboard ? ` (${r.onDashboard} with a .spp still on the dashboard)` : ''}.`);
+  };
+  useEffect(() => {
+    if (root && state.settings.portalLastPull) void checkFolder(true);
+  }, [root]);
+  const changeRoot = async () => {
+    const p = await hub.pickFolder(root || undefined);
+    if (!p) return;
+    await hub.upsert('companies', { ...withFolder(cfg, p) });
+    toast(`MetaZtech output folder: ${p}`);
+  };
 
   useEffect(() => {
     setOpenModel(openId);
@@ -213,6 +234,47 @@ export function MetaZtech({ state, openId, now }: { state: AppState; openId?: st
                 >
                   <Icon name="calendar" size={15} />
                   <span className="grow">Job details & files</span>
+                </button>
+                <hr />
+                {root && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title="Approved jobs leave the dashboard; a job folder with a .spp file that is no longer on it counts as approved"
+                    onClick={() => {
+                      close();
+                      void checkFolder(false);
+                    }}
+                  >
+                    <Icon name="sync" size={15} />
+                    <span className="grow">Check output folder</span>
+                  </button>
+                )}
+                {root && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    title={root}
+                    onClick={() => {
+                      close();
+                      hub.openPath(root);
+                    }}
+                  >
+                    <Icon name="folderOpen" size={15} />
+                    <span className="grow">Open output folder</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  role="menuitem"
+                  title="Each job's folder, named starting with its job ID, holding the .spp"
+                  onClick={() => {
+                    close();
+                    void changeRoot();
+                  }}
+                >
+                  <Icon name="folder" size={15} />
+                  <span className="grow">{root ? 'Change output folder' : 'Choose output folder'}</span>
                 </button>
               </>
             )}
